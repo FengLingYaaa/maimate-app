@@ -1,0 +1,63 @@
+/**
+ * MaimaiDX 数据类型定义
+ * 对应 Diving-Fish Prober API 的 /api/maimaidxprober/music_data 响应
+ */
+
+/** 谱面数据 */
+export interface ChartData {
+  notes: number[];       // [TAP, HOLD, SLIDE, TOUCH?, BREAK] — SD 无 TOUCH
+  charter: string;       // 谱师名
+}
+
+/** 歌曲基本信息 */
+export interface BasicInfo {
+  title: string;
+  artist: string;
+  genre: string;         // 分类：流行&动漫 / 东方Project / VOCALOID / 其他游戏 / 舞萌 / 原创
+  bpm: number;
+  release_date: string;
+  from: string;          // 出处版本
+  is_new: boolean;
+}
+
+/** 歌曲完整数据 (Prober API 返回格式) */
+export interface MusicData {
+  id: string;            // 歌曲ID
+  title: string;         // 歌曲标题
+  type: 'SD' | 'DX';     // 类型
+  ds: number[];          // 各难度定数
+  level: string[];       // 各难度等级标签
+  cids: number[];        // Chart 内部 ID
+  charts: ChartData[];   // 各难度谱面详情
+  basic_info: BasicInfo;
+}
+
+/** 筛选条件 */
+export interface FilterOptions {
+  genre?: string | string[];
+  difficulty?: number | number[];    // 难度索引 0-4
+  level?: string | string[];         // 等级标签如 "12+"
+  dsRange?: [number, number];        // 定数范围
+  version?: string | string[];       // 版本
+  type?: 'SD' | 'DX' | ('SD' | 'DX')[];
+  artist?: string;                   // 曲师关键词
+  charter?: string;                  // 谱师关键词
+  bpmRange?: [number, number];       // BPM 范围
+  titleSearch?: string;              // 标题关键词
+}
+
+/** 推分计划条目 */
+export interface PlanEntry {
+  songId: string;
+  difficultyIndex: number;  // 目标练习的难度
+  addedAt: number;          // 添加时间戳
+  order: number;            // 排序权重
+  note?: string;            // 用户备注
+  targetScore?: number;     // 目标达成率
+}
+
+/** 推分计划 */
+export interface PushPlan {
+  entries: PlanEntry[];
+  updatedAt: number;
+}
