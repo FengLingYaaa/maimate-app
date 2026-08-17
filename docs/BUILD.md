@@ -60,6 +60,36 @@ cat /sys/fs/cgroup/memory.max
 - 架构: arm64-v8a（覆盖几乎所有现代手机）
 - 签名: debug keystore（内测用；正式发布前需替换自己的 keystore）
 
+### 重要：依赖版本必须与 Expo SDK 57 对齐
+
+`package.json` 中的原生库版本已按 `expo/bundledNativeModules.json` 对齐。
+**不要**使用 create-expo-app 旧模板的过时版本，否则 JS 打包会报：
+
+```
+Unable to resolve module react-native/Libraries/Renderer/shims/ReactNative
+from react-native-reanimated/src/platform-specific/findHostInstance.ts
+```
+
+正确组合（Expo SDK 57 / RN 0.86）：
+- `react-native-reanimated`: **4.5.1**（不是 3.18！）
+- `react-native-worklets`: 0.10.1（reanimated v4 必需）
+- `react-native-gesture-handler`: ~2.32.0
+- `react-native-screens`: ~4.26.0
+- `react-native-safe-area-context`: ~5.7.0
+- `@react-native-async-storage/async-storage`: 2.2.0
+
+### 本机（DSH 工作区）4GB 容器限制说明
+
+本工作区所在的 Linux 容器给用户进程分配约 4GB cgroup 内存（含 DSH 及其他会话进程），
+RN 新架构的原生 C++ 编译峰值会超过该限额，导致内核 OOM：
+
+```
+Gradle build daemon disappeared unexpectedly (it may have been killed or may have crashed)
+```
+
+`cat /sys/fs/cgroup/memory.max` 可查限额（4294967296 ≈ 4GB）。这是环境硬限制，
+**本机构建会失败，请使用方式一（GitHub Actions）或在内存 ≥8GB 的其他电脑上构建**。
+
 ## 方式三：开发调试（Expo Go）
 
 仅用于开发阶段快速预览（最终安装仍需 APK）：
