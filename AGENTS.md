@@ -5,7 +5,7 @@
 ## Quick Start
 
 ```bash
-cd /home/agent/dsh-workspace/mai
+cd /home/agent/dsh-workspace/maimate/app
 npm install
 npx expo start
 ```
