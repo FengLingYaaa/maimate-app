@@ -7,9 +7,6 @@ on:
         description: 'Release notes for this build'
         required: false
         default: 'Manual build'
-  push:
-    tags:
-      - 'v*'
 
 jobs:
   build-apk:
@@ -33,6 +30,8 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          api-level: 35
 
       - name: Install dependencies
         run: npm ci
