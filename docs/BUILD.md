@@ -1,5 +1,7 @@
 # MaiMate 构建指南
 
+> 目标是生成可直接安装的独立 `app-release.apk`，**不使用 Expo Go、不需要扫码**。Expo Go 仅是可选的开发预览工具，不适用于本项目当前手机环境。
+
 ## 方式一：GitHub Actions 云构建（推荐，无需本地 Android 环境）
 
 在任何一台能上网的电脑上都可以，完全不需要安装 Android SDK：
@@ -19,7 +21,7 @@
 
 - Node.js 20+
 - JDK 17
-- Android SDK（platforms;android-35, build-tools;35.0.0）
+- Android SDK（platforms;android-36, build-tools;36.0.0, NDK 27.1.12297006, CMake 3.30.5）
 - 内存 ≥ 8GB（本机 4GB 容器会 OOM，见下方调优）
 
 ### 步骤
@@ -27,7 +29,7 @@
 ```bash
 git clone https://github.com/FengLingYaaa/maimate-app.git
 cd maimate-app
-npm install
+npm install --legacy-peer-deps
 npx expo prebuild --platform android --no-install
 cd android
 ./gradlew assembleRelease
