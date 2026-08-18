@@ -3,11 +3,11 @@
  * 支持筛选、搜索、列表展示
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, Pressable, RefreshControl, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMusicStore } from '../src/store';
-import { SongCard, FilterBar } from '../src/components';
+import { SongCard, FilterBar, TitleRecognizer } from '../src/components';
 import { Colors } from '../src/constants';
 import { getMatchingDifficultyIndices, MusicList } from '../src/data/music-list';
 import type { FilterOptions, MusicData } from '../src/data/types';
@@ -19,6 +19,7 @@ function formatCacheTime(timestamp: number | null): string {
 
 export default function SongBrowser() {
   const router = useRouter();
+  const [titleRecognizerVisible, setTitleRecognizerVisible] = useState(false);
   const rawData = useMusicStore(s => s.rawData);
   const musicList = useMusicStore(s => s.musicList);
   const loading = useMusicStore(s => s.loading);
@@ -51,6 +52,11 @@ export default function SongBrowser() {
     void Linking.openURL('https://maimate.flya.ccwu.cc/');
   }, []);
 
+  const openRecognizedSong = useCallback((music: MusicData) => {
+    setTitleRecognizerVisible(false);
+    router.push(`/song/${music.id}` as any);
+  }, [router]);
+
   const getPreviewCount = useCallback((nextFilters: FilterOptions) => {
     return new MusicList(rawData).filter(nextFilters).length;
   }, [rawData]);
@@ -76,15 +82,18 @@ export default function SongBrowser() {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <Text style={styles.headerTitle}>🎵 曲库</Text>
-          <Pressable style={styles.updateButton} onPress={openDownloadSite} accessibilityRole="button">
-            <Text style={styles.updateButtonText}>更新 / 下载</Text>
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable style={styles.scanButton} onPress={() => setTitleRecognizerVisible(true)} accessibilityRole="button">
+              <Text style={styles.scanButtonText}>拍照识别</Text>
+            </Pressable>
+            <Pressable style={styles.updateButton} onPress={openDownloadSite} accessibilityRole="button">
+              <Text style={styles.updateButtonText}>更新 / 下载</Text>
+            </Pressable>
+          </View>
         </View>
         <Text style={styles.headerSub}>{rawData.length} 首歌曲 · 更新于 {formatCacheTime(cacheTimestamp)}</Text>
         {updating && <Text style={styles.updatingText}>正在后台同步 Diving-Fish 曲库…</Text>}
-        {error && (
-          <Text style={styles.errorText}>{error}</Text>
-        )}
+        {error && <Text style={styles.errorText}>{error}</Text>}
       </View>
 
       {/* 筛选栏 */}
@@ -137,6 +146,13 @@ export default function SongBrowser() {
         maxToRenderPerBatch={20}
         windowSize={10}
       />
+
+      <TitleRecognizer
+        visible={titleRecognizerVisible}
+        rawData={rawData}
+        onClose={() => setTitleRecognizerVisible(false)}
+        onOpenSong={openRecognizedSong}
+      />
     </View>
   );
 }
@@ -156,13 +172,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   headerTitle: {
     fontSize: 26,
     fontWeight: '800',
     color: Colors.text.primary,
   },
+  scanButton: {
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: `${Colors.accent.secondary}22`,
+    borderWidth: 1,
+    borderColor: Colors.accent.secondary,
+  },
+  scanButtonText: {
+    fontSize: 11,
+    color: Colors.accent.secondary,
+    fontWeight: '800',
+  },
   updateButton: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 9,
     paddingVertical: 7,
     borderRadius: 10,
     backgroundColor: `${Colors.accent.primary}22`,

@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useMusicStore, usePlanStore } from '../../src/store';
-import { DifficultyBadge, NoteBar, RatingPanel } from '../../src/components';
+import { ChartVideoPanel, DifficultyBadge, NoteBar, RatingPanel } from '../../src/components';
 import { Colors } from '../../src/constants';
 import { DifficultyLabels, getCoverUrl } from '../../src/constants/game';
 import { getTotalNotes } from '../../src/data/music-list';
@@ -199,6 +199,11 @@ export default function SongDetail() {
                 </View>
 
                 <RatingPanel ds={ds} fitDiff={stats?.fit_diff} loading={chartStatsLoading} />
+                <ChartVideoPanel
+                  songId={music.id}
+                  songTitle={music.title}
+                  difficultyIndex={selectedDiff}
+                />
               </View>
             </View>
 

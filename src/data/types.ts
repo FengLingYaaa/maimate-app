@@ -48,6 +48,24 @@ export interface MusicData {
 /** Diving-Fish /chart_stats 的按歌曲 ID 索引结果 */
 export type ChartStatsMap = Record<string, Array<ChartStats | null>>;
 
+/** 已人工整理/审核的 Bilibili 谱面视频。仅允许红、紫、白谱。 */
+export type ChartVideoKind = 'chart_confirm' | 'hand';
+export type ChartVideoDifficulty = 2 | 3 | 4;
+
+export interface ChartVideo {
+  id: string;
+  songId: string;
+  difficultyIndex: ChartVideoDifficulty;
+  kind: ChartVideoKind;
+  platform: 'bilibili';
+  bvId: string;
+  url: string;
+  title: string;
+  uploader: string;
+  status: 'approved';
+  verifiedAt: string;
+}
+
 /** 筛选条件 */
 export interface FilterOptions {
   genre?: string | string[];

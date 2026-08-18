@@ -24,6 +24,7 @@ export function DifficultyBadge({ index, level, ds, size = 'md', highlighted = f
     lg: { badge: 44, font: 16 },
   };
   const s = sizes[size];
+  const activeTextColor = index === 4 ? Colors.text.inverse : '#fff';
 
   return (
     <View style={[
@@ -41,13 +42,13 @@ export function DifficultyBadge({ index, level, ds, size = 'md', highlighted = f
         styles.label,
         {
           fontSize: s.font,
-          color: highlighted ? '#fff' : color,
+          color: highlighted ? activeTextColor : color,
         },
       ]}>
         {level}
       </Text>
       {ds !== undefined && size === 'lg' && (
-        <Text style={[styles.ds, { color }]}>{ds.toFixed(1)}</Text>
+        <Text style={[styles.ds, { color: highlighted ? activeTextColor : color }]}>{ds.toFixed(1)}</Text>
       )}
     </View>
   );
