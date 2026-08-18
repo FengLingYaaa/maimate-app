@@ -3,9 +3,9 @@
  * 支持筛选、搜索、列表展示
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, Pressable, RefreshControl, Linking } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { View, Text, FlatList, StyleSheet, Pressable, Linking } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useMusicStore } from '../src/store';
 import { SongCard, FilterBar, TitleRecognizer } from '../src/components';
 import { Colors } from '../src/constants';
@@ -20,16 +20,22 @@ function formatCacheTime(timestamp: number | null): string {
 export default function SongBrowser() {
   const router = useRouter();
   const [titleRecognizerVisible, setTitleRecognizerVisible] = useState(false);
+  const restoreTitleRecognizerOnFocus = useRef(false);
   const rawData = useMusicStore(s => s.rawData);
   const musicList = useMusicStore(s => s.musicList);
-  const loading = useMusicStore(s => s.loading);
   const updating = useMusicStore(s => s.updating);
   const cacheTimestamp = useMusicStore(s => s.cacheTimestamp);
   const error = useMusicStore(s => s.error);
   const filters = useMusicStore(s => s.filters);
   const applyFilters = useMusicStore(s => s.applyFilters);
   const clearFilters = useMusicStore(s => s.clearFilters);
-  const loadData = useMusicStore(s => s.loadData);
+
+  useFocusEffect(useCallback(() => {
+    if (restoreTitleRecognizerOnFocus.current) {
+      restoreTitleRecognizerOnFocus.current = false;
+      setTitleRecognizerVisible(true);
+    }
+  }, []));
 
   const songs = useMemo(() => musicList.all(), [musicList]);
 
@@ -44,15 +50,12 @@ export default function SongBrowser() {
     return [...values].sort();
   }, [rawData]);
 
-  const handleRefresh = useCallback(() => {
-    loadData(true);
-  }, [loadData]);
-
   const openDownloadSite = useCallback(() => {
     void Linking.openURL('https://maimate.flya.ccwu.cc/');
   }, []);
 
   const openRecognizedSong = useCallback((music: MusicData) => {
+    restoreTitleRecognizerOnFocus.current = true;
     setTitleRecognizerVisible(false);
     router.push(`/song/${music.id}` as any);
   }, [router]);
@@ -125,14 +128,6 @@ export default function SongBrowser() {
           </View>
         )}
         contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={loading || updating}
-            onRefresh={handleRefresh}
-            tintColor={Colors.accent.primary}
-            colors={[Colors.accent.primary]}
-          />
-        }
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyText}>没有匹配的歌曲</Text>

@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { CameraType } from 'expo-image-picker';
 import TextRecognition, { TextRecognitionScript } from '@react-native-ml-kit/text-recognition';
-import { Colors } from '../constants';
+import { Colors, DifficultyLabels } from '../constants';
 import { matchSongTitles, type TitleMatch } from '../data/title-search';
+import { usePlanStore } from '../store';
 import type { MusicData } from '../data/types';
 
 interface Props {
@@ -14,19 +15,34 @@ interface Props {
   onOpenSong: (music: MusicData) => void;
 }
 
+function getQuickAddDifficulty(music: MusicData): number | null {
+  const count = Math.min(music.charts.length, music.ds.length, music.level.length);
+  return count > 0 ? count - 1 : null;
+}
+
 export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props) {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [recognizedText, setRecognizedText] = useState('');
   const [matches, setMatches] = useState<TitleMatch[]>([]);
   const [status, setStatus] = useState('点击下方按钮拍摄曲名');
   const [working, setWorking] = useState(false);
+  const [planFeedback, setPlanFeedback] = useState<string | null>(null);
+  const preserveResultsOnClose = useRef(false);
+  const addEntry = usePlanStore(s => s.addEntry);
+  const isInPlan = usePlanStore(s => s.isInPlan);
+  const planLoaded = usePlanStore(s => s.loaded);
 
   useEffect(() => {
     if (!visible) {
+      if (preserveResultsOnClose.current) {
+        preserveResultsOnClose.current = false;
+        return;
+      }
       setImageUri(null);
       setRecognizedText('');
       setMatches([]);
       setStatus('点击下方按钮拍摄曲名');
+      setPlanFeedback(null);
       setWorking(false);
     }
   }, [visible]);
@@ -36,6 +52,7 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
     setWorking(true);
     setMatches([]);
     setRecognizedText('');
+    setPlanFeedback(null);
     setStatus('正在请求相机权限…');
 
     try {
@@ -89,6 +106,33 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
     }
   };
 
+  const handleOpenSong = (music: MusicData) => {
+    preserveResultsOnClose.current = true;
+    onOpenSong(music);
+  };
+
+  const handleQuickAdd = (music: MusicData) => {
+    if (!planLoaded) {
+      setPlanFeedback('推分计划正在加载，请稍后再试');
+      return;
+    }
+
+    const difficultyIndex = getQuickAddDifficulty(music);
+    if (difficultyIndex === null) {
+      setPlanFeedback(`「${music.title}」没有可加入的谱面`);
+      return;
+    }
+
+    const difficultyLabel = DifficultyLabels[difficultyIndex];
+    if (isInPlan(music.id, difficultyIndex)) {
+      setPlanFeedback(`已在推分计划：${music.title} · ${difficultyLabel}`);
+      return;
+    }
+
+    addEntry({ songId: music.id, difficultyIndex });
+    setPlanFeedback(`已加入推分计划：${music.title} · ${difficultyLabel}`);
+  };
+
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
@@ -120,18 +164,45 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
             {matches.length > 0 && (
               <View style={styles.results}>
                 <Text style={styles.sectionTitle}>可能的歌曲</Text>
-                {matches.map(match => (
-                  <Pressable key={match.music.id} style={styles.resultRow} onPress={() => onOpenSong(match.music)}>
-                    <View style={styles.resultInfo}>
-                      <Text style={styles.resultTitle} numberOfLines={2}>{match.music.title}</Text>
-                      <Text style={styles.resultMeta}>{match.music.basic_info.artist} · {match.music.type}</Text>
-                      <Text style={styles.resultSource}>匹配文字：{match.recognizedText}</Text>
+                {matches.map(match => {
+                  const difficultyIndex = getQuickAddDifficulty(match.music);
+                  const difficultyLabel = difficultyIndex === null ? null : DifficultyLabels[difficultyIndex];
+                  const alreadyInPlan = difficultyIndex !== null && planLoaded && isInPlan(match.music.id, difficultyIndex);
+                  return (
+                    <View key={match.music.id} style={styles.resultRow}>
+                      <Pressable
+                        style={styles.resultMain}
+                        onPress={() => handleOpenSong(match.music)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`查看歌曲 ${match.music.title}`}
+                      >
+                        <View style={styles.resultInfo}>
+                          <Text style={styles.resultTitle} numberOfLines={2}>{match.music.title}</Text>
+                          <Text style={styles.resultMeta}>{match.music.basic_info.artist} · {match.music.type}</Text>
+                          <Text style={styles.resultSource}>识别文字：{match.recognizedText}</Text>
+                        </View>
+                      </Pressable>
+                      <View style={styles.resultActions}>
+                        <Text style={styles.score}>{Math.round(match.score * 100)}%</Text>
+                        <Pressable
+                          style={[styles.quickAddButton, (!planLoaded || difficultyIndex === null) && styles.quickAddButtonDisabled]}
+                          onPress={() => handleQuickAdd(match.music)}
+                          disabled={!planLoaded || difficultyIndex === null}
+                          accessibilityRole="button"
+                          accessibilityLabel={alreadyInPlan ? '已在推分计划' : difficultyLabel ? `加入${difficultyLabel}到推分计划` : '没有可加入的谱面'}
+                        >
+                          <Text style={styles.quickAddText}>
+                            {!planLoaded ? '计划加载中' : alreadyInPlan ? '已在计划' : difficultyLabel ? `+ ${difficultyLabel}` : '不可加入'}
+                          </Text>
+                        </Pressable>
+                      </View>
                     </View>
-                    <Text style={styles.score}>{Math.round(match.score * 100)}%</Text>
-                  </Pressable>
-                ))}
+                  );
+                })}
               </View>
             )}
+
+            {planFeedback && <Text style={styles.planFeedback}>{planFeedback}</Text>}
 
             <Text style={styles.note}>提示：请尽量让曲名完整、清晰地出现在照片中。当前不会根据曲绘识别歌曲。</Text>
           </ScrollView>
@@ -230,7 +301,7 @@ const styles = StyleSheet.create({
   },
   resultRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     gap: 8,
     padding: 11,
     borderRadius: 10,
@@ -238,8 +309,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border.light,
   },
-  resultInfo: {
+  resultMain: {
     flex: 1,
+    justifyContent: 'center',
+  },
+  resultInfo: {
     gap: 3,
   },
   resultTitle: {
@@ -255,10 +329,36 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: Colors.text.muted,
   },
+  resultActions: {
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
   score: {
     fontSize: 12,
     fontWeight: '800',
     color: Colors.accent.primary,
+  },
+  quickAddButton: {
+    paddingHorizontal: 7,
+    paddingVertical: 5,
+    borderRadius: 7,
+    backgroundColor: `${Colors.accent.secondary}22`,
+    borderWidth: 1,
+    borderColor: Colors.accent.secondary,
+  },
+  quickAddButtonDisabled: {
+    opacity: 0.5,
+  },
+  quickAddText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: Colors.accent.secondary,
+  },
+  planFeedback: {
+    fontSize: 11,
+    lineHeight: 16,
+    color: Colors.accent.secondary,
   },
   note: {
     fontSize: 10,

@@ -76,7 +76,13 @@ export function DrumRoll({ items, resultIndex, spinning, onSpinEnd, onResultPres
 
   return (
     <View style={styles.container}>
-      <View style={styles.carousel}>
+      <Pressable
+        style={({ pressed }) => [styles.carousel, pressed && spinning && styles.carouselPressed]}
+        onPress={spinning ? onSpinEnd : undefined}
+        disabled={!spinning}
+        accessibilityRole={spinning ? 'button' : undefined}
+        accessibilityLabel={spinning ? '点击停止抽选' : undefined}
+      >
         <View style={styles.orbit} />
         <Image
           source={{ uri: getCoverUrl(previous.music.id) }}
@@ -95,8 +101,8 @@ export function DrumRoll({ items, resultIndex, spinning, onSpinEnd, onResultPres
           style={[styles.sideCover, styles.rightCover]}
           defaultSource={require('../../assets/icon.png')}
         />
-        <Text style={styles.switchLabel}>{spinning ? '顺时针旋转中…' : '抽选完成'}</Text>
-      </View>
+        <Text style={styles.switchLabel}>{spinning ? '旋转中…点击此处停止' : '抽选完成'}</Text>
+      </Pressable>
 
       {!spinning && result && (
         <Pressable
@@ -138,7 +144,10 @@ const styles = StyleSheet.create({
     height: 220,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
+    overflow: 'visible',
+  },
+  carouselPressed: {
+    opacity: 0.88,
   },
   orbit: {
     position: 'absolute',
@@ -166,6 +175,7 @@ const styles = StyleSheet.create({
   },
   sideCover: {
     position: 'absolute',
+    zIndex: 1,
     width: SIDE_COVER_SIZE,
     height: SIDE_COVER_SIZE,
     borderRadius: 10,

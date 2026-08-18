@@ -245,7 +245,6 @@ export default function RandomPicker() {
           />
         ) : (
           <View style={styles.placeholder}>
-            <Text style={styles.placeholderIcon}>🎰</Text>
             <Text style={styles.placeholderText}>
               {candidates.length === 0
                 ? mode === 'plan' ? '推分计划中没有可抽的谱面' : '没有符合条件的歌曲'
@@ -261,7 +260,7 @@ export default function RandomPicker() {
         disabled={spinning || candidates.length === 0}
       >
         <Text style={styles.drawBtnText}>
-          {spinning ? '🌀 旋转中...' : `🎰 抽一项（${candidateLabel}）`}
+          {spinning ? '🌀 旋转中...' : `抽一项（${candidateLabel}）`}
         </Text>
       </Pressable>
     </View>
@@ -409,9 +408,6 @@ const styles = StyleSheet.create({
   placeholder: {
     alignItems: 'center',
     gap: 12,
-  },
-  placeholderIcon: {
-    fontSize: 64,
   },
   placeholderText: {
     fontSize: 15,

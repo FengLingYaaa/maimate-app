@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useMusicStore, usePlanStore } from '../../src/store';
-import { ChartVideoPanel, DifficultyBadge, NoteBar, RatingPanel } from '../../src/components';
+import { BilibiliSearchPanel, DifficultyBadge, NoteBar, RatingPanel } from '../../src/components';
 import { Colors } from '../../src/constants';
 import { DifficultyLabels, getCoverUrl } from '../../src/constants/game';
 import { getTotalNotes } from '../../src/data/music-list';
@@ -199,40 +199,13 @@ export default function SongDetail() {
                 </View>
 
                 <RatingPanel ds={ds} fitDiff={stats?.fit_diff} loading={chartStatsLoading} />
-                <ChartVideoPanel
-                  songId={music.id}
+                <BilibiliSearchPanel
                   songTitle={music.title}
                   difficultyIndex={selectedDiff}
                 />
               </View>
             </View>
 
-            {/* 各难度 Note 总览 */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>全难度比较</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.compareRow}>
-                  {music.charts
-                    .map((c, i) => ({ chart: c, index: i }))
-                    .filter(({ index }) => index !== selectedDiff)
-                    .map(({ chart: c, index: i }) => (
-                    <Pressable
-                      key={i}
-                      style={[styles.compareCard, selectedDiff === i && styles.compareCardActive]}
-                      onPress={() => setSelectedDiff(i)}
-                    >
-                      <Text style={[styles.compareDiff, { color: Colors.difficulty[['basic', 'advanced', 'expert', 'master', 'remaster'][i] as keyof typeof Colors.difficulty] }]}>
-                        {DifficultyLabels[i]}
-                      </Text>
-                      <Text style={styles.compareDs}>定数 {music.ds[i]}</Text>
-                      <Text style={styles.compareNotes}>
-                        {getTotalNotes(c)} notes
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </ScrollView>
-            </View>
           </>
         )}
 
@@ -477,37 +450,6 @@ const styles = StyleSheet.create({
   charterValue: {
     fontSize: 14,
     color: Colors.text.primary,
-  },
-  // Compare cards
-  compareRow: {
-    gap: 10,
-    flexDirection: 'row',
-  },
-  compareCard: {
-    backgroundColor: Colors.bg.secondary,
-    borderRadius: 12,
-    padding: 12,
-    minWidth: 100,
-    alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: Colors.border.light,
-  },
-  compareCardActive: {
-    borderColor: Colors.accent.primary,
-  },
-  compareDiff: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  compareDs: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.text.primary,
-  },
-  compareNotes: {
-    fontSize: 11,
-    color: Colors.text.muted,
   },
   // Actions
   actions: {

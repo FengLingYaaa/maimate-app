@@ -5,5 +5,5 @@ export { FilterBar } from './FilterBar';
 export { RangeSlider } from './RangeSlider';
 export { RatingPanel } from './RatingPanel';
 export { DrumRoll } from './DrumRoll';
-export { ChartVideoPanel } from './ChartVideoPanel';
+export { BilibiliSearchPanel } from './BilibiliSearchPanel';
 export { TitleRecognizer } from './TitleRecognizer';
