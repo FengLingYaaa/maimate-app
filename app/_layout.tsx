@@ -34,7 +34,7 @@ export default function RootLayout() {
 
   return (
     <>
-      <StatusBar style="light" backgroundColor={Colors.bg.primary} />
+      <StatusBar style="light" />
       <Tabs
         screenOptions={{
           headerShown: false,

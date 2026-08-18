@@ -4,7 +4,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MusicData } from './types';
+import { MusicData } from '../data/types';
 import { PROBER_API_BASE, CACHE_KEYS } from '../constants/game';
 
 const MUSIC_DATA_URL = `${PROBER_API_BASE}/music_data`;

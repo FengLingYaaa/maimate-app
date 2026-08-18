@@ -40,7 +40,7 @@ export function NoteBar({ chart, isDX, compact = false }: Props) {
 
   return (
     <View style={styles.wrapper}>
-      <View style={styles.bar}>
+      <View style={[styles.bar, compact && styles.barCompact]}>
         {segments.map((seg, i) => (
           <View
             key={seg.label}
@@ -78,9 +78,12 @@ const styles = StyleSheet.create({
   },
   bar: {
     flexDirection: 'row',
-    height: compact ? 6 : 10,
+    height: 10,
     borderRadius: 4,
     overflow: 'hidden',
+  },
+  barCompact: {
+    height: 6,
   },
   segment: {
     height: '100%',
