@@ -96,7 +96,7 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | `a74b19d feat: simplify Bilibili search and refine UX` |
+| 当前提交 | `5759b60 fix: name release asset for download site` |
 | 当前标签 | `v1.3.0-alpha`（待云构建/发布） |
 | Android applicationId | `cc.flya.maimate` |
 | App 版本 | `1.3.0` |
@@ -627,3 +627,13 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 发布设计：tag `v1.3.0-alpha` 触发 `.github/workflows/build-apk.yml`，工作流使用 `contents: write` 将 APK 上传到同名 GitHub Release；`landing/_worker.js` 已指向该 Release，Cloudflare Pages 部署脚本仍负责个人站发布。
 - 人类需要确认：本步没有把任何视频条目写入 App；云构建完成后仍需确认 APK 下载、版本、包名、SHA-256 和个人站线上结果。
 - 下一步：提交设计记录后推送 `main` 和 `v1.3.0-alpha`，等待 GitHub Actions 完成，下载/核验 Release APK，运行 `landing/deploy-download-site.sh` 部署个人站，再做线上 HTTP 验证。
+
+### 2026-08-18 — 云发布资产名修正并重新触发构建
+
+- 用户目标：确保云构建产物能被个人站 Worker 以固定路径 `/MaiMate-latest.apk` 下载。
+- 本步范围：修正 `.github/workflows/build-apk.yml` 的 Release 上传文件名，并重新触发同一 release tag；不改变 App 功能。
+- 状态：进行中，等待第二次 GitHub Actions 运行完成。
+- 实际修改：工作流先复制 Gradle APK 到 `${RUNNER_TEMP}/MaiMate-latest.apk`，再创建/覆盖同名 GitHub Release 资产；提交 `5759b603e27bb4b842f9aedbeb6a5201940ebe58`，`v1.3.0-alpha` 已更新到该提交并推送。
+- 验证证据：第一次运行 `32169009368` 使用旧资产名，第二次运行 `32169500810` 已排队等待同一并发组；Cloudflare `wrangler whoami` 成功，个人站部署脚本 `bash -n` 成功。
+- 人类需要确认：仍需等待第二次构建成功并检查 Release 资产名、APK SHA-256、下载站 HTTP 响应。
+- 下一步：获取 run `32169500810` 的结果和 Release APK，更新 `landing/MaiMate-latest.apk.sha256`/页面信息，执行 `landing/deploy-download-site.sh`，再验证下载站。
