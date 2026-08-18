@@ -96,8 +96,8 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | `5759b60 fix: name release asset for download site` |
-| 当前标签 | `v1.3.0-alpha`（云构建/个人站已发布） |
+| 当前提交 | `0ebf7f8 fix: make drum roll early stop idempotent` |
+| 当前标签 | `v1.3.0-alpha`（修正待重新云构建） |
 | Android applicationId | `cc.flya.maimate` |
 | App 版本 | `1.3.0` |
 | 下载站 | <https://maimate.flya.ccwu.cc/> |
@@ -646,3 +646,13 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 验证证据：GitHub Actions run `32169500810` success，Release 页面为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.3.0-alpha>；APK 59,889,321 bytes，SHA-256 `7144f9a14d08f719fa141a8baf1caa05b4f818a43676de1f69bc751a554c485a`；`landing/deploy-download-site.sh` 部署成功，预览地址为 <https://a1460cb5.maimate-landing.pages.dev>；生产页 <https://maimate.flya.ccwu.cc/> 显示 `v1.3.0-alpha` 和同一 SHA；`GET/HEAD https://maimate.flya.ccwu.cc/MaiMate-latest.apk` 返回 HTTP 200、`application/vnd.android.package-archive`、`content-length: 59889321`、固定附件名；完整下载后的 SHA 与本地 Release APK 一致。
 - 人类需要确认：本会话 `adb devices` 只有标题行、没有设备，因此没有虚报安装、相机、Bilibili 深链或 HTTPS 回退的真机结果。
 - 下一步：若提供 Android 设备，完成深链优先/HTTPS 回退、OCR 快速加入和返回恢复、随机抽歌点击停止的真机回归；不恢复 Bilibili 自动抓取或内置视频目录。
+
+### 2026-08-18 — 审查修正 DrumRoll 提前停止竞态
+
+- 用户目标：处理后台审查发现的点击停止竞态，确保停止时不会留下 interval、部分旋转角度或重复 `onSpinEnd` 回调。
+- 本步范围：只修正 `DrumRoll` 的提前停止完成路径，不改变抽选目标、结果卡片路由或其他产品边界。
+- 状态：代码修正已完成，等待重新推送 tag、云构建和个人站 APK 更新。
+- 实际修改：`app/src/components/DrumRoll.tsx`；新增完成回调 ref、spin generation guard 和幂等 `finish`，点击时清理 interval、取消 Reanimated 动画、回到最终角度、显示真实 `resultIndex` 并只调用一次 `onSpinEnd`。
+- 验证证据：提交 `0ebf7f8f6389bfcbdf5f96ccc1785530c106ce8e`；`npm run lint`、`npx expo export --platform android`、`git diff --check` 均成功。审查没有修改其他文件。
+- 人类需要确认：此次修正仍不代表真机验收完成；需沿用 `v1.3.0-alpha` 的 GitHub Actions/个人站发布链路重新生成 APK。
+- 下一步：提交本记录，推送 `main`，将 `v1.3.0-alpha` 更新到本修正，等待云构建成功后更新下载站 SHA 并验证固定 APK URL。
