@@ -15,6 +15,17 @@
 
 > GitHub 托管 runner 内存充足，不受本机 4GB 容器限制。
 
+### 发布到个人下载站
+
+发布版本时，推荐用带 `v` 前缀的 tag 触发同一工作流：
+
+```bash
+git tag -a v1.3.0-alpha -m "MaiMate v1.3.0-alpha"
+git push origin v1.3.0-alpha
+```
+
+工作流会完成 arm64 APK 云构建，并把产物以固定文件名 `MaiMate-latest.apk` 上传到同名 GitHub Release。随后更新 `landing/_worker.js` 中的 Release 地址，执行 `landing/deploy-download-site.sh` 部署 Cloudflare Pages/Worker；下载站不会把 42 MiB APK 直接上传到 Pages，而是由 Worker 转发 GitHub Release 资产。
+
 ## 方式二：本地构建（需要 Android 环境）
 
 ### 前置条件
