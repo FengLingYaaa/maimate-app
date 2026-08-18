@@ -260,7 +260,7 @@ export default function RandomPicker() {
         disabled={spinning || candidates.length === 0}
       >
         <Text style={styles.drawBtnText}>
-          {spinning ? '🌀 旋转中...' : `抽一项（${candidateLabel}）`}
+          {spinning ? '🌀 旋转中...' : `🎰 抽一项（${candidateLabel}）`}
         </Text>
       </Pressable>
     </View>
