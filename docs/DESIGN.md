@@ -676,3 +676,13 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 验证证据：GitHub Actions run `32173744736` success，构建提交为 `24c94e8ce9481581cafe6a7b19a8c6c8c37c0c72`；固定 Release URL 返回成功；`landing/deploy-download-site.sh` 部署成功，预览地址为 <https://66b1a735.maimate-landing.pages.dev>；生产首页 <https://maimate.flya.ccwu.cc/> 显示 `v1.3.0-alpha` 和新 SHA；APK 返回 HTTP 200、`content-length: 59889781`、`application/vnd.android.package-archive`、固定附件名；完整下载后的 SHA 与本地 APK 一致。
 - 人类需要确认：`adb devices` 仍没有 Android 设备，不能把 Bilibili 深链、HTTPS 回退、OCR 相机、OCR 返回和随机点击停止宣称为真机已验收。
 - 下一步：接入 Android 设备后做最后回归；继续保持不抓取 Bilibili、不内置视频目录的产品边界。
+
+### 2026-08-18 — 发布后 OCR/路由只读审查
+
+- 用户目标：复核 OCR 文字展示、快速加入推分计划和 OCR 详情返回路径，确认最终发布代码没有遗漏。
+- 本步范围：只读审查，不修改代码、不重新发布 APK。
+- 状态：审查完成；报告中的部分“待修复”描述对应较早快照，当前最终代码已经包含这些修正。
+- 当前证据：`TitleRecognizer` 已显示完整 OCR 和每条匹配的 `match.recognizedText`；快速加入已保护空谱面数据，并在 `planLoaded` 前禁用；`app/index.tsx` 已用 `restoreTitleRecognizerOnFocus`、`useFocusEffect` 和导航前 preserve 标志在返回曲库时恢复 OCR 弹窗。当前 Tabs 布局下该方案仍需真实设备验证返回行为。
+- 运行时边界：`@react-native-ml-kit/text-recognition` 是原生模块，最终验证应使用云构建 APK 而不是 Expo Go；本次 `npm run lint` 通过，App Git 工作树干净，设计副本同步，`git diff --check` 通过。
+- 人类需要确认：仍无 Android 设备，因此不能把 OCR 相机、详情返回、Bilibili 深链/HTTPS 回退等宣称为真机验收完成；不新增视频目录或 Bilibili 自动化抓取。
+- 下一步：接入 Android 设备后执行最后的 OCR、路由、深链和回退回归。
