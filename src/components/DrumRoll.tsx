@@ -2,7 +2,7 @@
  * DrumRoll — 顺时针曲绘滚筒，候选会多次切换，最后停在真实抽中歌曲。
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -29,32 +29,50 @@ const SIDE_COVER_SIZE = 54;
 export function DrumRoll({ items, resultIndex, spinning, onSpinEnd, onResultPress }: Props) {
   const rotation = useSharedValue(0);
   const [activeIndex, setActiveIndex] = useState(0);
+  const finishRef = useRef<(() => void) | null>(null);
+  const spinGenerationRef = useRef(0);
   const result = resultIndex === null ? undefined : items[resultIndex];
   const active = items[activeIndex] || result;
   const previous = items[Math.max(0, activeIndex - 1)] || active;
   const next = items[Math.min(items.length - 1, activeIndex + 1)] || active;
 
   useEffect(() => {
+    const generation = spinGenerationRef.current + 1;
+    spinGenerationRef.current = generation;
+    finishRef.current = null;
     cancelAnimation(rotation);
+
     if (!spinning || resultIndex === null || items.length === 0) {
       if (!spinning && resultIndex !== null) setActiveIndex(resultIndex);
-      return undefined;
+      return () => {
+        if (spinGenerationRef.current === generation) finishRef.current = null;
+      };
     }
 
     setActiveIndex(0);
     rotation.value = 0;
     let currentIndex = 0;
-    const switchTimer = setInterval(() => {
+    let switchTimer: ReturnType<typeof setInterval> | null = setInterval(() => {
       currentIndex = Math.min(currentIndex + 1, resultIndex);
       setActiveIndex(currentIndex);
     }, 82);
+    let didFinish = false;
 
     const finish = () => {
-      clearInterval(switchTimer);
+      if (didFinish || spinGenerationRef.current !== generation) return;
+      didFinish = true;
+      if (switchTimer) {
+        clearInterval(switchTimer);
+        switchTimer = null;
+      }
+      cancelAnimation(rotation);
+      rotation.value = Math.PI * 2 * 6;
       setActiveIndex(resultIndex);
+      finishRef.current = null;
       onSpinEnd?.();
     };
 
+    finishRef.current = finish;
     rotation.value = withTiming(Math.PI * 2 * 6, {
       duration: Math.min(4600, Math.max(2800, 2500 + resultIndex * 48)),
       easing: Easing.out(Easing.cubic),
@@ -63,8 +81,10 @@ export function DrumRoll({ items, resultIndex, spinning, onSpinEnd, onResultPres
     });
 
     return () => {
-      clearInterval(switchTimer);
+      if (switchTimer) clearInterval(switchTimer);
+      switchTimer = null;
       cancelAnimation(rotation);
+      if (spinGenerationRef.current === generation) finishRef.current = null;
     };
   }, [items.length, resultIndex, spinning, onSpinEnd, rotation]);
 
@@ -72,13 +92,17 @@ export function DrumRoll({ items, resultIndex, spinning, onSpinEnd, onResultPres
     transform: [{ rotateZ: `${rotation.value}rad` }],
   }));
 
+  const handleStop = () => {
+    finishRef.current?.();
+  };
+
   if (!active) return null;
 
   return (
     <View style={styles.container}>
       <Pressable
         style={({ pressed }) => [styles.carousel, pressed && spinning && styles.carouselPressed]}
-        onPress={spinning ? onSpinEnd : undefined}
+        onPress={spinning ? handleStop : undefined}
         disabled={!spinning}
         accessibilityRole={spinning ? 'button' : undefined}
         accessibilityLabel={spinning ? '点击停止抽选' : undefined}
