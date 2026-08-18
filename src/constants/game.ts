@@ -13,13 +13,17 @@ export const DifficultyColors = ['绿', '黄', '红', '紫', '白'] as const;
 export const DifficultyShortLabels = ['Bas', 'Adv', 'Exp', 'Mst', 'ReM'] as const;
 
 /** 歌曲分类 */
+/**
+ * 兼容未加载曲库时的分类回退值；正常界面优先从 API 动态生成。
+ */
 export const Genres = [
-  '流行&动漫',
+  'niconico & VOCALOID',
   '东方Project',
-  'VOCALOID',
   '其他游戏',
+  '宴会場',
+  '流行&动漫',
   '舞萌',
-  '原创',
+  '音击&中二节奏',
 ] as const;
 
 /** 歌曲类型 */
@@ -71,6 +75,7 @@ export function getCoverUrl(id: string): string {
 export const CACHE_KEYS = {
   musicData: 'maimate_music_data',
   musicDataVersion: 'maimate_music_version',
+  chartStats: 'maimate_chart_stats',
   planData: 'maimate_plan_data',
   settings: 'maimate_settings',
 } as const;

@@ -3,7 +3,7 @@
  * 展示谱面信息、note分布、推分操作
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useMusicStore, usePlanStore } from '../../src/store';
-import { DifficultyBadge, NoteBar } from '../../src/components';
+import { DifficultyBadge, NoteBar, RatingPanel } from '../../src/components';
 import { Colors } from '../../src/constants';
 import { DifficultyLabels, getCoverUrl } from '../../src/constants/game';
 import { getTotalNotes } from '../../src/data/music-list';
@@ -25,13 +25,21 @@ export default function SongDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const rawData = useMusicStore(s => s.rawData);
+  const chartStats = useMusicStore(s => s.chartStats);
+  const chartStatsLoading = useMusicStore(s => s.chartStatsLoading);
   const isInPlan = usePlanStore(s => s.isInPlan);
   const addEntry = usePlanStore(s => s.addEntry);
   const removeEntry = usePlanStore(s => s.removeEntry);
 
   const music = rawData.find(m => m.id === id);
 
-  const [selectedDiff, setSelectedDiff] = useState<number>(music ? music.charts.length - 1 : 0);
+  const [selectedDiff, setSelectedDiff] = useState(0);
+
+  useEffect(() => {
+    if (!music) return;
+    const highestAvailable = Math.min(music.charts.length, music.ds.length, music.level.length) - 1;
+    setSelectedDiff(Math.max(0, highestAvailable));
+  }, [music?.id, music?.charts.length, music?.ds.length, music?.level.length]);
 
   const handleAddToPlan = useCallback(() => {
     if (!music) return;
@@ -80,6 +88,7 @@ export default function SongDetail() {
   const ds = music.ds[selectedDiff];
   const level = music.level[selectedDiff];
   const isDX = music.type === 'DX';
+  const stats = chartStats[music.id]?.[selectedDiff] || undefined;
   const inPlan = isInPlan(music.id, selectedDiff);
 
   return (
@@ -150,7 +159,10 @@ export default function SongDetail() {
                     <Text style={styles.chartLevel}>
                       {DifficultyLabels[selectedDiff]} {level}
                     </Text>
-                    <Text style={styles.chartDs}>定数: {ds}</Text>
+                    <Text style={styles.chartDs}>官方定数: {ds}</Text>
+                    <Text style={styles.chartDs}>
+                      {stats ? `拟合定数: ${stats.fit_diff.toFixed(2)} · 样本 ${stats.cnt}` : chartStatsLoading ? '拟合定数加载中…' : '暂无拟合定数'}
+                    </Text>
                   </View>
                   <View style={styles.totalNotes}>
                     <Text style={styles.totalNotesNum}>{getTotalNotes(chart)}</Text>
@@ -184,6 +196,8 @@ export default function SongDetail() {
                   <Text style={styles.charterLabel}>谱师</Text>
                   <Text style={styles.charterValue}>{chart.charter || '-'}</Text>
                 </View>
+
+                <RatingPanel ds={ds} fitDiff={stats?.fit_diff} loading={chartStatsLoading} />
               </View>
             </View>
 

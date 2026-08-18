@@ -1,97 +1,54 @@
 /**
- * DrumRoll — 滚筒旋转抽歌动画
- * 模拟 MaimaiDX 洗衣机滚筒转动，停下展示抽中歌曲
+ * DrumRoll — 与最终候选绑定的确定性滚筒动画。
  */
 
-import React, { useEffect, useRef } from 'react';
-import { View, Text, Image, StyleSheet, Pressable } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, Image, StyleSheet } from 'react-native';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSequence,
-  withDelay,
+  cancelAnimation,
   Easing,
   runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
-import { Colors } from '../constants';
-import { getCoverUrl } from '../constants/game';
-import type { MusicData } from '../data/types';
+import { Colors, DifficultyLabels, getCoverUrl } from '../constants';
+import type { DrawCandidate } from '../data/types';
 
 interface Props {
-  songs: MusicData[];           // 参与抽选的歌曲列表
-  resultIndex: number | null;   // 抽中结果索引（null = 未开始/动画中）
-  spinning: boolean;            // 是否正在旋转
-  onSpinEnd?: () => void;       // 旋转结束回调
+  items: DrawCandidate[];
+  resultIndex: number | null;
+  spinning: boolean;
+  onSpinEnd?: () => void;
 }
 
 const SLOT_HEIGHT = 72;
 const VISIBLE_SLOTS = 3;
 
-export function DrumRoll({ songs, resultIndex, spinning, onSpinEnd }: Props) {
+export function DrumRoll({ items, resultIndex, spinning, onSpinEnd }: Props) {
   const translateY = useSharedValue(0);
   const opacity = useSharedValue(0);
-  const spinCount = useRef(0);
+  const result = resultIndex === null ? undefined : items[resultIndex];
 
   useEffect(() => {
-    if (spinning && songs.length > 0) {
-      // 开始旋转动画：快速上下滚动
-      opacity.value = withTiming(1, { duration: 300 });
-      runSpinAnimation();
-    }
-  }, [spinning]);
+    cancelAnimation(translateY);
+    if (!spinning || resultIndex === null || items.length === 0) return;
 
-  useEffect(() => {
-    if (!spinning && resultIndex !== null && songs.length > 0) {
-      // 停止：定位到结果
-      const targetY = -resultIndex * SLOT_HEIGHT + SLOT_HEIGHT * Math.floor(VISIBLE_SLOTS / 2);
-      translateY.value = withTiming(targetY, {
-        duration: 800,
+    translateY.value = 0;
+    opacity.value = 0;
+    opacity.value = withTiming(1, { duration: 180 });
+    const targetY = -resultIndex * SLOT_HEIGHT;
+    translateY.value = withTiming(
+      targetY,
+      {
+        duration: Math.min(3600, Math.max(1500, 1200 + resultIndex * 85)),
         easing: Easing.out(Easing.cubic),
-      });
-
-      if (onSpinEnd) {
-        setTimeout(onSpinEnd, 900);
-      }
-    }
-  }, [spinning, resultIndex]);
-
-  const runSpinAnimation = () => {
-    if (!spinning) return;
-
-    const steps = 20;
-    const stepHeight = SLOT_HEIGHT;
-    let currentStep = 0;
-
-    const doStep = () => {
-      if (!spinning) return;
-      currentStep++;
-      const target = -((currentStep * stepHeight) % (songs.length * SLOT_HEIGHT));
-      translateY.value = withTiming(target, {
-        duration: 60,
-        easing: Easing.linear,
-      });
-
-      if (currentStep < steps) {
-        setTimeout(doStep, 50);
-      } else {
-        // 减速阶段
-        const slowSteps = 8;
-        const doSlow = (i: number) => {
-          if (!spinning || i >= slowSteps) return;
-          const slowTarget = target - Math.random() * SLOT_HEIGHT * 0.5;
-          translateY.value = withTiming(slowTarget, {
-            duration: 100 + i * 30,
-            easing: Easing.out(Easing.quad),
-          });
-          setTimeout(() => doSlow(i + 1), 120 + i * 30);
-        };
-        setTimeout(() => doSlow(0), 60);
-      }
-    };
-
-    doStep();
-  };
+      },
+      finished => {
+        if (finished && onSpinEnd) runOnJS(onSpinEnd)();
+      },
+    );
+  }, [items.length, resultIndex, spinning, onSpinEnd, opacity, translateY]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
@@ -103,28 +60,28 @@ export function DrumRoll({ songs, resultIndex, spinning, onSpinEnd }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* 滚筒窗口 */}
       <View style={styles.window}>
-        {/* 中心高亮指示线 */}
         <View style={styles.highlightLine} />
-
         <Animated.View style={[styles.slotList, animatedStyle]}>
-          {songs.map((song, i) => (
-            <View key={`${song.id}-${i}`} style={styles.slotItem}>
-              <Image
-                source={{ uri: getCoverUrl(song.id) }}
-                style={styles.slotCover}
-                defaultSource={require('../../assets/icon.png')}
-              />
-              <View style={styles.slotInfo}>
-                <Text style={styles.slotTitle} numberOfLines={1}>{song.title}</Text>
-                <Text style={styles.slotArtist} numberOfLines={1}>{song.basic_info.artist}</Text>
+          {items.map((candidate, index) => {
+            const { music, difficultyIndex } = candidate;
+            return (
+              <View key={`${music.id}-${difficultyIndex ?? 'song'}-${index}`} style={styles.slotItem}>
+                <Image
+                  source={{ uri: getCoverUrl(music.id) }}
+                  style={styles.slotCover}
+                  defaultSource={require('../../assets/icon.png')}
+                />
+                <View style={styles.slotInfo}>
+                  <Text style={styles.slotTitle} numberOfLines={1}>{music.title}</Text>
+                  <Text style={styles.slotArtist} numberOfLines={1}>
+                    {difficultyIndex === undefined ? music.basic_info.artist : `${DifficultyLabels[difficultyIndex]} · ${music.basic_info.artist}`}
+                  </Text>
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </Animated.View>
-
-        {/* 顶部/底部渐变遮罩 */}
         <View style={styles.topFade}>
           <Animated.View style={[styles.fadeGradient, overlayStyle]} />
         </View>
@@ -133,23 +90,25 @@ export function DrumRoll({ songs, resultIndex, spinning, onSpinEnd }: Props) {
         </View>
       </View>
 
-      {/* 结果展示区 */}
-      {!spinning && resultIndex !== null && songs[resultIndex] && (
-        <Animated.View style={[styles.resultCard]}>
+      {!spinning && result && (
+        <View style={styles.resultCard}>
           <Image
-            source={{ uri: getCoverUrl(songs[resultIndex].id) }}
+            source={{ uri: getCoverUrl(result.music.id) }}
             style={styles.resultCover}
+            defaultSource={require('../../assets/icon.png')}
           />
           <View style={styles.resultInfo}>
-            <Text style={styles.resultTitle}>{songs[resultIndex].title}</Text>
-            <Text style={styles.resultArtist}>{songs[resultIndex].basic_info.artist}</Text>
+            <Text style={styles.resultTitle}>{result.music.title}</Text>
+            <Text style={styles.resultArtist}>{result.music.basic_info.artist}</Text>
             <View style={styles.resultMeta}>
-              <Text style={styles.resultMetaText}>{songs[resultIndex].basic_info.genre}</Text>
-              <Text style={styles.resultMetaText}> · BPM {songs[resultIndex].basic_info.bpm}</Text>
-              <Text style={styles.resultMetaText}> · {songs[resultIndex].type}</Text>
+              <Text style={styles.resultMetaText}>{result.music.basic_info.genre}</Text>
+              <Text style={styles.resultMetaText}> · {result.music.type}</Text>
+              {result.difficultyIndex !== undefined && (
+                <Text style={styles.resultMetaText}> · {DifficultyLabels[result.difficultyIndex]} {result.music.ds[result.difficultyIndex]}</Text>
+              )}
             </View>
           </View>
-        </Animated.View>
+        </View>
       )}
     </View>
   );
@@ -181,7 +140,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   slotList: {
-    paddingTop: SLOT_HEIGHT * Math.floor(VISIBLE_SLOTS / 2),
+    paddingTop: SLOT_HEIGHT,
   },
   slotItem: {
     height: SLOT_HEIGHT,

@@ -1,191 +1,247 @@
 /**
- * 随机抽歌页 — 滚筒旋转动画抽选
- * 支持按难度/分类/等级筛选后随机抽选
+ * 随机抽歌页 — 推分计划、全曲库和按条件抽选。
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
-import { useMusicStore } from '../src/store';
-import { DrumRoll } from '../src/components';
-import { DifficultyBadge } from '../src/components/DifficultyBadge';
-import { Colors } from '../src/constants';
-import { DifficultyLabels, Genres, MusicTypes } from '../src/constants/game';
-import { MusicList } from '../src/data/music-list';
-import type { FilterOptions, MusicData } from '../src/data/types';
+import React, { useCallback, useMemo, useState } from 'react';
+import { View, Text, Pressable, StyleSheet, ScrollView, TextInput } from 'react-native';
+import { useMusicStore, usePlanStore } from '../src/store';
+import { DrumRoll, RangeSlider } from '../src/components';
+import { Colors, DifficultyColorMap, DifficultyLabels, MusicTypes } from '../src/constants';
+import { getMatchingDifficultyIndices, MusicList } from '../src/data/music-list';
+import type { DrawCandidate, FilterOptions } from '../src/data/types';
 
-type DrawMode = 'any' | 'filtered';
+type DrawMode = 'plan' | 'any' | 'filtered';
+
+function toggleValue<T extends string | number>(current: T | T[] | undefined, value: T): T | T[] | undefined {
+  if (current === undefined) return value;
+  const values = Array.isArray(current) ? [...current] : [current];
+  if (values.includes(value)) {
+    const next = values.filter(item => item !== value);
+    return next.length > 0 ? next : undefined;
+  }
+  return [...values, value];
+}
 
 export default function RandomPicker() {
   const rawData = useMusicStore(s => s.rawData);
+  const planEntries = usePlanStore(s => s.entries);
 
-  const [mode, setMode] = useState<DrawMode>('any');
-  const [selectedDiffs, setSelectedDiffs] = useState<number[]>([]);
-  const [selectedGenre, setSelectedGenre] = useState<string | undefined>();
-  const [selectedType, setSelectedType] = useState<'SD' | 'DX' | undefined>();
-  const [result, setResult] = useState<MusicData | null>(null);
+  const [mode, setMode] = useState<DrawMode>('plan');
+  const [filters, setFilters] = useState<FilterOptions>({});
+  const [animationItems, setAnimationItems] = useState<DrawCandidate[]>([]);
+  const [animationResultIndex, setAnimationResultIndex] = useState<number | null>(null);
   const [spinning, setSpinning] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
 
-  // 参与抽选的歌曲池
-  const songPool = useMemo(() => {
-    let list = new MusicList(rawData);
+  const genres = useMemo(() => [...new Set(rawData.map(music => music.basic_info.genre))].sort(), [rawData]);
+  const versions = useMemo(() => [...new Set(rawData.map(music => music.basic_info.from))].sort(), [rawData]);
+  const planCandidates = useMemo<DrawCandidate[]>(() => {
+    const byId = new Map(rawData.map(music => [music.id, music]));
+    return planEntries
+      .slice()
+      .sort((left, right) => left.order - right.order)
+      .flatMap(entry => {
+        const music = byId.get(entry.songId);
+        if (!music || entry.difficultyIndex < 0 || entry.difficultyIndex >= music.charts.length) return [];
+        return [{ music, difficultyIndex: entry.difficultyIndex, planEntry: entry }];
+      });
+  }, [planEntries, rawData]);
 
-    if (mode === 'filtered') {
-      const opts: FilterOptions = {};
-      if (selectedDiffs.length > 0) opts.difficulty = selectedDiffs;
-      if (selectedGenre) opts.genre = selectedGenre;
-      if (selectedType) opts.type = selectedType;
-      list = list.filter(opts);
-    }
+  const candidates = useMemo<DrawCandidate[]>(() => {
+    if (mode === 'plan') return planCandidates;
+    const list = mode === 'any' ? new MusicList(rawData) : new MusicList(rawData).filter(filters);
+    const songs = list.all();
+    const chartConstrained = mode === 'filtered' && (
+      filters.difficulty !== undefined ||
+      filters.level !== undefined ||
+      filters.dsRange !== undefined ||
+      filters.charter !== undefined
+    );
+    if (!chartConstrained) return songs.map(music => ({ music }));
 
-    return list;
-  }, [rawData, mode, selectedDiffs, selectedGenre, selectedType]);
+    return songs.flatMap(music => getMatchingDifficultyIndices(music, filters).map(difficultyIndex => ({
+      music,
+      difficultyIndex,
+    })));
+  }, [filters, mode, planCandidates, rawData]);
 
-  const songArray = useMemo(() => songPool.all(), [songPool]);
+  const setModeAndReset = (nextMode: DrawMode) => {
+    if (spinning) return;
+    setMode(nextMode);
+    setAnimationItems([]);
+    setAnimationResultIndex(null);
+  };
+
+  const updateFilters = (next: FilterOptions) => {
+    if (spinning) return;
+    setFilters(next);
+    setAnimationItems([]);
+    setAnimationResultIndex(null);
+  };
+
+  const updateTextFilter = (key: 'titleSearch' | 'artist' | 'charter', value: string) => {
+    updateFilters({ ...filters, [key]: value || undefined });
+  };
 
   const handleDraw = useCallback(() => {
-    if (songArray.length === 0) return;
-    setResult(null);
+    if (candidates.length === 0 || spinning) return;
+    const target = candidates[Math.floor(Math.random() * candidates.length)];
+    const decoys = candidates.filter(candidate => candidate !== target);
+    const displayItems: DrawCandidate[] = [];
+    for (let i = 0; i < 18; i += 1) {
+      const source = decoys.length > 0 ? decoys[i % decoys.length] : target;
+      displayItems.push(source);
+    }
+    displayItems.push(target);
+    setAnimationItems(displayItems);
+    setAnimationResultIndex(displayItems.length - 1);
     setSpinning(true);
+  }, [candidates, spinning]);
 
-    // 随机选结果，2秒后展示
-    const pick = Math.floor(Math.random() * songArray.length);
-    setTimeout(() => {
-      setResult(songArray[pick]);
-      setSpinning(false);
-    }, 2000);
-  }, [songArray]);
+  const handleSpinEnd = useCallback(() => {
+    setSpinning(false);
+  }, []);
 
-  const toggleDiff = (idx: number) => {
-    setSelectedDiffs(prev =>
-      prev.includes(idx) ? prev.filter(d => d !== idx) : [...prev, idx]
-    );
-  };
+  const activeRange: [number, number] = filters.dsRange || [0, 15];
+  const candidateLabel = mode === 'plan' ? `${candidates.length} 个计划谱面` : `${candidates.length} 个候选`;
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>🎲 随机抽歌</Text>
-        <Text style={styles.headerSub}>
-          {mode === 'filtered' && songPool.length !== rawData.length
-            ? `候选池: ${songPool.length} 首`
-            : `全曲库: ${rawData.length} 首`}
-        </Text>
+        <Text style={styles.headerSub}>{candidateLabel}</Text>
       </View>
 
-      {/* 模式切换 */}
       <View style={styles.modeRow}>
-        <Pressable
-          style={[styles.modeBtn, mode === 'any' && styles.modeBtnActive]}
-          onPress={() => setMode('any')}
-        >
-          <Text style={[styles.modeBtnText, mode === 'any' && styles.modeBtnTextActive]}>
-            全曲随机
-          </Text>
+        <Pressable style={[styles.modeBtn, mode === 'plan' && styles.modeBtnActive]} onPress={() => setModeAndReset('plan')}>
+          <Text style={[styles.modeBtnText, mode === 'plan' && styles.modeBtnTextActive]}>推分计划</Text>
         </Pressable>
-        <Pressable
-          style={[styles.modeBtn, mode === 'filtered' && styles.modeBtnActive]}
-          onPress={() => { setMode('filtered'); setShowFilters(true); }}
-        >
-          <Text style={[styles.modeBtnText, mode === 'filtered' && styles.modeBtnTextActive]}>
-            按条件抽选
-          </Text>
+        <Pressable style={[styles.modeBtn, mode === 'any' && styles.modeBtnActive]} onPress={() => setModeAndReset('any')}>
+          <Text style={[styles.modeBtnText, mode === 'any' && styles.modeBtnTextActive]}>全曲随机</Text>
+        </Pressable>
+        <Pressable style={[styles.modeBtn, mode === 'filtered' && styles.modeBtnActive]} onPress={() => setModeAndReset('filtered')}>
+          <Text style={[styles.modeBtnText, mode === 'filtered' && styles.modeBtnTextActive]}>按条件</Text>
         </Pressable>
       </View>
 
-      {/* 筛选条件（filtered 模式） */}
-      {mode === 'filtered' && showFilters && (
-        <ScrollView style={styles.filterPanel} horizontal={false}>
-          {/* 难度 */}
-          <Text style={styles.filterLabel}>难度</Text>
+      {mode === 'plan' && planEntries.length === 0 && (
+        <View style={styles.notice}>
+          <Text style={styles.noticeText}>推分计划还是空的，请先在曲库中添加歌曲。</Text>
+        </View>
+      )}
+
+      {mode === 'filtered' && (
+        <ScrollView style={styles.filterPanel} horizontal={false} showsVerticalScrollIndicator={false}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="模糊搜索歌曲名、曲师或谱师..."
+            placeholderTextColor={Colors.text.muted}
+            value={filters.titleSearch || ''}
+            onChangeText={value => updateTextFilter('titleSearch', value)}
+          />
+
+          <Text style={styles.filterLabel}>难度颜色</Text>
           <View style={styles.chipRow}>
-            {DifficultyLabels.map((label, i) => (
-              <Pressable
-                key={i}
-                style={[styles.chip, selectedDiffs.includes(i) && styles.chipActive]}
-                onPress={() => toggleDiff(i)}
-              >
-                <Text style={[styles.chipText, selectedDiffs.includes(i) && styles.chipTextActive]}>
-                  {label}
-                </Text>
-              </Pressable>
-            ))}
+            {DifficultyLabels.map((label, index) => {
+              const active = Array.isArray(filters.difficulty) ? filters.difficulty.includes(index) : filters.difficulty === index;
+              return (
+                <Pressable
+                  key={index}
+                  style={[styles.chip, active && { backgroundColor: `${DifficultyColorMap[index]}33`, borderColor: DifficultyColorMap[index] }]}
+                  onPress={() => updateFilters({ ...filters, difficulty: toggleValue(filters.difficulty, index) as FilterOptions['difficulty'] })}
+                >
+                  <Text style={[styles.chipText, active && { color: DifficultyColorMap[index] }]}>{label}</Text>
+                </Pressable>
+              );
+            })}
           </View>
 
-          {/* 分类 */}
+          <RangeSlider
+            value={activeRange}
+            onChange={range => updateFilters({ ...filters, dsRange: range[0] <= 0 && range[1] >= 15 ? undefined : range })}
+          />
+
           <Text style={styles.filterLabel}>分类</Text>
           <View style={styles.chipRow}>
-            <Pressable
-              style={[styles.chip, !selectedGenre && styles.chipActive]}
-              onPress={() => setSelectedGenre(undefined)}
-            >
-              <Text style={[styles.chipText, !selectedGenre && styles.chipTextActive]}>全部</Text>
-            </Pressable>
-            {Genres.map(g => (
-              <Pressable
-                key={g}
-                style={[styles.chip, selectedGenre === g && styles.chipActive]}
-                onPress={() => setSelectedGenre(selectedGenre === g ? undefined : g)}
-              >
-                <Text style={[styles.chipText, selectedGenre === g && styles.chipTextActive]}>{g}</Text>
-              </Pressable>
-            ))}
+            {genres.map(genre => {
+              const active = Array.isArray(filters.genre) ? filters.genre.includes(genre) : filters.genre === genre;
+              return (
+                <Pressable key={genre} style={[styles.chip, active && styles.chipActive]} onPress={() => updateFilters({ ...filters, genre: toggleValue(filters.genre, genre) as FilterOptions['genre'] })}>
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{genre}</Text>
+                </Pressable>
+              );
+            })}
           </View>
 
-          {/* 类型 */}
           <Text style={styles.filterLabel}>类型</Text>
           <View style={styles.chipRow}>
-            <Pressable
-              style={[styles.chip, !selectedType && styles.chipActive]}
-              onPress={() => setSelectedType(undefined)}
-            >
-              <Text style={[styles.chipText, !selectedType && styles.chipTextActive]}>全部</Text>
-            </Pressable>
-            {MusicTypes.map(t => (
-              <Pressable
-                key={t}
-                style={[styles.chip, selectedType === t && styles.chipActive]}
-                onPress={() => setSelectedType(selectedType === t ? undefined : t)}
-              >
-                <Text style={[styles.chipText, selectedType === t && styles.chipTextActive]}>{t}</Text>
-              </Pressable>
-            ))}
+            {MusicTypes.map(type => {
+              const active = Array.isArray(filters.type) ? filters.type.includes(type) : filters.type === type;
+              return (
+                <Pressable key={type} style={[styles.chip, active && styles.chipActive]} onPress={() => updateFilters({ ...filters, type: toggleValue(filters.type, type) as FilterOptions['type'] })}>
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{type}</Text>
+                </Pressable>
+              );
+            })}
           </View>
+
+          <Text style={styles.filterLabel}>版本</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {versions.map(version => {
+              const active = Array.isArray(filters.version) ? filters.version.includes(version) : filters.version === version;
+              return (
+                <Pressable key={version} style={[styles.chip, active && styles.chipActive]} onPress={() => updateFilters({ ...filters, version: toggleValue(filters.version, version) as FilterOptions['version'] })}>
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{version}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <Text style={styles.filterLabel}>曲师关键词</Text>
+          <TextInput
+            style={styles.fieldInput}
+            placeholder="例如：cosMo"
+            placeholderTextColor={Colors.text.muted}
+            value={filters.artist || ''}
+            onChangeText={value => updateTextFilter('artist', value)}
+          />
+          <Text style={styles.filterLabel}>谱师关键词</Text>
+          <TextInput
+            style={styles.fieldInput}
+            placeholder="例如：譜面-100号"
+            placeholderTextColor={Colors.text.muted}
+            value={filters.charter || ''}
+            onChangeText={value => updateTextFilter('charter', value)}
+          />
         </ScrollView>
       )}
 
-      {/* 滚筒动画 + 结果 */}
       <View style={styles.drumArea}>
-        {spinning ? (
+        {animationItems.length > 0 && animationResultIndex !== null ? (
           <DrumRoll
-            songs={songArray.slice(0, 50)}
-            resultIndex={null}
-            spinning={true}
-          />
-        ) : result ? (
-          <DrumRoll
-            songs={[result]}
-            resultIndex={0}
-            spinning={false}
+            items={animationItems}
+            resultIndex={animationResultIndex}
+            spinning={spinning}
+            onSpinEnd={handleSpinEnd}
           />
         ) : (
           <View style={styles.placeholder}>
             <Text style={styles.placeholderIcon}>🎰</Text>
             <Text style={styles.placeholderText}>
-              {songArray.length === 0 ? '没有符合条件的歌曲' : '点击下方按钮开始抽选'}
+              {candidates.length === 0
+                ? mode === 'plan' ? '推分计划中没有可抽的谱面' : '没有符合条件的歌曲'
+                : '点击下方按钮开始抽选'}
             </Text>
           </View>
         )}
       </View>
 
-      {/* 抽选按钮 */}
       <Pressable
-        style={[styles.drawBtn, (spinning || songArray.length === 0) && styles.drawBtnDisabled]}
+        style={[styles.drawBtn, (spinning || candidates.length === 0) && styles.drawBtnDisabled]}
         onPress={handleDraw}
-        disabled={spinning || songArray.length === 0}
+        disabled={spinning || candidates.length === 0}
       >
         <Text style={styles.drawBtnText}>
-          {spinning ? '🌀 旋转中...' : `🎰 抽一首 (${songArray.length}首候选)`}
+          {spinning ? '🌀 旋转中...' : `🎰 抽一项（${candidateLabel}）`}
         </Text>
       </Pressable>
     </View>
@@ -214,7 +270,7 @@ const styles = StyleSheet.create({
   },
   modeRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
@@ -232,16 +288,48 @@ const styles = StyleSheet.create({
     backgroundColor: `${Colors.accent.primary}22`,
   },
   modeBtnText: {
-    fontSize: 14,
+    fontSize: 12,
     color: Colors.text.secondary,
     fontWeight: '600',
   },
   modeBtnTextActive: {
     color: Colors.accent.primary,
   },
+  notice: {
+    marginHorizontal: 12,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: `${Colors.functional.warning}18`,
+  },
+  noticeText: {
+    fontSize: 12,
+    color: Colors.functional.warning,
+    textAlign: 'center',
+  },
   filterPanel: {
-    maxHeight: 200,
+    maxHeight: 290,
     paddingHorizontal: 12,
+  },
+  searchInput: {
+    backgroundColor: Colors.bg.secondary,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    fontSize: 13,
+    color: Colors.text.primary,
+    borderWidth: 1,
+    borderColor: Colors.border.light,
+    marginBottom: 4,
+  },
+  fieldInput: {
+    backgroundColor: Colors.bg.secondary,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    color: Colors.text.primary,
+    borderWidth: 1,
+    borderColor: Colors.border.light,
+    marginBottom: 4,
   },
   filterLabel: {
     fontSize: 12,
@@ -262,13 +350,15 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.bg.tertiary,
     borderWidth: 1,
     borderColor: Colors.border.light,
+    marginRight: 4,
+    marginBottom: 4,
   },
   chipActive: {
     backgroundColor: `${Colors.accent.primary}33`,
     borderColor: Colors.accent.primary,
   },
   chipText: {
-    fontSize: 11,
+    fontSize: 10,
     color: Colors.text.secondary,
   },
   chipTextActive: {
@@ -305,7 +395,7 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   drawBtnText: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
     color: '#fff',
   },

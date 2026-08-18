@@ -1,35 +1,39 @@
 /**
  * 曲目数据 Zustand Store
- * 管理全量曲库加载、缓存状态、筛选结果
+ * 管理全量曲库、筛选结果和 Diving-Fish 谱面统计。
  */
 
 import { create } from 'zustand';
-import { MusicData, FilterOptions } from '../data/types';
+import { MusicData, FilterOptions, ChartStatsMap } from '../data/types';
 import { MusicList } from '../data/music-list';
 import { getMusicData, getCacheTimestamp } from '../api/prober';
+import { getChartStats } from '../api/chart-stats';
 
 interface MusicStore {
-  /** 全量曲目原始数据 */
   rawData: MusicData[];
-  /** 是否正在加载 */
   loading: boolean;
-  /** 加载错误 */
   error: string | null;
-  /** 缓存时间戳 */
   cacheTimestamp: number | null;
-  /** 当前 MusicList 实例（应用筛选后） */
   musicList: MusicList;
-  /** 当前筛选条件 */
   filters: FilterOptions;
+  chartStats: ChartStatsMap;
+  chartStatsLoading: boolean;
+  chartStatsError: string | null;
 
-  /** 从 API/缓存 加载曲目数据 */
   loadData: (forceRefresh?: boolean) => Promise<void>;
-  /** 应用筛选 */
+  loadChartStats: (forceRefresh?: boolean) => Promise<void>;
   applyFilters: (filters: FilterOptions) => void;
-  /** 清除筛选 */
   clearFilters: () => void;
-  /** 重置为全量 */
   getFullList: () => MusicList;
+}
+
+function hasFilters(filters: FilterOptions): boolean {
+  return Object.values(filters).some(value => {
+    if (value === undefined || value === null) return false;
+    if (typeof value === 'string' && value.trim() === '') return false;
+    if (Array.isArray(value) && value.length === 0) return false;
+    return true;
+  });
 }
 
 export const useMusicStore = create<MusicStore>((set, get) => ({
@@ -39,6 +43,9 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
   cacheTimestamp: null,
   musicList: new MusicList([]),
   filters: {},
+  chartStats: {},
+  chartStatsLoading: false,
+  chartStatsError: null,
 
   loadData: async (forceRefresh = false) => {
     set({ loading: true, error: null });
@@ -53,9 +60,10 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
         cacheTimestamp: ts,
         filters: {},
       });
+      // 统计数据不阻塞曲库首屏；详情页会在加载完成后自动显示拟合定数。
+      void get().loadChartStats(forceRefresh);
     } catch (e: any) {
       const msg = e?.message || '未知错误';
-      // 如果有缓存数据，静默使用缓存
       const { rawData } = get();
       if (rawData.length > 0) {
         set({ loading: false, error: `更新失败（使用缓存）: ${msg}` });
@@ -65,22 +73,24 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
     }
   },
 
+  loadChartStats: async (forceRefresh = false) => {
+    set({ chartStatsLoading: true, chartStatsError: null });
+    try {
+      const chartStats = await getChartStats(forceRefresh);
+      set({ chartStats, chartStatsLoading: false });
+    } catch (e: any) {
+      set({
+        chartStatsLoading: false,
+        chartStatsError: e?.message || '拟合定数暂时不可用',
+      });
+    }
+  },
+
   applyFilters: (filters: FilterOptions) => {
     const { rawData } = get();
-    let list = new MusicList(rawData);
-
-    // 检查是否有任何有效筛选
-    const hasFilters = Object.values(filters).some(v => {
-      if (v === undefined || v === null) return false;
-      if (typeof v === 'string' && v.trim() === '') return false;
-      if (Array.isArray(v) && v.length === 0) return false;
-      return true;
-    });
-
-    if (hasFilters) {
-      list = list.filter(filters);
-    }
-
+    const list = hasFilters(filters)
+      ? new MusicList(rawData).filter(filters)
+      : new MusicList(rawData);
     set({ musicList: list, filters });
   },
 
@@ -89,7 +99,5 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
     set({ musicList: new MusicList(rawData), filters: {} });
   },
 
-  getFullList: () => {
-    return new MusicList(get().rawData);
-  },
+  getFullList: () => new MusicList(get().rawData),
 }));

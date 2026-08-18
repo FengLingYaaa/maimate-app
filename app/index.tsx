@@ -9,7 +9,8 @@ import { useRouter } from 'expo-router';
 import { useMusicStore } from '../src/store';
 import { SongCard, FilterBar } from '../src/components';
 import { Colors } from '../src/constants';
-import type { MusicData } from '../src/data/types';
+import { MusicList } from '../src/data/music-list';
+import type { FilterOptions, MusicData } from '../src/data/types';
 
 export default function SongBrowser() {
   const router = useRouter();
@@ -24,14 +25,24 @@ export default function SongBrowser() {
 
   const songs = useMemo(() => musicList.all(), [musicList]);
 
-  const versions = useMemo(() => {
-    const set = new Set(rawData.map(m => m.basic_info.from));
-    return [...set].sort();
+  const genres = useMemo(() => [...new Set(rawData.map(m => m.basic_info.genre))].sort(), [rawData]);
+  const versions = useMemo(() => [...new Set(rawData.map(m => m.basic_info.from))].sort(), [rawData]);
+  const artists = useMemo(() => [...new Set(rawData.map(m => m.basic_info.artist))].sort(), [rawData]);
+  const charters = useMemo(() => {
+    const values = new Set<string>();
+    rawData.forEach(music => music.charts.forEach(chart => {
+      if (chart.charter && chart.charter !== '-') values.add(chart.charter);
+    }));
+    return [...values].sort();
   }, [rawData]);
 
   const handleRefresh = useCallback(() => {
     loadData(true);
   }, [loadData]);
+
+  const getPreviewCount = useCallback((nextFilters: FilterOptions) => {
+    return new MusicList(rawData).filter(nextFilters).length;
+  }, [rawData]);
 
   const handleSongPress = useCallback((music: MusicData) => {
     router.push(`/song/${music.id}` as any);
@@ -59,7 +70,11 @@ export default function SongBrowser() {
         onClear={clearFilters}
         totalCount={rawData.length}
         filteredCount={songs.length}
+        getPreviewCount={getPreviewCount}
+        genres={genres}
         versions={versions}
+        artists={artists}
+        charters={charters}
       />
 
       {/* 歌曲列表 */}

@@ -1,9 +1,9 @@
 /**
- * FilterBar — 多维筛选栏
- * 支持：分类/难度/等级/定数/版本/类型/曲师/谱师/BPM/标题
+ * FilterBar — 曲库统一筛选栏。
+ * 曲库和抽选页使用同一套 FilterOptions，避免两边规则不一致。
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,11 +12,12 @@ import {
   Pressable,
   StyleSheet,
   Modal,
-  Switch,
 } from 'react-native';
 import { Colors, DifficultyColorMap } from '../constants';
-import { DifficultyLabels, Genres, MusicTypes } from '../constants/game';
+import { DifficultyLabels, MusicTypes } from '../constants/game';
+import { normalizeSearchText } from '../data/music-list';
 import type { FilterOptions } from '../data/types';
+import { RangeSlider } from './RangeSlider';
 
 interface Props {
   filters: FilterOptions;
@@ -24,100 +25,150 @@ interface Props {
   onClear: () => void;
   totalCount: number;
   filteredCount: number;
+  getPreviewCount?: (filters: FilterOptions) => number;
+  genres: string[];
   versions: string[];
+  artists: string[];
+  charters: string[];
 }
 
-export function FilterBar({ filters, onApply, onClear, totalCount, filteredCount, versions }: Props) {
+function cleanFilters(input: FilterOptions): FilterOptions {
+  const next: FilterOptions = { ...input };
+  for (const key of ['titleSearch', 'artist', 'charter'] as const) {
+    if (next[key] !== undefined && next[key]!.trim() === '') next[key] = undefined;
+  }
+  if (next.dsRange && next.dsRange[0] <= 0 && next.dsRange[1] >= 15) {
+    next.dsRange = undefined;
+  }
+  return next;
+}
+
+function toggleValue<T extends string | number>(
+  current: T | T[] | undefined,
+  value: T,
+): T | T[] | undefined {
+  if (current === undefined) return value;
+  const values = Array.isArray(current) ? [...current] : [current];
+  if (values.includes(value)) {
+    const next = values.filter(item => item !== value);
+    return next.length > 0 ? next : undefined;
+  }
+  return [...values, value];
+}
+
+export function FilterBar({
+  filters,
+  onApply,
+  onClear,
+  totalCount,
+  filteredCount,
+  getPreviewCount,
+  genres,
+  versions,
+  artists,
+  charters,
+}: Props) {
   const [showModal, setShowModal] = useState(false);
   const [localFilters, setLocalFilters] = useState<FilterOptions>({ ...filters });
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const hasActiveFilters = Object.values(filters).some(v => {
-    if (v === undefined || v === null) return false;
-    if (typeof v === 'string' && v.trim() === '') return false;
-    if (Array.isArray(v) && v.length === 0) return false;
+  useEffect(() => {
+    setLocalFilters({ ...filters });
+  }, [filters]);
+
+  useEffect(() => () => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+  }, []);
+
+  const hasActiveFilters = Object.values(filters).some(value => {
+    if (value === undefined || value === null) return false;
+    if (typeof value === 'string' && value.trim() === '') return false;
+    if (Array.isArray(value) && value.length === 0) return false;
     return true;
   });
 
+  const artistSuggestions = useMemo(() => {
+    const query = normalizeSearchText(localFilters.artist || '');
+    if (!query) return [];
+    return artists
+      .filter(artist => normalizeSearchText(artist).includes(query))
+      .slice(0, 8);
+  }, [artists, localFilters.artist]);
+
+  const charterSuggestions = useMemo(() => {
+    const query = normalizeSearchText(localFilters.charter || '');
+    if (!query) return [];
+    return charters
+      .filter(charter => normalizeSearchText(charter).includes(query))
+      .slice(0, 8);
+  }, [charters, localFilters.charter]);
+
+  const update = (next: FilterOptions) => setLocalFilters(next);
+
   const toggleGenre = (genre: string) => {
-    const current = localFilters.genre;
-    if (current === undefined || current === genre) {
-      setLocalFilters({ ...localFilters, genre: undefined });
-    } else if (Array.isArray(current)) {
-      if (current.includes(genre)) {
-        const next = current.filter(g => g !== genre);
-        setLocalFilters({ ...localFilters, genre: next.length > 0 ? next : undefined });
-      } else {
-        setLocalFilters({ ...localFilters, genre: [...current, genre] });
-      }
-    } else {
-      setLocalFilters({ ...localFilters, genre: [genre] });
-    }
+    update({ ...localFilters, genre: toggleValue(localFilters.genre, genre) as FilterOptions['genre'] });
   };
 
-  const toggleDifficulty = (idx: number) => {
-    const current = localFilters.difficulty;
-    if (current === undefined) {
-      setLocalFilters({ ...localFilters, difficulty: [idx] });
-    } else if (Array.isArray(current)) {
-      if (current.includes(idx)) {
-        const next = current.filter(d => d !== idx);
-        setLocalFilters({ ...localFilters, difficulty: next.length > 0 ? next : undefined });
-      } else {
-        setLocalFilters({ ...localFilters, difficulty: [...current, idx] });
-      }
-    } else if (current === idx) {
-      setLocalFilters({ ...localFilters, difficulty: undefined });
-    } else {
-      setLocalFilters({ ...localFilters, difficulty: [current as number, idx] });
-    }
+  const toggleDifficulty = (index: number) => {
+    update({ ...localFilters, difficulty: toggleValue(localFilters.difficulty, index) as FilterOptions['difficulty'] });
   };
 
   const toggleType = (type: 'SD' | 'DX') => {
-    const current = localFilters.type;
-    if (current === undefined) {
-      setLocalFilters({ ...localFilters, type });
-    } else if (Array.isArray(current)) {
-      if (current.includes(type)) {
-        const next = current.filter(t => t !== type);
-        setLocalFilters({ ...localFilters, type: next.length > 0 ? next as ('SD' | 'DX')[] : undefined });
-      } else {
-        setLocalFilters({ ...localFilters, type: [...current, type] });
-      }
-    } else if (current === type) {
-      setLocalFilters({ ...localFilters, type: undefined });
-    } else {
-      setLocalFilters({ ...localFilters, type: [current as 'SD' | 'DX', type] });
-    }
+    update({ ...localFilters, type: toggleValue(localFilters.type, type) as FilterOptions['type'] });
+  };
+
+  const toggleVersion = (version: string) => {
+    update({ ...localFilters, version: toggleValue(localFilters.version, version) as FilterOptions['version'] });
+  };
+
+  const setText = (key: 'artist' | 'charter', value: string) => {
+    update({ ...localFilters, [key]: value || undefined });
+  };
+
+  const handleSearchChange = (text: string) => {
+    const next = cleanFilters({ ...localFilters, titleSearch: text || undefined });
+    setLocalFilters(next);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => onApply(next), 180);
+  };
+
+  const clearSearch = () => {
+    const next = { ...localFilters, titleSearch: undefined };
+    setLocalFilters(next);
+    onApply(cleanFilters(next));
   };
 
   const applyAndClose = () => {
-    onApply(localFilters);
+    onApply(cleanFilters(localFilters));
     setShowModal(false);
   };
 
   const clearAll = () => {
-    const empty = {};
-    setLocalFilters(empty);
+    setLocalFilters({});
     onClear();
     setShowModal(false);
   };
 
+  const dsRange: [number, number] = localFilters.dsRange || [0, 15];
+  const pendingCount = getPreviewCount ? getPreviewCount(cleanFilters(localFilters)) : filteredCount;
+
   return (
     <View>
-      {/* 顶部快速搜索栏 */}
       <View style={styles.quickBar}>
         <TextInput
           style={styles.searchInput}
-          placeholder="搜索歌曲名..."
+          placeholder="模糊搜索歌曲名、曲师或谱师..."
           placeholderTextColor={Colors.text.muted}
           value={localFilters.titleSearch || ''}
-          onChangeText={text => {
-            const next = { ...localFilters, titleSearch: text || undefined };
-            setLocalFilters(next);
-            onApply(next);
-          }}
-          onSubmitEditing={() => onApply(localFilters)}
+          onChangeText={handleSearchChange}
+          onSubmitEditing={() => onApply(cleanFilters(localFilters))}
+          returnKeyType="search"
         />
+        {!!localFilters.titleSearch && (
+          <Pressable style={styles.clearSearch} onPress={clearSearch}>
+            <Text style={styles.clearSearchText}>×</Text>
+          </Pressable>
+        )}
         <Pressable
           style={[styles.filterBtn, hasActiveFilters && styles.filterBtnActive]}
           onPress={() => setShowModal(true)}
@@ -128,15 +179,11 @@ export function FilterBar({ filters, onApply, onClear, totalCount, filteredCount
         </Pressable>
       </View>
 
-      {/* 结果计数 */}
       {hasActiveFilters && (
-        <Text style={styles.countText}>
-          {filteredCount} / {totalCount} 首
-        </Text>
+        <Text style={styles.countText}>{filteredCount} / {totalCount} 首</Text>
       )}
 
-      {/* 筛选弹窗 */}
-      <Modal visible={showModal} transparent animationType="slide">
+      <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => setShowModal(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -147,50 +194,44 @@ export function FilterBar({ filters, onApply, onClear, totalCount, filteredCount
             </View>
 
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              {/* 分类筛选 */}
               <Text style={styles.sectionTitle}>分类</Text>
               <View style={styles.chipRow}>
-                {Genres.map(genre => {
+                {genres.map(genre => {
                   const active = Array.isArray(localFilters.genre)
                     ? localFilters.genre.includes(genre)
                     : localFilters.genre === genre;
                   return (
-                    <Pressable
-                      key={genre}
-                      style={[styles.chip, active && styles.chipActive]}
-                      onPress={() => toggleGenre(genre)}
-                    >
+                    <Pressable key={genre} style={[styles.chip, active && styles.chipActive]} onPress={() => toggleGenre(genre)}>
                       <Text style={[styles.chipText, active && styles.chipTextActive]}>{genre}</Text>
                     </Pressable>
                   );
                 })}
               </View>
 
-              {/* 难度筛选 */}
-              <Text style={styles.sectionTitle}>难度</Text>
+              <Text style={styles.sectionTitle}>难度颜色</Text>
               <View style={styles.chipRow}>
-                {DifficultyLabels.map((label, i) => {
+                {DifficultyLabels.map((label, index) => {
                   const active = Array.isArray(localFilters.difficulty)
-                    ? localFilters.difficulty.includes(i)
-                    : localFilters.difficulty === i;
+                    ? localFilters.difficulty.includes(index)
+                    : localFilters.difficulty === index;
                   return (
                     <Pressable
-                      key={i}
-                      style={[
-                        styles.chip,
-                        active && { backgroundColor: `${DifficultyColorMap[i]}33`, borderColor: DifficultyColorMap[i] },
-                      ]}
-                      onPress={() => toggleDifficulty(i)}
+                      key={index}
+                      style={[styles.chip, active && { backgroundColor: `${DifficultyColorMap[index]}33`, borderColor: DifficultyColorMap[index] }]}
+                      onPress={() => toggleDifficulty(index)}
                     >
-                      <Text style={[styles.chipText, active && { color: DifficultyColorMap[i] }]}>
-                        {label}
-                      </Text>
+                      <Text style={[styles.chipText, active && { color: DifficultyColorMap[index] }]}>{label}</Text>
                     </Pressable>
                   );
                 })}
               </View>
 
-              {/* 类型筛选 */}
+              <Text style={styles.sectionTitle}>官方定数</Text>
+              <RangeSlider
+                value={dsRange}
+                onChange={range => update({ ...localFilters, dsRange: range[0] <= 0 && range[1] >= 15 ? undefined : range })}
+              />
+
               <Text style={styles.sectionTitle}>类型</Text>
               <View style={styles.chipRow}>
                 {MusicTypes.map(type => {
@@ -200,62 +241,69 @@ export function FilterBar({ filters, onApply, onClear, totalCount, filteredCount
                   return (
                     <Pressable
                       key={type}
-                      style={[
-                        styles.chip,
-                        active && { backgroundColor: type === 'DX' ? `${Colors.accent.secondary}33` : `${Colors.accent.primary}33` },
-                      ]}
+                      style={[styles.chip, active && { backgroundColor: `${type === 'DX' ? Colors.accent.secondary : Colors.accent.primary}33`, borderColor: type === 'DX' ? Colors.accent.secondary : Colors.accent.primary }]}
                       onPress={() => toggleType(type)}
                     >
-                      <Text style={[
-                        styles.chipText,
-                        active && { color: type === 'DX' ? Colors.accent.secondary : Colors.accent.primary },
-                      ]}>
-                        {type}
-                      </Text>
+                      <Text style={[styles.chipText, active && { color: type === 'DX' ? Colors.accent.secondary : Colors.accent.primary }]}>{type}</Text>
                     </Pressable>
                   );
                 })}
               </View>
 
-              {/* 版本筛选 */}
               <Text style={styles.sectionTitle}>版本</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollRow}>
-                {versions.map(ver => {
+                {versions.map(version => {
                   const active = Array.isArray(localFilters.version)
-                    ? localFilters.version.includes(ver)
-                    : localFilters.version === ver;
+                    ? localFilters.version.includes(version)
+                    : localFilters.version === version;
                   return (
-                    <Pressable
-                      key={ver}
-                      style={[styles.chip, active && styles.chipActive]}
-                      onPress={() => {
-                        const current = localFilters.version;
-                        if (current === undefined) {
-                          setLocalFilters({ ...localFilters, version: ver });
-                        } else if (Array.isArray(current)) {
-                          if (current.includes(ver)) {
-                            const next = current.filter(v => v !== ver);
-                            setLocalFilters({ ...localFilters, version: next.length > 0 ? next : undefined });
-                          } else {
-                            setLocalFilters({ ...localFilters, version: [...current, ver] });
-                          }
-                        } else if (current === ver) {
-                          setLocalFilters({ ...localFilters, version: undefined });
-                        } else {
-                          setLocalFilters({ ...localFilters, version: [current, ver] });
-                        }
-                      }}
-                    >
-                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{ver}</Text>
+                    <Pressable key={version} style={[styles.chip, active && styles.chipActive]} onPress={() => toggleVersion(version)}>
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{version}</Text>
                     </Pressable>
                   );
                 })}
               </ScrollView>
+
+              <Text style={styles.sectionTitle}>曲师</Text>
+              <TextInput
+                style={styles.fieldInput}
+                placeholder="输入曲师关键词"
+                placeholderTextColor={Colors.text.muted}
+                value={localFilters.artist || ''}
+                onChangeText={value => setText('artist', value)}
+              />
+              {artistSuggestions.length > 0 && (
+                <View style={styles.suggestionRow}>
+                  {artistSuggestions.map(artist => (
+                    <Pressable key={artist} style={styles.suggestion} onPress={() => setText('artist', artist)}>
+                      <Text style={styles.suggestionText}>{artist}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
+              <Text style={styles.sectionTitle}>谱师</Text>
+              <TextInput
+                style={styles.fieldInput}
+                placeholder="输入谱师关键词"
+                placeholderTextColor={Colors.text.muted}
+                value={localFilters.charter || ''}
+                onChangeText={value => setText('charter', value)}
+              />
+              {charterSuggestions.length > 0 && (
+                <View style={styles.suggestionRow}>
+                  {charterSuggestions.map(charter => (
+                    <Pressable key={charter} style={styles.suggestion} onPress={() => setText('charter', charter)}>
+                      <Text style={styles.suggestionText}>{charter}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
             </ScrollView>
 
             <View style={styles.modalFooter}>
               <Pressable style={styles.applyBtn} onPress={applyAndClose}>
-                <Text style={styles.applyBtnText}>应用 ({filteredCount} 首)</Text>
+                <Text style={styles.applyBtnText}>应用（待筛选 {pendingCount} 首）</Text>
               </Pressable>
             </View>
           </View>
@@ -283,6 +331,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border.light,
   },
+  clearSearch: {
+    position: 'absolute',
+    right: 78,
+    top: 16,
+    zIndex: 2,
+  },
+  clearSearchText: {
+    fontSize: 22,
+    lineHeight: 22,
+    color: Colors.text.muted,
+  },
   filterBtn: {
     backgroundColor: Colors.bg.secondary,
     borderRadius: 10,
@@ -308,7 +367,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 4,
   },
-  // Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: Colors.bg.overlay,
@@ -318,7 +376,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.bg.primary,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '75%',
+    maxHeight: '86%',
     paddingTop: 16,
   },
   modalHeader: {
@@ -342,13 +400,11 @@ const styles = StyleSheet.create({
   modalBody: {
     paddingHorizontal: 20,
     paddingTop: 12,
-    maxHeight: '60%',
   },
   sectionTitle: {
     fontSize: 13,
     fontWeight: '700',
     color: Colors.text.secondary,
-    textTransform: 'uppercase',
     marginTop: 14,
     marginBottom: 8,
   },
@@ -367,6 +423,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.bg.tertiary,
     borderWidth: 1,
     borderColor: Colors.border.light,
+    marginRight: 6,
   },
   chipActive: {
     backgroundColor: `${Colors.accent.primary}33`,
@@ -379,6 +436,31 @@ const styles = StyleSheet.create({
   chipTextActive: {
     color: Colors.accent.primary,
     fontWeight: '600',
+  },
+  fieldInput: {
+    backgroundColor: Colors.bg.secondary,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    color: Colors.text.primary,
+    borderWidth: 1,
+    borderColor: Colors.border.light,
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 6,
+  },
+  suggestion: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: `${Colors.accent.secondary}22`,
+  },
+  suggestionText: {
+    fontSize: 10,
+    color: Colors.accent.secondary,
   },
   modalFooter: {
     padding: 16,
