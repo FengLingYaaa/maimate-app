@@ -96,8 +96,8 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | 待本轮实现完成后记录 |
-| 当前标签 | `v1.3.0-alpha`（计划） |
+| 当前提交 | `a74b19d feat: simplify Bilibili search and refine UX` |
+| 当前标签 | `v1.3.0-alpha`（待云构建/发布） |
 | Android applicationId | `cc.flya.maimate` |
 | App 版本 | `1.3.0` |
 | 下载站 | <https://maimate.flya.ccwu.cc/> |
@@ -413,7 +413,7 @@ interface ChartData {
 - 不把研究文件作为 App 构建或发布前置条件；
 - 不把任何研究结果自动写入 App，也不生成 `app/src/data/bilibili-search.ts` 之外的视频数据文件。
 
-### A1：用户提出的下一版交互修订（设计已调整，等待明确开工）
+### A1：用户提出的下一版交互修订（本轮已实现，等待构建/真机验收）
 
 1. 将 Bilibili 区域简化为一个“去 Bilibili 搜索该谱面”按钮，删除内部说明文字；
 2. 删除视频列表、视频类型、UP 主、单条打开、复制链接和“暂无已确认的视频”状态；
@@ -427,7 +427,7 @@ interface ChartData {
 10. 修复随机滚筒左右曲绘裁切；
 11. 删除随机页未开始时的老虎机图标。
 
-新方案不包含“人工审核视频后填充正式目录”这一步。以上项目在用户明确“先不修改 App”期间不得实施。
+新方案不包含“人工审核视频后填充正式目录”这一步。本轮代码已实现上述交互；仍需通过 GitHub Actions 云构建、真实 Android 验收和个人站部署后才能称为本版本发布完成。
 
 ### A2：第三阶段只读审查
 
@@ -585,14 +585,13 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 
 ## 12. 当前工作结论
 
-在外部 Bilibili 搜索方案下，项目的正确下一步不是继续抓取或审核视频，而是：
+在外部 Bilibili 搜索方案下，代码实施已经完成，当前正确下一步是：
 
-1. 保留 `research/djnaughty/` 作为历史研究证据，不让 HTTP 412 阻塞 App；
-2. 等用户明确“开始实施”后，简化详情页 Bilibili 区域，只保留外部搜索按钮；
-3. 在真实 Android 设备上验证 Bilibili 客户端深链和 HTTPS 回退；
-4. 同时完成用户提出的 OCR、刷新、滚筒、详情页和其他交互修订；
-5. 重新 lint、导出、云构建并发布新版本；
-6. 将每个步骤和证据继续追加到本文档。
+1. 在真实 Android 设备上验证 Bilibili 客户端深链和 HTTPS 回退；
+2. 通过 GitHub Actions 对 `v1.3.0-alpha` 做 arm64 云构建，并由工作流上传 APK Release 资产；
+3. 更新 Cloudflare Worker 和下载页后部署到 `https://maimate.flya.ccwu.cc/`；
+4. 验证 APK 下载 URL、版本、包名、SHA-256 和页面文案；
+5. 将构建、部署和线上验证证据继续追加到本文档。
 
 当前不需要、也不允许把任何视频条目写入正式 App。
 
@@ -616,3 +615,15 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 可行性结论：可行。当前版本已有 HTTPS 搜索入口；新方案主要是删除空目录、单条视频操作和内部说明。客户端深链是否能在不同 Android/Bilibili 版本中稳定拉起，必须在实施阶段用真实设备验证，不能在设计阶段保证。
 - 人类需要确认：本条只代表设计方向，不代表已经开始改 App；在用户明确开工前保持源代码不变。
 - 下一步：用户确认后，按 A1 实施 UI 简化和深链回退，再进行 Expo SDK 57 兼容性检查、真机验证、lint、导出、云构建和发布记录。
+
+### 2026-08-18 — v1.3.0-alpha 代码实施完成，等待云构建部署
+
+- 用户目标：按已确认方案移除 App 内置视频，保留 Bilibili 外部搜索，并同时完成此前列出的交互修订。
+- 本步范围：实施 App 代码、依赖清理、版本号和 GitHub Actions 发布链路；不抓取 Bilibili，不新增视频数据。
+- 状态：代码已完成；云端构建、Release 资产和个人站部署待完成。
+- 实际修改：`app/src/components/BilibiliSearchPanel.tsx`、`app/src/data/bilibili-search.ts`、`app/app/index.tsx`、`app/app/random.tsx`、`app/app/song/[id].tsx`、`app/src/components/DrumRoll.tsx`、`app/src/components/TitleRecognizer.tsx`、`app/src/data/types.ts`、`app/src/components/index.ts`、`app/app.json`、`app/package.json`、`app/package-lock.json`、`app/.github/workflows/build-apk.yml`、`landing/_worker.js`、`landing/index.html`；删除旧的 `ChartVideoPanel`、`chart-videos.ts` 和 `expo-clipboard`。
+- 实际功能：Bilibili 客户端深链优先、HTTPS 回退；删除下拉刷新和全难度比较；滚筒点击停止、侧边曲绘不裁切、移除抽歌前老虎机图标；OCR 显示匹配文字、快速加入最高可用难度并在返回时恢复 OCR；Android 版本改为 `1.3.0`。
+- 验证证据：提交 `a74b19d933b01ffcdbe5e2689d8857a2612c6270`；`npm run lint` 成功；`npm ci --legacy-peer-deps --ignore-scripts --dry-run` 成功；`npx expo export --platform android` 成功；`git diff --check` 成功。尚未完成真实 Android 深链/相机验收和 GitHub Actions 云构建。
+- 发布设计：tag `v1.3.0-alpha` 触发 `.github/workflows/build-apk.yml`，工作流使用 `contents: write` 将 APK 上传到同名 GitHub Release；`landing/_worker.js` 已指向该 Release，Cloudflare Pages 部署脚本仍负责个人站发布。
+- 人类需要确认：本步没有把任何视频条目写入 App；云构建完成后仍需确认 APK 下载、版本、包名、SHA-256 和个人站线上结果。
+- 下一步：提交设计记录后推送 `main` 和 `v1.3.0-alpha`，等待 GitHub Actions 完成，下载/核验 Release APK，运行 `landing/deploy-download-site.sh` 部署个人站，再做线上 HTTP 验证。
