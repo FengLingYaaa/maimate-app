@@ -96,7 +96,7 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | `0ebf7f8 fix: make drum roll early stop idempotent` |
+| 当前提交 | `cd83ce2 fix: preserve draw button icon` |
 | 当前标签 | `v1.3.0-alpha`（修正待重新云构建） |
 | Android applicationId | `cc.flya.maimate` |
 | App 版本 | `1.3.0` |
@@ -656,3 +656,13 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 验证证据：提交 `0ebf7f8f6389bfcbdf5f96ccc1785530c106ce8e`；`npm run lint`、`npx expo export --platform android`、`git diff --check` 均成功。审查没有修改其他文件。
 - 人类需要确认：此次修正仍不代表真机验收完成；需沿用 `v1.3.0-alpha` 的 GitHub Actions/个人站发布链路重新生成 APK。
 - 下一步：提交本记录，推送 `main`，将 `v1.3.0-alpha` 更新到本修正，等待云构建成功后更新下载站 SHA 并验证固定 APK URL。
+
+### 2026-08-18 — 审查补充：保留抽歌按钮图标
+
+- 用户目标：只删除随机页无结果区域的预旋转 `🎰` 占位图标，不误删实际“抽一项”按钮上的操作图标。
+- 本步范围：恢复 `app/app/random.tsx` 抽歌按钮的 `🎰`，保留预旋转占位区删除结果；不改变滚筒空状态提示。
+- 状态：代码修正已完成，等待最终云构建和个人站更新。
+- 实际修改：`app/app/random.tsx`；按钮恢复为 `🎰 抽一项（...）`，旋转中仍显示 `🌀 旋转中...`。
+- 验证证据：提交 `cd83ce2a26a1d33a69ade3d9079bef00e1b494e6`；`npm run lint`、`npx expo export --platform android`、`git diff --check` 均成功。
+- 人类需要确认：最终 APK 必须来自包含本条修正的 tag，而不是上一轮已发布的 APK。
+- 下一步：将 tag 更新到本提交及同步设计记录，完成最后一次 GitHub Actions 云构建、APK 校验值更新和个人站验证。
