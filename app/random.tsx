@@ -4,6 +4,7 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, TextInput } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useMusicStore, usePlanStore } from '../src/store';
 import { DrumRoll, RangeSlider } from '../src/components';
 import { Colors, DifficultyColorMap, DifficultyLabels, MusicTypes } from '../src/constants';
@@ -23,11 +24,13 @@ function toggleValue<T extends string | number>(current: T | T[] | undefined, va
 }
 
 export default function RandomPicker() {
+  const router = useRouter();
   const rawData = useMusicStore(s => s.rawData);
   const planEntries = usePlanStore(s => s.entries);
 
   const [mode, setMode] = useState<DrawMode>('plan');
   const [filters, setFilters] = useState<FilterOptions>({});
+  const [showVersions, setShowVersions] = useState(false);
   const [animationItems, setAnimationItems] = useState<DrawCandidate[]>([]);
   const [animationResultIndex, setAnimationResultIndex] = useState<number | null>(null);
   const [spinning, setSpinning] = useState(false);
@@ -87,7 +90,7 @@ export default function RandomPicker() {
     const target = candidates[Math.floor(Math.random() * candidates.length)];
     const decoys = candidates.filter(candidate => candidate !== target);
     const displayItems: DrawCandidate[] = [];
-    for (let i = 0; i < 18; i += 1) {
+    for (let i = 0; i < 32; i += 1) {
       const source = decoys.length > 0 ? decoys[i % decoys.length] : target;
       displayItems.push(source);
     }
@@ -100,6 +103,11 @@ export default function RandomPicker() {
   const handleSpinEnd = useCallback(() => {
     setSpinning(false);
   }, []);
+
+  const handleResultPress = useCallback((musicId: string) => {
+    if (spinning) return;
+    router.push(`/song/${musicId}` as any);
+  }, [router, spinning]);
 
   const activeRange: [number, number] = filters.dsRange || [0, 15];
   const candidateLabel = mode === 'plan' ? `${candidates.length} 个计划谱面` : `${candidates.length} 个候选`;
@@ -184,17 +192,28 @@ export default function RandomPicker() {
             })}
           </View>
 
-          <Text style={styles.filterLabel}>版本</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {versions.map(version => {
-              const active = Array.isArray(filters.version) ? filters.version.includes(version) : filters.version === version;
-              return (
-                <Pressable key={version} style={[styles.chip, active && styles.chipActive]} onPress={() => updateFilters({ ...filters, version: toggleValue(filters.version, version) as FilterOptions['version'] })}>
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{version}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+          <View style={styles.expandHeader}>
+            <Text style={styles.filterLabel}>版本</Text>
+            <Pressable onPress={() => setShowVersions(value => !value)}>
+              <Text style={styles.expandText}>{showVersions ? '收起' : `展开全部（${versions.length}）`}</Text>
+            </Pressable>
+          </View>
+          {showVersions ? (
+            <View style={styles.chipRow}>
+              {versions.map(version => {
+                const active = Array.isArray(filters.version) ? filters.version.includes(version) : filters.version === version;
+                return (
+                  <Pressable key={version} style={[styles.chip, active && styles.chipActive]} onPress={() => updateFilters({ ...filters, version: toggleValue(filters.version, version) as FilterOptions['version'] })}>
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{version}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : (
+            <Text style={styles.collapsedHint}>
+              {Array.isArray(filters.version) ? `${filters.version.length} 个版本已选择` : filters.version || '未选择版本'}
+            </Text>
+          )}
 
           <Text style={styles.filterLabel}>曲师关键词</Text>
           <TextInput
@@ -222,6 +241,7 @@ export default function RandomPicker() {
             resultIndex={animationResultIndex}
             spinning={spinning}
             onSpinEnd={handleSpinEnd}
+            onResultPress={handleResultPress}
           />
         ) : (
           <View style={styles.placeholder}>
@@ -337,6 +357,21 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     marginTop: 8,
     marginBottom: 4,
+  },
+  expandHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  expandText: {
+    fontSize: 11,
+    color: Colors.accent.primary,
+    fontWeight: '700',
+  },
+  collapsedHint: {
+    fontSize: 11,
+    color: Colors.text.muted,
+    paddingVertical: 4,
   },
   chipRow: {
     flexDirection: 'row',

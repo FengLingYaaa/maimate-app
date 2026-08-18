@@ -12,11 +12,6 @@ interface Props {
   label?: string;
 }
 
-function roundToStep(value: number, step: number): number {
-  const decimals = step.toString().split('.')[1]?.length ?? 0;
-  return Number(value.toFixed(decimals));
-}
-
 export function RangeSlider({
   value,
   min = 0,
@@ -26,6 +21,13 @@ export function RangeSlider({
   label = '定数范围',
 }: Props) {
   const [lower, upper] = value;
+  // Android's native Slider can quantize the final decimal steps incorrectly.
+  // Store/render the slider in integer step units (0..150 for 0.0..15.0).
+  const scale = Math.round(1 / step);
+  const minUnit = Math.round(min * scale);
+  const maxUnit = Math.round(max * scale);
+  const lowerUnit = Math.round(lower * scale);
+  const upperUnit = Math.round(upper * scale);
 
   return (
     <View style={styles.container}>
@@ -37,15 +39,15 @@ export function RangeSlider({
         <Text style={styles.edge}>{min.toFixed(1)}</Text>
         <Slider
           style={styles.slider}
-          minimumValue={min}
-          maximumValue={max}
-          step={step}
-          value={lower}
+          minimumValue={minUnit}
+          maximumValue={maxUnit}
+          step={1}
+          value={lowerUnit}
           minimumTrackTintColor={Colors.accent.primary}
           maximumTrackTintColor={Colors.bg.tertiary}
           thumbTintColor={Colors.accent.primary}
           onValueChange={next => {
-            const nextLower = Math.min(roundToStep(next, step), upper);
+            const nextLower = Math.min(Number((next / scale).toFixed(1)), upper);
             onChange([nextLower, upper]);
           }}
         />
@@ -55,15 +57,15 @@ export function RangeSlider({
         <Text style={styles.edge}>{min.toFixed(1)}</Text>
         <Slider
           style={styles.slider}
-          minimumValue={min}
-          maximumValue={max}
-          step={step}
-          value={upper}
+          minimumValue={minUnit}
+          maximumValue={maxUnit}
+          step={1}
+          value={upperUnit}
           minimumTrackTintColor={Colors.accent.secondary}
           maximumTrackTintColor={Colors.bg.tertiary}
           thumbTintColor={Colors.accent.secondary}
           onValueChange={next => {
-            const nextUpper = Math.max(roundToStep(next, step), lower);
+            const nextUpper = Math.max(Number((next / scale).toFixed(1)), lower);
             onChange([lower, nextUpper]);
           }}
         />

@@ -16,11 +16,11 @@ interface Props {
 }
 
 const NOTE_COLORS = {
-  tap: '#43a047',
+  tap: '#ff6b9d',
   hold: '#fdd835',
-  slide: '#f44336',
-  touch: '#00d4ff',
-  brk: '#ff6b9d',
+  slide: '#4d8dff',
+  touch: '#43a047',
+  brk: '#ff9800',
 };
 
 const NOTE_LABELS = ['TAP', 'HOLD', 'SLIDE', 'TOUCH', 'BREAK'];

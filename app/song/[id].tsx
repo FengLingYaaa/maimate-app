@@ -3,7 +3,7 @@
  * 展示谱面信息、note分布、推分操作
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  Alert,
+  Modal,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useMusicStore, usePlanStore } from '../../src/store';
@@ -34,6 +34,9 @@ export default function SongDetail() {
   const music = rawData.find(m => m.id === id);
 
   const [selectedDiff, setSelectedDiff] = useState(0);
+  const [planModalVisible, setPlanModalVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!music) return;
@@ -41,37 +44,35 @@ export default function SongDetail() {
     setSelectedDiff(Math.max(0, highestAvailable));
   }, [music?.id, music?.charts.length, music?.ds.length, music?.level.length]);
 
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+  }, []);
+
+  const showToast = useCallback((message: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToastMessage(message);
+    toastTimer.current = setTimeout(() => setToastMessage(null), 1800);
+  }, []);
+
   const handleAddToPlan = useCallback(() => {
     if (!music) return;
+    setPlanModalVisible(true);
+  }, [music]);
+
+  const handlePlanConfirm = useCallback(() => {
+    if (!music) return;
     if (isInPlan(music.id, selectedDiff)) {
-      Alert.alert('已在计划中', '要从推分计划中移除吗？', [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '移除',
-          style: 'destructive',
-          onPress: () => removeEntry(music.id, selectedDiff),
-        },
-      ]);
+      removeEntry(music.id, selectedDiff);
+      showToast('已从推分计划移除');
     } else {
-      Alert.alert(
-        '添加到推分计划',
-        `将「${music.title}」${DifficultyLabels[selectedDiff]} 谱面加入推分计划？`,
-        [
-          { text: '取消', style: 'cancel' },
-          {
-            text: '添加',
-            onPress: () => {
-              addEntry({
-                songId: music.id,
-                difficultyIndex: selectedDiff,
-              });
-              Alert.alert('已添加', '已加入推分计划，可在「推分计划」标签页查看');
-            },
-          },
-        ]
-      );
+      addEntry({
+        songId: music.id,
+        difficultyIndex: selectedDiff,
+      });
+      showToast('已添加到推分计划');
     }
-  }, [music, selectedDiff, isInPlan, addEntry, removeEntry]);
+    setPlanModalVisible(false);
+  }, [music, selectedDiff, isInPlan, addEntry, removeEntry, showToast]);
 
   if (!music) {
     return (
@@ -206,7 +207,10 @@ export default function SongDetail() {
               <Text style={styles.sectionTitle}>全难度比较</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.compareRow}>
-                  {music.charts.map((c, i) => (
+                  {music.charts
+                    .map((c, i) => ({ chart: c, index: i }))
+                    .filter(({ index }) => index !== selectedDiff)
+                    .map(({ chart: c, index: i }) => (
                     <Pressable
                       key={i}
                       style={[styles.compareCard, selectedDiff === i && styles.compareCardActive]}
@@ -244,6 +248,41 @@ export default function SongDetail() {
           数据来源: Diving-Fish 舞萌DX查分器 (MIT)
         </Text>
       </ScrollView>
+
+      <Modal
+        transparent
+        visible={planModalVisible}
+        animationType="fade"
+        onRequestClose={() => setPlanModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.planModalCard}>
+            <Text style={styles.planModalTitle}>{inPlan ? '已在推分计划中' : '添加到推分计划'}</Text>
+            <Text style={styles.planModalMessage}>
+              {inPlan
+                ? `要从计划中移除「${music.title}」的${DifficultyLabels[selectedDiff]}谱面吗？`
+                : `将「${music.title}」的${DifficultyLabels[selectedDiff]}谱面加入推分计划？`}
+            </Text>
+            <View style={styles.planModalActions}>
+              <Pressable style={styles.planCancelButton} onPress={() => setPlanModalVisible(false)}>
+                <Text style={styles.planCancelText}>取消</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.planConfirmButton, inPlan && styles.planRemoveButton]}
+                onPress={handlePlanConfirm}
+              >
+                <Text style={styles.planConfirmText}>{inPlan ? '移除' : '添加'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {toastMessage && (
+        <View pointerEvents="none" style={styles.toast}>
+          <Text style={styles.toastText}>{toastMessage}</Text>
+        </View>
+      )}
     </>
   );
 }
@@ -490,6 +529,84 @@ const styles = StyleSheet.create({
   },
   actionBtnTextRemove: {
     color: Colors.functional.danger,
+  },
+  modalBackdrop: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    backgroundColor: 'rgba(0, 0, 0, 0.62)',
+  },
+  planModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    padding: 20,
+    borderRadius: 18,
+    backgroundColor: Colors.bg.secondary,
+    borderWidth: 1,
+    borderColor: Colors.border.accent,
+  },
+  planModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: Colors.text.primary,
+  },
+  planModalMessage: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 20,
+    color: Colors.text.secondary,
+  },
+  planModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 20,
+  },
+  planCancelButton: {
+    minWidth: 82,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: Colors.bg.tertiary,
+  },
+  planCancelText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.text.secondary,
+  },
+  planConfirmButton: {
+    minWidth: 82,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: Colors.accent.primary,
+  },
+  planRemoveButton: {
+    backgroundColor: Colors.functional.danger,
+  },
+  planConfirmText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  toast: {
+    position: 'absolute',
+    left: 24,
+    right: 24,
+    bottom: 34,
+    alignItems: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(25, 25, 34, 0.94)',
+  },
+  toastText: {
+    fontSize: 13,
+    color: '#fff',
+    fontWeight: '700',
   },
   // Attribution
   attribution: {

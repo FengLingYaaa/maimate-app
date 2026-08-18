@@ -69,6 +69,7 @@ export function FilterBar({
   charters,
 }: Props) {
   const [showModal, setShowModal] = useState(false);
+  const [showVersions, setShowVersions] = useState(false);
   const [localFilters, setLocalFilters] = useState<FilterOptions>({ ...filters });
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -193,7 +194,12 @@ export function FilterBar({
               </Pressable>
             </View>
 
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={styles.modalBody}
+              contentContainerStyle={styles.modalBodyContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
               <Text style={styles.sectionTitle}>分类</Text>
               <View style={styles.chipRow}>
                 {genres.map(genre => {
@@ -250,19 +256,30 @@ export function FilterBar({
                 })}
               </View>
 
-              <Text style={styles.sectionTitle}>版本</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollRow}>
-                {versions.map(version => {
-                  const active = Array.isArray(localFilters.version)
-                    ? localFilters.version.includes(version)
-                    : localFilters.version === version;
-                  return (
-                    <Pressable key={version} style={[styles.chip, active && styles.chipActive]} onPress={() => toggleVersion(version)}>
-                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{version}</Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
+              <View style={styles.expandHeader}>
+                <Text style={styles.sectionTitle}>版本</Text>
+                <Pressable onPress={() => setShowVersions(value => !value)}>
+                  <Text style={styles.expandText}>{showVersions ? '收起' : `展开全部（${versions.length}）`}</Text>
+                </Pressable>
+              </View>
+              {showVersions ? (
+                <View style={styles.chipRow}>
+                  {versions.map(version => {
+                    const active = Array.isArray(localFilters.version)
+                      ? localFilters.version.includes(version)
+                      : localFilters.version === version;
+                    return (
+                      <Pressable key={version} style={[styles.chip, active && styles.chipActive]} onPress={() => toggleVersion(version)}>
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{version}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : (
+                <Text style={styles.collapsedHint}>
+                  {Array.isArray(localFilters.version) ? `${localFilters.version.length} 个版本已选择` : localFilters.version || '未选择版本'}
+                </Text>
+              )}
 
               <Text style={styles.sectionTitle}>曲师</Text>
               <TextInput
@@ -398,8 +415,12 @@ const styles = StyleSheet.create({
     color: Colors.functional.danger,
   },
   modalBody: {
+    flexShrink: 1,
+  },
+  modalBodyContent: {
     paddingHorizontal: 20,
     paddingTop: 12,
+    paddingBottom: 32,
   },
   sectionTitle: {
     fontSize: 13,
@@ -415,6 +436,21 @@ const styles = StyleSheet.create({
   },
   scrollRow: {
     marginBottom: 8,
+  },
+  expandHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  expandText: {
+    fontSize: 11,
+    color: Colors.accent.primary,
+    fontWeight: '700',
+  },
+  collapsedHint: {
+    fontSize: 11,
+    color: Colors.text.muted,
+    paddingVertical: 6,
   },
   chip: {
     paddingHorizontal: 12,

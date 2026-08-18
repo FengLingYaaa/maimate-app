@@ -13,9 +13,10 @@ interface Props {
   music: MusicData;
   onPress?: (music: MusicData) => void;
   onLongPress?: (music: MusicData) => void;
+  highlightedDifficulties?: number[];
 }
 
-export const SongCard = memo(function SongCard({ music, onPress, onLongPress }: Props) {
+export const SongCard = memo(function SongCard({ music, onPress, onLongPress, highlightedDifficulties }: Props) {
   const coverId = parseInt(music.id, 10);
   const len5 = coverId > 10000 && coverId <= 11000
     ? (coverId - 10000).toString().padStart(5, '0')
@@ -51,7 +52,13 @@ export const SongCard = memo(function SongCard({ music, onPress, onLongPress }: 
         </View>
         <View style={styles.difficulties}>
           {music.level.map((lv, i) => (
-            <DifficultyBadge key={i} index={i} level={lv} size="sm" />
+            <DifficultyBadge
+              key={i}
+              index={i}
+              level={lv}
+              size="sm"
+              highlighted={highlightedDifficulties?.includes(i) ?? false}
+            />
           ))}
         </View>
       </View>

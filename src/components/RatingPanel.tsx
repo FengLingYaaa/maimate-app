@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { Colors } from '../constants';
 import { calculateRating, RATING_CHECKPOINTS } from '../data/rating';
@@ -11,17 +11,24 @@ interface Props {
 }
 
 export function RatingPanel({ ds, fitDiff, loading = false }: Props) {
-  const [achievement, setAchievement] = useState(100);
+  const [achievement, setAchievement] = useState(100.5);
+  const [showLowRate, setShowLowRate] = useState(false);
   const checkpoints = useMemo(
-    () => RATING_CHECKPOINTS.map(rate => ({
+    () => RATING_CHECKPOINTS
+      .filter(rate => showLowRate || rate >= 97)
+      .map(rate => ({
       rate,
       official: calculateRating(ds, rate),
       fitted: fitDiff === undefined ? null : calculateRating(fitDiff, rate),
     })),
-    [ds, fitDiff],
+    [ds, fitDiff, showLowRate],
   );
   const official = calculateRating(ds, achievement);
   const fitted = fitDiff === undefined ? null : calculateRating(fitDiff, achievement);
+  const toggleLowRate = () => {
+    if (showLowRate && achievement < 97) setAchievement(97);
+    setShowLowRate(value => !value);
+  };
 
   return (
     <View style={styles.container}>
@@ -34,17 +41,39 @@ export function RatingPanel({ ds, fitDiff, loading = false }: Props) {
         <Text style={styles.rateLabel}>完成率</Text>
         <Text style={styles.rateValue}>{achievement.toFixed(1)}%</Text>
       </View>
+      <Text style={styles.sliderCaption}>主要区间：97.0%～100.5%</Text>
       <Slider
         style={styles.slider}
-        minimumValue={50}
+        minimumValue={97}
         maximumValue={100.5}
         step={0.1}
-        value={achievement}
+        value={Math.max(97, achievement)}
         minimumTrackTintColor={Colors.accent.primary}
         maximumTrackTintColor={Colors.bg.tertiary}
         thumbTintColor={Colors.accent.primary}
         onValueChange={value => setAchievement(Number(value.toFixed(1)))}
       />
+      <Pressable style={styles.lowRateToggle} onPress={toggleLowRate}>
+        <Text style={styles.lowRateToggleText}>
+          {showLowRate ? '收起 50.0%～97.0% 低分段' : '展开 50.0%～97.0% 低分段'}
+        </Text>
+      </Pressable>
+      {showLowRate && (
+        <>
+          <Text style={styles.sliderCaption}>低分区间：50.0%～97.0%</Text>
+          <Slider
+            style={styles.slider}
+            minimumValue={50}
+            maximumValue={97}
+            step={0.1}
+            value={Math.min(97, achievement)}
+            minimumTrackTintColor={Colors.accent.secondary}
+            maximumTrackTintColor={Colors.bg.tertiary}
+            thumbTintColor={Colors.accent.secondary}
+            onValueChange={value => setAchievement(Number(value.toFixed(1)))}
+          />
+        </>
+      )}
       <View style={styles.currentRow}>
         <View style={styles.currentBox}>
           <Text style={styles.currentLabel}>官方 DX Rating</Text>
@@ -117,6 +146,19 @@ const styles = StyleSheet.create({
   },
   slider: {
     height: 30,
+  },
+  sliderCaption: {
+    fontSize: 10,
+    color: Colors.text.muted,
+  },
+  lowRateToggle: {
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+  },
+  lowRateToggleText: {
+    fontSize: 11,
+    color: Colors.accent.secondary,
+    fontWeight: '700',
   },
   currentRow: {
     flexDirection: 'row',

@@ -61,6 +61,9 @@ export const Versions = [
 /** Prober API 基础 URL */
 export const PROBER_API_BASE = 'https://www.diving-fish.com/api/maimaidxprober';
 
+/** 缓存超过 12 小时后进入后台刷新流程。 */
+export const CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+
 /** 封面图 URL 模板 */
 export const COVER_BASE = 'https://www.diving-fish.com/covers';
 
@@ -74,8 +77,10 @@ export function getCoverUrl(id: string): string {
 /** 本地缓存键 */
 export const CACHE_KEYS = {
   musicData: 'maimate_music_data',
+  // 兼容已有版本，同时作为音乐数据缓存的写入时间。
   musicDataVersion: 'maimate_music_version',
   chartStats: 'maimate_chart_stats',
+  chartStatsVersion: 'maimate_chart_stats_version',
   planData: 'maimate_plan_data',
   settings: 'maimate_settings',
 } as const;

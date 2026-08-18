@@ -4,19 +4,26 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
-import { View, Text, FlatList, StyleSheet, Pressable, RefreshControl } from 'react-native';
+import { View, Text, FlatList, StyleSheet, Pressable, RefreshControl, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMusicStore } from '../src/store';
 import { SongCard, FilterBar } from '../src/components';
 import { Colors } from '../src/constants';
-import { MusicList } from '../src/data/music-list';
+import { getMatchingDifficultyIndices, MusicList } from '../src/data/music-list';
 import type { FilterOptions, MusicData } from '../src/data/types';
+
+function formatCacheTime(timestamp: number | null): string {
+  if (!timestamp) return '尚未同步';
+  return new Date(timestamp).toLocaleString();
+}
 
 export default function SongBrowser() {
   const router = useRouter();
   const rawData = useMusicStore(s => s.rawData);
   const musicList = useMusicStore(s => s.musicList);
   const loading = useMusicStore(s => s.loading);
+  const updating = useMusicStore(s => s.updating);
+  const cacheTimestamp = useMusicStore(s => s.cacheTimestamp);
   const error = useMusicStore(s => s.error);
   const filters = useMusicStore(s => s.filters);
   const applyFilters = useMusicStore(s => s.applyFilters);
@@ -40,6 +47,10 @@ export default function SongBrowser() {
     loadData(true);
   }, [loadData]);
 
+  const openDownloadSite = useCallback(() => {
+    void Linking.openURL('https://maimate.flya.ccwu.cc/');
+  }, []);
+
   const getPreviewCount = useCallback((nextFilters: FilterOptions) => {
     return new MusicList(rawData).filter(nextFilters).length;
   }, [rawData]);
@@ -52,12 +63,25 @@ export default function SongBrowser() {
     router.push(`/song/${music.id}` as any);
   }, [router]);
 
+  const hasChartHighlightFilter = Boolean(
+    filters.charter?.trim()
+      || filters.difficulty !== undefined
+      || filters.level !== undefined
+      || filters.dsRange !== undefined,
+  );
+
   return (
     <View style={styles.container}>
       {/* 顶部标题 */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>🎵 曲库</Text>
-        <Text style={styles.headerSub}>{rawData.length} 首歌曲</Text>
+        <View style={styles.headerTop}>
+          <Text style={styles.headerTitle}>🎵 曲库</Text>
+          <Pressable style={styles.updateButton} onPress={openDownloadSite} accessibilityRole="button">
+            <Text style={styles.updateButtonText}>更新 / 下载</Text>
+          </Pressable>
+        </View>
+        <Text style={styles.headerSub}>{rawData.length} 首歌曲 · 更新于 {formatCacheTime(cacheTimestamp)}</Text>
+        {updating && <Text style={styles.updatingText}>正在后台同步 Diving-Fish 曲库…</Text>}
         {error && (
           <Text style={styles.errorText}>{error}</Text>
         )}
@@ -87,13 +111,14 @@ export default function SongBrowser() {
               music={item}
               onPress={handleSongPress}
               onLongPress={handleSongLongPress}
+              highlightedDifficulties={hasChartHighlightFilter ? getMatchingDifficultyIndices(item, filters) : undefined}
             />
           </View>
         )}
         contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl
-            refreshing={loading}
+            refreshing={loading || updating}
             onRefresh={handleRefresh}
             tintColor={Colors.accent.primary}
             colors={[Colors.accent.primary]}
@@ -126,15 +151,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 4,
   },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   headerTitle: {
     fontSize: 26,
     fontWeight: '800',
     color: Colors.text.primary,
   },
+  updateButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: `${Colors.accent.primary}22`,
+    borderWidth: 1,
+    borderColor: Colors.accent.primary,
+  },
+  updateButtonText: {
+    fontSize: 11,
+    color: Colors.accent.primary,
+    fontWeight: '800',
+  },
   headerSub: {
     fontSize: 13,
     color: Colors.text.muted,
     marginTop: 2,
+  },
+  updatingText: {
+    fontSize: 11,
+    color: Colors.accent.secondary,
+    marginTop: 4,
   },
   errorText: {
     fontSize: 11,
