@@ -3,7 +3,7 @@
 > 文档性质：项目事实基线、产品设计、工程约束和持续变更记录。
 > 最后更新：2026-08-18
 > 当前版本：`v1.3.0-alpha`
-> 当前状态：第一、第二阶段完成；第三阶段基础代码完成；外部 Bilibili 搜索和交互修订已实现，云端构建与个人站部署待验证。
+> 当前状态：第一、第二阶段完成；第三阶段基础代码和 v1.3.0-alpha 云端发布完成；外部 Bilibili 搜索和交互修订已实现，真机验收仍待设备。
 > GitHub：<https://github.com/FengLingYaaa/maimate-app>
 
 这份文档的目标不是只描述“理想中的产品”，而是让人类或新对话中的智能体能够回答：
@@ -97,7 +97,7 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
 | 当前提交 | `5759b60 fix: name release asset for download site` |
-| 当前标签 | `v1.3.0-alpha`（待云构建/发布） |
+| 当前标签 | `v1.3.0-alpha`（云构建/个人站已发布） |
 | Android applicationId | `cc.flya.maimate` |
 | App 版本 | `1.3.0` |
 | 下载站 | <https://maimate.flya.ccwu.cc/> |
@@ -125,16 +125,16 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 | 顺时针曲绘滚筒 | 已完成基础版本 | `src/components/DrumRoll.tsx`，动画中多次切换封面 |
 | Bilibili 外部搜索入口 | 本轮已实现 | 优先尝试 `bilibili://search`，失败回退 HTTPS 搜索；不在 App 内置视频目录 |
 | OCR 拍照识别 | 已完成基础版本 | ML Kit；中文/日文/拉丁文字；只匹配曲名 |
-| APK 发布链路 | 已完成当前版本 | GitHub Actions → GitHub Release → Cloudflare Worker 下载站 |
+| APK 发布链路 | v1.3.0-alpha 已完成 | GitHub Actions → GitHub Release `MaiMate-latest.apk` → Cloudflare Worker 下载站 |
 
 ### 3.3 已完成但仍需人工验收的能力
 
-第三阶段基础代码已经发布，本轮实现已完成；下列内容仍需发布前验证：
+代码、静态检查、云构建和线上下载链路已经完成；仍需真实 Android 设备做最后验收：
 
 - Bilibili 客户端深链是否在真实 Android/Bilibili 版本组合中成功打开搜索；
 - 深链失败时 HTTPS 搜索回退是否在真实设备上可用；
 - OCR 相机、快速加入计划、详情返回 OCR 和随机动画需要真机验收；
-- 需要完成一次只读的 TypeScript、Expo SDK 57、运行时和隐私边界审查。
+- 本会话没有连接 Android 设备（`adb devices` 为空），因此以上真机结果不能虚报为已验证。
 
 ---
 
@@ -413,7 +413,7 @@ interface ChartData {
 - 不把研究文件作为 App 构建或发布前置条件；
 - 不把任何研究结果自动写入 App，也不生成 `app/src/data/bilibili-search.ts` 之外的视频数据文件。
 
-### A1：用户提出的下一版交互修订（本轮已实现，等待构建/真机验收）
+### A1：用户提出的下一版交互修订（代码和云发布已完成，等待真机验收）
 
 1. 将 Bilibili 区域简化为一个“去 Bilibili 搜索该谱面”按钮，删除内部说明文字；
 2. 删除视频列表、视频类型、UP 主、单条打开、复制链接和“暂无已确认的视频”状态；
@@ -585,13 +585,12 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 
 ## 12. 当前工作结论
 
-在外部 Bilibili 搜索方案下，代码实施已经完成，当前正确下一步是：
+在外部 Bilibili 搜索方案下，v1.3.0-alpha 的代码、云构建、Release 和个人站部署已经完成，当前正确下一步是：
 
-1. 在真实 Android 设备上验证 Bilibili 客户端深链和 HTTPS 回退；
-2. 通过 GitHub Actions 对 `v1.3.0-alpha` 做 arm64 云构建，并由工作流上传 APK Release 资产；
-3. 更新 Cloudflare Worker 和下载页后部署到 `https://maimate.flya.ccwu.cc/`；
-4. 验证 APK 下载 URL、版本、包名、SHA-256 和页面文案；
-5. 将构建、部署和线上验证证据继续追加到本文档。
+1. 若接入 Android 设备，验证 Bilibili 客户端深链和 HTTPS 回退；
+2. 真机验收 OCR 相机、快速加入计划、详情返回 OCR 和随机抽歌点击停止；
+3. 保持 `research/djnaughty/` 为历史研究证据，不恢复自动抓取或内置视频目录；
+4. 后续每次设计、研究、代码或发布步骤继续追加到本文档。
 
 当前不需要、也不允许把任何视频条目写入正式 App。
 
@@ -632,8 +631,18 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 
 - 用户目标：确保云构建产物能被个人站 Worker 以固定路径 `/MaiMate-latest.apk` 下载。
 - 本步范围：修正 `.github/workflows/build-apk.yml` 的 Release 上传文件名，并重新触发同一 release tag；不改变 App 功能。
-- 状态：进行中，等待第二次 GitHub Actions 运行完成。
+- 状态：已完成。
 - 实际修改：工作流先复制 Gradle APK 到 `${RUNNER_TEMP}/MaiMate-latest.apk`，再创建/覆盖同名 GitHub Release 资产；提交 `5759b603e27bb4b842f9aedbeb6a5201940ebe58`，`v1.3.0-alpha` 已更新到该提交并推送。
-- 验证证据：第一次运行 `32169009368` 使用旧资产名，第二次运行 `32169500810` 已排队等待同一并发组；Cloudflare `wrangler whoami` 成功，个人站部署脚本 `bash -n` 成功。
-- 人类需要确认：仍需等待第二次构建成功并检查 Release 资产名、APK SHA-256、下载站 HTTP 响应。
-- 下一步：获取 run `32169500810` 的结果和 Release APK，更新 `landing/MaiMate-latest.apk.sha256`/页面信息，执行 `landing/deploy-download-site.sh`，再验证下载站。
+- 验证证据：第一次运行 `32169009368` 成功但仅上传了旧名 `app-release.apk`；第二次运行 `32169500810` 以 `5759b60` 成功完成，固定资产 URL 返回 200；APK 为 59,889,321 bytes，SHA-256 为 `7144f9a14d08f719fa141a8baf1caa05b4f818a43676de1f69bc751a554c485a`；Cloudflare `wrangler whoami` 成功，个人站部署脚本 `bash -n` 成功。
+- 人类需要确认：云构建和线上下载链路已完成；真机安装、OCR 相机和 Bilibili 深链仍需 Android 设备验收。
+- 下一步：保留 Release/下载站证据，若接入 Android 设备再完成深链、HTTPS 回退、OCR 返回和随机抽歌的真机回归。
+
+### 2026-08-18 — v1.3.0-alpha 云构建、Release 和个人站部署完成
+
+- 用户目标：完成代码后必须使用 GitHub Actions 云构建，并部署到个人站，不能只停留在本地导出。
+- 本步范围：下载云端 Release APK，更新下载页校验信息，部署 Cloudflare Pages/Worker，并验证公开页面和 APK 代理。
+- 状态：已完成；发布链路可用，真机验收因无连接设备保留为后续事项。
+- 实际修改：`landing/MaiMate-latest.apk`、`landing/MaiMate-latest.apk.sha256`、`landing/index.html`；`landing/_worker.js` 已指向 `v1.3.0-alpha/MaiMate-latest.apk`；工作区 `README.md` 已更新当前 Release。
+- 验证证据：GitHub Actions run `32169500810` success，Release 页面为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.3.0-alpha>；APK 59,889,321 bytes，SHA-256 `7144f9a14d08f719fa141a8baf1caa05b4f818a43676de1f69bc751a554c485a`；`landing/deploy-download-site.sh` 部署成功，预览地址为 <https://a1460cb5.maimate-landing.pages.dev>；生产页 <https://maimate.flya.ccwu.cc/> 显示 `v1.3.0-alpha` 和同一 SHA；`GET/HEAD https://maimate.flya.ccwu.cc/MaiMate-latest.apk` 返回 HTTP 200、`application/vnd.android.package-archive`、`content-length: 59889321`、固定附件名；完整下载后的 SHA 与本地 Release APK 一致。
+- 人类需要确认：本会话 `adb devices` 只有标题行、没有设备，因此没有虚报安装、相机、Bilibili 深链或 HTTPS 回退的真机结果。
+- 下一步：若提供 Android 设备，完成深链优先/HTTPS 回退、OCR 快速加入和返回恢复、随机抽歌点击停止的真机回归；不恢复 Bilibili 自动抓取或内置视频目录。
