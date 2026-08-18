@@ -96,8 +96,8 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | `cd83ce2 fix: preserve draw button icon` |
-| 当前标签 | `v1.3.0-alpha`（修正待重新云构建） |
+| 当前提交 | `24c94e8 docs: record final random-page icon correction` |
+| 当前标签 | `v1.3.0-alpha`（最终修正版已云构建/个人站已发布） |
 | Android applicationId | `cc.flya.maimate` |
 | App 版本 | `1.3.0` |
 | 下载站 | <https://maimate.flya.ccwu.cc/> |
@@ -666,3 +666,13 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 验证证据：提交 `cd83ce2a26a1d33a69ade3d9079bef00e1b494e6`；`npm run lint`、`npx expo export --platform android`、`git diff --check` 均成功。
 - 人类需要确认：最终 APK 必须来自包含本条修正的 tag，而不是上一轮已发布的 APK。
 - 下一步：将 tag 更新到本提交及同步设计记录，完成最后一次 GitHub Actions 云构建、APK 校验值更新和个人站验证。
+
+### 2026-08-18 — 最终审查修正版云构建与个人站更新完成
+
+- 用户目标：确保后台审查指出的 DrumRoll 提前停止竞态和随机页图标误删都进入最终 APK，并重新完成云构建与个人站部署。
+- 本步范围：以 `24c94e8ce9481581cafe6a7b19a8c6c8c37c0c72` 为 `v1.3.0-alpha` 最终 tag，执行 GitHub Actions、更新固定 Release 资产和 Cloudflare Worker 下载站。
+- 状态：已完成；最终 APK 已发布，真机验收仍因没有连接设备而保留。
+- 实际修改：最终 APK 为 `59889781` bytes；`landing/MaiMate-latest.apk.sha256` 更新为 `9764119d96a5f0620f913e8675b433a7f544d062333b0fb841485221a5be5196`；`landing/index.html` 同步更新校验值；设计副本继续保持同步。
+- 验证证据：GitHub Actions run `32173744736` success，构建提交为 `24c94e8ce9481581cafe6a7b19a8c6c8c37c0c72`；固定 Release URL 返回成功；`landing/deploy-download-site.sh` 部署成功，预览地址为 <https://66b1a735.maimate-landing.pages.dev>；生产首页 <https://maimate.flya.ccwu.cc/> 显示 `v1.3.0-alpha` 和新 SHA；APK 返回 HTTP 200、`content-length: 59889781`、`application/vnd.android.package-archive`、固定附件名；完整下载后的 SHA 与本地 APK 一致。
+- 人类需要确认：`adb devices` 仍没有 Android 设备，不能把 Bilibili 深链、HTTPS 回退、OCR 相机、OCR 返回和随机点击停止宣称为真机已验收。
+- 下一步：接入 Android 设备后做最后回归；继续保持不抓取 Bilibili、不内置视频目录的产品边界。
