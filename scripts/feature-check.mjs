@@ -4,7 +4,12 @@ import { getMusicPlatformAppUrls, getMusicPlatformSearchUrl } from '../src/data/
 import { getChinaVersionOptions, getVersionOptions } from '../src/data/version-catalog.ts';
 import { buildPlateEntries, getPlateMask, getPlateChinaVersionOptions, summarizePlates, PLATE_BITS } from '../src/data/plates.ts';
 import { canDragPlanRows, reorderVisibleEntries } from '../src/data/plan-order.ts';
-import { getBilibiliCoverCacheFilename, getBilibiliCoverExtension, isBilibiliCoverCacheFileForLink } from '../src/data/bilibili-cover-cache.ts';
+import {
+  getBilibiliCoverCacheFilename,
+  getBilibiliCoverExtension,
+  isBilibiliCoverCacheFileForLink,
+  isLegacyBilibiliCoverUri,
+} from '../src/data/bilibili-cover-cache.ts';
 
 const share = parseBilibiliShare('【第一人称maimai/舞萌 Trick tear 紫14.4 sss+ 手元-哔哩哔哩】 https://b23.tv/TdQjEN6');
 assert.equal(share?.url, 'https://b23.tv/TdQjEN6');
@@ -21,9 +26,12 @@ const coverA = 'https://i0.hdslb.com/bfs/archive/cover-a.jpg?x=1';
 const coverB = 'https://i0.hdslb.com/bfs/archive/cover-b.jpg?x=2';
 assert.notEqual(getBilibiliCoverCacheFilename(coverLinkId, coverA), getBilibiliCoverCacheFilename(coverLinkId, coverB));
 assert.equal(getBilibiliCoverCacheFilename(coverLinkId, coverA), getBilibiliCoverCacheFilename(coverLinkId, coverA));
+assert.notEqual(getBilibiliCoverCacheFilename(coverLinkId, coverA, 1), getBilibiliCoverCacheFilename(coverLinkId, coverA, 2));
 assert.equal(getBilibiliCoverExtension('https://example.com/cover.webp?width=400'), '.webp');
 assert.equal(isBilibiliCoverCacheFileForLink(`${encodeURIComponent(coverLinkId)}.jpg`, coverLinkId), true);
 assert.equal(isBilibiliCoverCacheFileForLink(`${encodeURIComponent(coverLinkId)}.webp`, coverLinkId), true);
+assert.equal(isLegacyBilibiliCoverUri(`file:///cache/bilibili-covers/${encodeURIComponent(coverLinkId)}.webp`, coverLinkId), true);
+assert.equal(isLegacyBilibiliCoverUri(getBilibiliCoverCacheFilename(coverLinkId, coverA, 1), coverLinkId), false);
 assert.equal(isBilibiliCoverCacheFileForLink(getBilibiliCoverCacheFilename(coverLinkId, coverA), coverLinkId), true);
 assert.equal(isBilibiliCoverCacheFileForLink('other-link-deadbeef.jpg', coverLinkId), false);
 

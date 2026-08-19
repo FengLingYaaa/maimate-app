@@ -9,6 +9,7 @@ import {
   normalizeBilibiliVideoUrl,
   parseBilibiliShare,
 } from '../data/bilibili-links';
+import { isLegacyBilibiliCoverUri } from '../data/bilibili-cover-cache';
 import {
   downloadBilibiliCover,
   fetchBilibiliMetadata,
@@ -27,8 +28,26 @@ interface BilibiliStore {
   getLinksForChart: (songId: string, musicType: 'SD' | 'DX', difficultyIndex: number) => BilibiliVideoLink[];
 }
 
-async function persist(links: BilibiliVideoLink[]): Promise<void> {
-  await AsyncStorage.setItem(CACHE_KEYS.bilibiliLinks, JSON.stringify(links));
+let persistQueue: Promise<void> = Promise.resolve();
+
+function persist(links: BilibiliVideoLink[]): Promise<void> {
+  const serialized = JSON.stringify(links);
+  persistQueue = persistQueue
+    .catch(() => undefined)
+    .then(() => AsyncStorage.setItem(CACHE_KEYS.bilibiliLinks, serialized));
+  return persistQueue;
+}
+
+const metadataGenerations = new Map<string, number>();
+
+function beginMetadataRequest(id: string): number {
+  const next = (metadataGenerations.get(id) || 0) + 1;
+  metadataGenerations.set(id, next);
+  return next;
+}
+
+function isCurrentMetadataRequest(id: string, generation: number): boolean {
+  return metadataGenerations.get(id) === generation;
 }
 
 function normalizeLoadedLink(value: unknown): BilibiliVideoLink | null {
@@ -56,10 +75,25 @@ export const useBilibiliStore = create<BilibiliStore>((set, get) => ({
     try {
       const raw = await AsyncStorage.getItem(CACHE_KEYS.bilibiliLinks);
       const parsed = raw ? JSON.parse(raw) : [];
-      const links = Array.isArray(parsed)
+      const normalizedLinks = Array.isArray(parsed)
         ? parsed.map(normalizeLoadedLink).filter((link): link is BilibiliVideoLink => link !== null)
         : [];
+      const idsToInvalidate = new Set([
+        ...get().links.map(link => link.id),
+        ...normalizedLinks.map(link => link.id),
+      ]);
+      idsToInvalidate.forEach(id => beginMetadataRequest(id));
+      const legacyCoverUris = normalizedLinks
+        .filter(link => isLegacyBilibiliCoverUri(link.coverUri, link.id))
+        .map(link => link.coverUri as string);
+      const links = normalizedLinks.map(link => isLegacyBilibiliCoverUri(link.coverUri, link.id)
+        ? { ...link, coverUri: undefined, metadataStatus: 'idle' as const }
+        : link);
       set({ links, loaded: true });
+      if (legacyCoverUris.length > 0) {
+        await persist(links);
+        await Promise.all(legacyCoverUris.map(uri => removeBilibiliCover(uri)));
+      }
     } catch {
       set({ links: [], loaded: true });
     }
@@ -94,9 +128,12 @@ export const useBilibiliStore = create<BilibiliStore>((set, get) => ({
     const normalizedUrl = patch.url === undefined ? current.url : normalizeBilibiliVideoUrl(patch.url);
     if (!normalizedUrl) throw new Error('请输入有效的 Bilibili 视频分享链接');
     const urlChanged = normalizedUrl !== current.url;
-    // Clear every legacy and source-keyed cover before changing the URL. This prevents an
-    // in-flight metadata request for the old URL from leaving a reusable stale file behind.
-    if (urlChanged) await removeBilibiliCoversForLink(id);
+    // Changing the URL invalidates every older metadata response, including A → B → A edits.
+    if (urlChanged) {
+      beginMetadataRequest(id);
+      // Clear every legacy and source-keyed cover before changing the URL.
+      await removeBilibiliCoversForLink(id);
+    }
     const links = get().links.map(link => {
       if (link.id !== id) return link;
       return {
@@ -120,6 +157,7 @@ export const useBilibiliStore = create<BilibiliStore>((set, get) => ({
   refreshMetadata: async id => {
     const current = get().links.find(link => link.id === id);
     if (!current) return;
+    const requestGeneration = beginMetadataRequest(id);
     const requestUrl = current.url;
     const loading = get().links.map(link => link.id === id ? { ...link, metadataStatus: 'loading' as const } : link);
     set({ links: loading });
@@ -127,18 +165,17 @@ export const useBilibiliStore = create<BilibiliStore>((set, get) => ({
     try {
       const metadata = await fetchBilibiliMetadata(requestUrl);
       const latest = get().links.find(link => link.id === id);
-      // Editing or deleting a link invalidates any metadata request started for its old URL.
-      if (!latest || latest.url !== requestUrl) return;
+      if (!isCurrentMetadataRequest(id, requestGeneration) || !latest || latest.url !== requestUrl) return;
       const coverChanged = Boolean(latest.coverUri && latest.coverSourceUrl && metadata.coverUrl && latest.coverSourceUrl !== metadata.coverUrl);
-      if (coverChanged) await removeBilibiliCover(latest.coverUri);
+      if (coverChanged) {
+        await removeBilibiliCover(latest.coverUri);
+        if (!isCurrentMetadataRequest(id, requestGeneration)) return;
+      }
       const downloadedCoverUri = metadata.coverUrl
-        ? await downloadBilibiliCover(id, metadata.coverUrl).catch(() => undefined)
+        ? await downloadBilibiliCover(id, metadata.coverUrl, requestGeneration).catch(() => undefined)
         : latest.coverUri;
       const afterDownload = get().links.find(link => link.id === id);
-      if (!afterDownload || afterDownload.url !== requestUrl) {
-        if (downloadedCoverUri && downloadedCoverUri !== afterDownload?.coverUri) await removeBilibiliCover(downloadedCoverUri);
-        return;
-      }
+      if (!isCurrentMetadataRequest(id, requestGeneration) || !afterDownload || afterDownload.url !== requestUrl) return;
       const nextCoverUri = coverChanged ? downloadedCoverUri : (downloadedCoverUri || afterDownload.coverUri);
       const next = get().links.map(link => link.id === id ? {
         ...link,
@@ -153,7 +190,7 @@ export const useBilibiliStore = create<BilibiliStore>((set, get) => ({
       await persist(next);
     } catch {
       const latest = get().links.find(link => link.id === id);
-      if (!latest || latest.url !== requestUrl) return;
+      if (!isCurrentMetadataRequest(id, requestGeneration) || !latest || latest.url !== requestUrl) return;
       const next = get().links.map(link => link.id === id ? {
         ...link,
         metadataStatus: 'error' as const,
@@ -166,6 +203,7 @@ export const useBilibiliStore = create<BilibiliStore>((set, get) => ({
   },
 
   removeLink: async id => {
+    beginMetadataRequest(id);
     const links = get().links.filter(link => link.id !== id);
     set({ links });
     await persist(links);

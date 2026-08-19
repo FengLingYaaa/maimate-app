@@ -16,12 +16,22 @@ export function getBilibiliCoverExtension(coverUrl: string): string {
   return extension ? `.${extension.toLowerCase()}` : DEFAULT_EXTENSION;
 }
 
-export function getBilibiliCoverCacheFilename(linkId: string, coverUrl: string): string {
-  return `${encodeURIComponent(linkId)}-${hashCoverSource(coverUrl)}${getBilibiliCoverExtension(coverUrl)}`;
+export function getBilibiliCoverCacheFilename(linkId: string, coverUrl: string, generation?: number | string): string {
+  const generationSuffix = generation === undefined ? '' : `-${generation}`;
+  return `${encodeURIComponent(linkId)}-${hashCoverSource(coverUrl)}${generationSuffix}${getBilibiliCoverExtension(coverUrl)}`;
+}
+
+export function isLegacyBilibiliCoverFileForLink(fileName: string, linkId: string): boolean {
+  const encodedId = encodeURIComponent(linkId);
+  return LEGACY_EXTENSIONS.some(extension => fileName === `${encodedId}${extension}`);
+}
+
+export function isLegacyBilibiliCoverUri(uri: string | undefined, linkId: string): boolean {
+  if (!uri) return false;
+  return isLegacyBilibiliCoverFileForLink(uri.split('/').pop() || '', linkId);
 }
 
 export function isBilibiliCoverCacheFileForLink(fileName: string, linkId: string): boolean {
   const encodedId = encodeURIComponent(linkId);
-  return LEGACY_EXTENSIONS.some(extension => fileName === `${encodedId}${extension}`)
-    || fileName.startsWith(`${encodedId}-`);
+  return isLegacyBilibiliCoverFileForLink(fileName, linkId) || fileName.startsWith(`${encodedId}-`);
 }

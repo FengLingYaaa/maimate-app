@@ -84,16 +84,37 @@ export async function fetchBilibiliMetadata(url: string): Promise<BilibiliMetada
   return { canonicalUrl: finalUrl, title, coverUrl };
 }
 
-export async function downloadBilibiliCover(linkId: string, coverUrl: string): Promise<string | undefined> {
+export async function downloadBilibiliCover(linkId: string, coverUrl: string, generation: number): Promise<string | undefined> {
   const cacheDirectory = FileSystem.cacheDirectory;
   if (!cacheDirectory || !/^https:\/\//i.test(coverUrl)) return undefined;
   const directory = `${cacheDirectory}bilibili-covers/`;
   await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
-  const destination = `${directory}${getBilibiliCoverCacheFilename(linkId, coverUrl)}`;
-  const existing = await FileSystem.getInfoAsync(destination);
-  if (existing.exists) return destination;
-  const result = await FileSystem.downloadAsync(coverUrl, destination);
-  return result.status >= 200 && result.status < 300 ? result.uri : undefined;
+  // The request nonce makes React Native observe a new local URI even when the CDN URL is unchanged.
+  const nonce = `${generation}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const destination = `${directory}${getBilibiliCoverCacheFilename(linkId, coverUrl, nonce)}`;
+  const temporary = `${destination}.download`;
+  let temporaryUri = temporary;
+  try {
+    const result = await FileSystem.downloadAsync(coverUrl, temporary, {
+      cache: false,
+      headers: { 'Cache-Control': 'no-cache' },
+    });
+    temporaryUri = result.uri;
+    if (result.status < 200 || result.status >= 300) {
+      await FileSystem.deleteAsync(temporaryUri, { idempotent: true });
+      return undefined;
+    }
+    await FileSystem.deleteAsync(destination, { idempotent: true });
+    await FileSystem.moveAsync({ from: temporaryUri, to: destination });
+    return destination;
+  } catch {
+    try {
+      await FileSystem.deleteAsync(temporaryUri, { idempotent: true });
+    } catch {
+      // Temporary-file cleanup is best effort.
+    }
+    return undefined;
+  }
 }
 
 export async function removeBilibiliCoversForLink(linkId: string): Promise<void> {
