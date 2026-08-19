@@ -23,6 +23,7 @@ assert.notEqual(getBilibiliCoverCacheFilename(coverLinkId, coverA), getBilibiliC
 assert.equal(getBilibiliCoverCacheFilename(coverLinkId, coverA), getBilibiliCoverCacheFilename(coverLinkId, coverA));
 assert.equal(getBilibiliCoverExtension('https://example.com/cover.webp?width=400'), '.webp');
 assert.equal(isBilibiliCoverCacheFileForLink(`${encodeURIComponent(coverLinkId)}.jpg`, coverLinkId), true);
+assert.equal(isBilibiliCoverCacheFileForLink(`${encodeURIComponent(coverLinkId)}.webp`, coverLinkId), true);
 assert.equal(isBilibiliCoverCacheFileForLink(getBilibiliCoverCacheFilename(coverLinkId, coverA), coverLinkId), true);
 assert.equal(isBilibiliCoverCacheFileForLink('other-link-deadbeef.jpg', coverLinkId), false);
 

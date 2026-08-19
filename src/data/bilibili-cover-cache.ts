@@ -1,4 +1,5 @@
 const DEFAULT_EXTENSION = '.jpg';
+const LEGACY_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
 
 function hashCoverSource(value: string): string {
   let hash = 2166136261;
@@ -21,5 +22,6 @@ export function getBilibiliCoverCacheFilename(linkId: string, coverUrl: string):
 
 export function isBilibiliCoverCacheFileForLink(fileName: string, linkId: string): boolean {
   const encodedId = encodeURIComponent(linkId);
-  return fileName === `${encodedId}${DEFAULT_EXTENSION}` || fileName.startsWith(`${encodedId}-`);
+  return LEGACY_EXTENSIONS.some(extension => fileName === `${encodedId}${extension}`)
+    || fileName.startsWith(`${encodedId}-`);
 }
