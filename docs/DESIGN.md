@@ -1,9 +1,9 @@
 # MaiMate（舞萌伴侣）项目设计案
 
 > 文档性质：项目事实基线、产品设计、工程约束和持续变更记录。
-> 最后更新：2026-08-18
-> 当前版本：`v1.3.0-alpha`
-> 当前状态：Phase1–Phase4 功能代码已实现并完成 TypeScript 校验；待提交后执行 GitHub Actions 云构建、个人站同步和真机验收。
+> 最后更新：2026-08-19
+> 当前版本：`v1.4.0-alpha`
+> 当前状态：Phase1–Phase4 功能代码已提交并触发 GitHub Actions 云构建；个人站同步和真机验收待完成。
 > GitHub：<https://github.com/FengLingYaaa/maimate-app>
 
 这份文档的目标不是只描述“理想中的产品”，而是让人类或新对话中的智能体能够回答：
@@ -96,13 +96,13 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | `24c94e8 docs: record final random-page icon correction` |
-| 当前标签 | `v1.3.0-alpha`（最终修正版已云构建/个人站已发布） |
+| 当前提交 | `8d6f51b45fbcdaf565f6c21a46e42a6386f7509f`（Phase1–Phase4） |
+| 当前标签 | `v1.4.0-alpha`（云构建运行中） |
 | Android applicationId | `cc.flya.maimate` |
-| App 版本 | `1.3.0` |
+| App 版本 | `1.4.0`（Android versionCode `2`） |
 | 下载站 | <https://maimate.flya.ccwu.cc/> |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
-| APK 来源 | GitHub Release `v1.3.0-alpha`，由 `landing/_worker.js` 代理/转发 |
+| APK 来源 | GitHub Release `v1.4.0-alpha`，由 `landing/_worker.js` 代理/转发（待同步） |
 | APK 构建方式 | GitHub Actions 云构建，arm64-v8a，内部测试使用 debug keystore |
 
 当前 App Git 仓库在第三阶段提交之后应保持干净；设计文档本身位于仓库外的工作区镜像和 App 仓库内的文档副本中，更新文档会让 App 仓库产生文档变更，这是预期行为。
@@ -130,7 +130,7 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 | OCR 拍照识别 | 已完成基础版本 | ML Kit；中文/日文/拉丁文字；候选歌曲现在置于原始识别文字之前 |
 | 今日舞萌运势 | Phase3 已完成 | 本地安装种子 + 上海日期的确定性娱乐结果；不读取 Token、不上传运势 |
 | 个人设置 | Phase4 已完成 | SecureStore Token 管理、只读成绩同步、显示/排序偏好和本地数据清理 |
-| APK 发布链路 | 待本轮云构建 | GitHub Actions → GitHub Release `MaiMate-latest.apk` → Cloudflare Worker 下载站 |
+| APK 发布链路 | 云构建中 | GitHub Actions run `32213629250` → GitHub Release `MaiMate-latest.apk` → Cloudflare Worker 下载站 |
 
 ### 3.3 已完成但仍需人工验收的能力
 
