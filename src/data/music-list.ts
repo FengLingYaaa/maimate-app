@@ -6,7 +6,7 @@
  */
 
 import type { FilterOptions, MusicData, ChartData, SortOptions } from './types';
-import { isBanquetGenre } from '../constants/game';
+import { getChinaVersionName, isBanquetGenre } from '../constants/game';
 import { getSearchTitles } from './song-aliases';
 
 /** 返回可用于官方定数筛选/排序/Rating 的定数；宴会場保留为缺失。 */
@@ -168,6 +168,7 @@ export function getMatchingDifficultyIndices(music: MusicData, opts: FilterOptio
 export function matchesMusic(music: MusicData, opts: FilterOptions): boolean {
   if (!inOrEqual(music.basic_info.genre, opts.genre)) return false;
   if (!inOrEqual(music.basic_info.from, opts.version)) return false;
+  if (!inOrEqual(getChinaVersionName(music.basic_info.from), opts.chinaVersion)) return false;
   if (!inOrEqual(music.type, opts.type)) return false;
   if (opts.bpmRange !== undefined && !inOrEqual(music.basic_info.bpm, opts.bpmRange)) return false;
   if (!matchesArtist(music, opts.artist)) return false;

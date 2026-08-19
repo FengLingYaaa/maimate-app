@@ -6,7 +6,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BackHandler,
-  Linking,
   View,
   Text,
   ScrollView,
@@ -22,7 +21,8 @@ import { Colors } from '../../src/constants';
 import { DifficultyLabels, getChinaVersionName } from '../../src/constants/game';
 import { getOfficialChartConstant, getTotalNotes } from '../../src/data/music-list';
 import { formatAchievement, normalizeAchievement } from '../../src/data/rating';
-import { getMusicPlatformSearchUrl, MUSIC_PLATFORM_LABELS } from '../../src/data/music-platforms';
+import { openMusicPlatformSearch } from '../../src/data/external-links';
+import { MUSIC_PLATFORM_LABELS } from '../../src/data/music-platforms';
 import type { ChartData, MusicPlatform } from '../../src/data/types';
 
 export default function SongDetail() {
@@ -151,9 +151,10 @@ export default function SongDetail() {
 
   const openMusicPlatform = async (platform: MusicPlatform) => {
     try {
-      await Linking.openURL(getMusicPlatformSearchUrl(platform, music.title, music.basic_info.artist));
+      const result = await openMusicPlatformSearch(platform, music.title, music.basic_info.artist);
+      showToast(result === 'app' ? `已打开${MUSIC_PLATFORM_LABELS[platform]}应用` : `已打开${MUSIC_PLATFORM_LABELS[platform]}网页`);
     } catch {
-      showToast('无法打开音乐平台网页');
+      showToast('无法打开音乐平台');
     }
   };
 
@@ -212,6 +213,23 @@ export default function SongDetail() {
             ))}
           </View>
         </View>
+
+        {inPlan && (
+          <View style={styles.targetEditorCard}>
+            <Text style={styles.targetEditorTitle}>推分目标</Text>
+            <Text style={styles.targetEditorHint}>已设置目标后，计划列表只显示目标和目标 Rating；其他目标可在这里自定义。</Text>
+            <View style={styles.targetPresetRow}>
+              {[100, 100.5].map(target => (
+                <Pressable key={target} style={[styles.detailTargetPreset, targetEntry?.targetScore === target && styles.detailTargetPresetActive]} onPress={() => { updateTargetScore(music.id, selectedDiff, targetEntry?.targetScore === target ? null : target, music.type); setCustomTarget(targetEntry?.targetScore === target ? '' : String(target)); }}>
+                  <Text style={[styles.detailTargetText, targetEntry?.targetScore === target && styles.detailTargetTextActive]}>{target}</Text>
+                </Pressable>
+              ))}
+              <TextInput style={styles.customTargetInput} value={customTarget} onChangeText={setCustomTarget} onEndEditing={commitCustomTarget} keyboardType="decimal-pad" placeholder="自定义，如 99.8" placeholderTextColor={Colors.text.muted} />
+              <Pressable style={styles.customTargetButton} onPress={commitCustomTarget}><Text style={styles.customTargetButtonText}>保存</Text></Pressable>
+            </View>
+            {!!targetEntry?.targetScore && <Text style={styles.targetSavedText}>当前目标：{targetEntry.targetScore}</Text>}
+          </View>
+        )}
 
         {/* 谱面详情 */}
         {chart && (
@@ -297,7 +315,7 @@ export default function SongDetail() {
                        </Pressable>
                      ))}
                    </View>
-                   <Text style={styles.platformNote}>使用歌曲名和曲师打开网页搜索，结果仍需手动确认版本。</Text>
+                   <Text style={styles.platformNote}>优先尝试打开已安装应用，失败时回退网页；结果仍需手动确认版本。</Text>
                  </View>
               </View>
             </View>
@@ -316,23 +334,6 @@ export default function SongDetail() {
             </Text>
           </Pressable>
         </View>
-
-        {inPlan && (
-          <View style={styles.targetEditorCard}>
-            <Text style={styles.targetEditorTitle}>推分目标</Text>
-            <Text style={styles.targetEditorHint}>计划页提供 100 / 100.5 快捷目标；其他目标可在这里自定义。</Text>
-            <View style={styles.targetPresetRow}>
-              {[100, 100.5].map(target => (
-                <Pressable key={target} style={[styles.detailTargetPreset, targetEntry?.targetScore === target && styles.detailTargetPresetActive]} onPress={() => { updateTargetScore(music.id, selectedDiff, targetEntry?.targetScore === target ? null : target, music.type); setCustomTarget(targetEntry?.targetScore === target ? '' : String(target)); }}>
-                  <Text style={[styles.detailTargetText, targetEntry?.targetScore === target && styles.detailTargetTextActive]}>{target}</Text>
-                </Pressable>
-              ))}
-              <TextInput style={styles.customTargetInput} value={customTarget} onChangeText={setCustomTarget} onEndEditing={commitCustomTarget} keyboardType="decimal-pad" placeholder="自定义，如 99.8" placeholderTextColor={Colors.text.muted} />
-              <Pressable style={styles.customTargetButton} onPress={commitCustomTarget}><Text style={styles.customTargetButtonText}>保存</Text></Pressable>
-            </View>
-            {!!targetEntry?.targetScore && <Text style={styles.targetSavedText}>当前目标：{targetEntry.targetScore}</Text>}
-          </View>
-        )}
 
         {/* 数据来源标注 */}
         <Text style={styles.attribution}>

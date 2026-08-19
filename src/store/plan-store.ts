@@ -28,6 +28,9 @@ interface PlanStore {
   updateTargetScore: (songId: string, difficultyIndex: number, score: number | null, musicType?: 'SD' | 'DX') => void;
   /** 重新排序 */
   reorder: (entries: PlanEntry[]) => void;
+  /** 将单个条目移动到计划顶部/底部。 */
+  moveToTop: (songId: string, difficultyIndex: number, musicType?: 'SD' | 'DX') => void;
+  moveToBottom: (songId: string, difficultyIndex: number, musicType?: 'SD' | 'DX') => void;
   /** 检查某歌曲是否在计划中 */
   isInPlan: (songId: string, difficultyIndex: number, musicType?: 'SD' | 'DX') => boolean;
   /** 清空计划 */
@@ -115,6 +118,26 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
     const reordered = entries.map((e, i) => ({ ...e, order: i }));
     set({ entries: reordered });
     get().savePlan();
+  },
+
+  moveToTop: (songId, difficultyIndex, musicType) => {
+    const { entries } = get();
+    const index = entries.findIndex(entry => matchesPlanEntry(entry, songId, difficultyIndex, musicType));
+    if (index <= 0) return;
+    const next = [...entries];
+    const [entry] = next.splice(index, 1);
+    next.unshift(entry);
+    get().reorder(next);
+  },
+
+  moveToBottom: (songId, difficultyIndex, musicType) => {
+    const { entries } = get();
+    const index = entries.findIndex(entry => matchesPlanEntry(entry, songId, difficultyIndex, musicType));
+    if (index < 0 || index === entries.length - 1) return;
+    const next = [...entries];
+    const [entry] = next.splice(index, 1);
+    next.push(entry);
+    get().reorder(next);
   },
 
   isInPlan: (songId, difficultyIndex, musicType) => {

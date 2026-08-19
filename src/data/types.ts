@@ -57,11 +57,15 @@ export interface SortOptions {
 }
 
 /** 版本筛选项：rawValue 用于真实筛选，label 用于 UI 展示。 */
+export type VersionRegion = 'japan' | 'china';
+
 export interface VersionOption {
   rawValue: string;
   chinaName: string;
   label: string;
   count: number;
+  region?: VersionRegion;
+  rawValues?: string[];
 }
 
 /** 独立别名层的条目；不修改 Diving-Fish 原始标题。 */
@@ -78,7 +82,8 @@ export interface FilterOptions {
   difficulty?: number | number[];    // 难度索引 0-4
   level?: string | string[];         // 等级标签如 "12+"
   dsRange?: [number, number];        // 官方定数范围
-  version?: string | string[];       // 原始版本名
+  version?: string | string[];       // 日服/原始版本名
+  chinaVersion?: string | string[];  // 中国区聚合版本名
   type?: 'SD' | 'DX' | ('SD' | 'DX')[];
   artist?: string;                   // 曲师关键词
   charter?: string;                  // 谱师关键词
@@ -153,12 +158,21 @@ export interface ScoreSyncState {
 
 export type MusicPlatform = 'netease' | 'qq' | 'kugou';
 
+export type BilibiliMetadataStatus = 'idle' | 'loading' | 'success' | 'partial' | 'error';
+
 export interface BilibiliVideoLink {
   id: string;
   songId: string;
   musicType: 'SD' | 'DX';
   difficultyIndex: number;
   url: string;
+  /** 标题优先来自公开元数据；没有网络时使用分享文本标题。 */
+  title?: string;
+  shareTitle?: string;
+  coverUri?: string;
+  coverSourceUrl?: string;
+  metadataStatus?: BilibiliMetadataStatus;
+  metadataFetchedAt?: number;
   remark: string;
   tags: string[];
   createdAt: number;

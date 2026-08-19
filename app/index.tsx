@@ -10,7 +10,7 @@ import { useMusicStore, useSettingsStore } from '../src/store';
 import { SongCard, FilterBar, TitleRecognizer } from '../src/components';
 import { Colors } from '../src/constants';
 import { getMatchingDifficultyIndices, MusicList } from '../src/data/music-list';
-import { getVersionOptions } from '../src/data/version-catalog';
+import { getChinaVersionOptions, getVersionOptions } from '../src/data/version-catalog';
 import type { FilterOptions, MusicData } from '../src/data/types';
 
 function formatCacheTime(timestamp: number | null): string {
@@ -50,6 +50,7 @@ export default function SongBrowser() {
 
   const genres = useMemo(() => [...new Set(rawData.map(m => m.basic_info.genre))].sort(), [rawData]);
   const versionOptions = useMemo(() => getVersionOptions(rawData), [rawData]);
+  const chinaVersionOptions = useMemo(() => getChinaVersionOptions(rawData), [rawData]);
   const artists = useMemo(() => [...new Set(rawData.map(m => m.basic_info.artist))].sort(), [rawData]);
   const charters = useMemo(() => {
     const values = new Set<string>();
@@ -122,6 +123,7 @@ export default function SongBrowser() {
         getPreviewCount={getPreviewCount}
         genres={genres}
         versionOptions={versionOptions}
+        chinaVersionOptions={chinaVersionOptions}
         artists={artists}
         charters={charters}
       />

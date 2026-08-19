@@ -2,7 +2,7 @@
   "expo": {
     "name": "MaiMate",
     "slug": "maimate-app",
-    "version": "1.5.0",
+    "version": "1.6.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -10,7 +10,10 @@
     "scheme": "maimate",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "cc.flya.maimate"
+      "bundleIdentifier": "cc.flya.maimate",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": ["bilibili", "orpheus", "qqmusic", "kugou"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -20,7 +23,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "package": "cc.flya.maimate",
-      "versionCode": 3,
+      "versionCode": 4,
       "permissions": ["android.permission.CAMERA"],
       "blockedPermissions": ["android.permission.RECORD_AUDIO"],
       "predictiveBackGestureEnabled": false
@@ -38,7 +41,8 @@
           "microphonePermission": false
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "./plugins/with-external-app-queries"
     ],
     "experiments": {
       "typedRoutes": true

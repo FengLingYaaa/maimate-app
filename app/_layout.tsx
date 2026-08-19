@@ -7,6 +7,7 @@ import React, { useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text, StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Colors } from '../src/constants';
 import { useBilibiliStore, useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '../src/store';
 
@@ -37,7 +38,7 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <GestureHandlerRootView style={styles.root}>
       <StatusBar style="light" />
       <Tabs
         screenOptions={{
@@ -93,12 +94,14 @@ export default function RootLayout() {
             tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>⚙️</Text>,
           }}
         />
+        <Tabs.Screen name="plates" options={{ href: null }} />
       </Tabs>
-    </>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   loading: {
     flex: 1,
     backgroundColor: Colors.bg.primary,

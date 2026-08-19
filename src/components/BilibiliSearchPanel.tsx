@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Colors, DifficultyColorMap, DifficultyLabels } from '../constants';
-import { getBilibiliSearchUrl, getBilibiliAppSearchUrl } from '../data/bilibili-search';
-import { BILIBILI_QUICK_TAGS, getBilibiliLinkChartKey, getChartKey, normalizeBilibiliVideoUrl } from '../data/bilibili-links';
+import { BILIBILI_QUICK_TAGS, getBilibiliLinkChartKey, getChartKey, normalizeBilibiliVideoUrl, parseBilibiliShare } from '../data/bilibili-links';
+import { openBilibiliSearch, openBilibiliVideo } from '../data/external-links';
 import { useBilibiliStore } from '../store';
 
 interface Props {
@@ -12,23 +12,6 @@ interface Props {
   difficultyIndex: number;
 }
 
-async function openBilibiliSearch(songTitle: string, difficultyLabel: string): Promise<void> {
-  const appUrl = getBilibiliAppSearchUrl(songTitle, difficultyLabel);
-  try {
-    if (await Linking.canOpenURL(appUrl)) {
-      await Linking.openURL(appUrl);
-      return;
-    }
-  } catch {
-    // Fall through to the stable HTTPS search page.
-  }
-  try {
-    await Linking.openURL(getBilibiliSearchUrl(songTitle, difficultyLabel));
-  } catch {
-    // Keep the detail page usable if no external handler is available.
-  }
-}
-
 export function BilibiliSearchPanel({ songId, songTitle, musicType, difficultyIndex }: Props) {
   const shouldShow = [2, 3, 4].includes(difficultyIndex);
   const difficultyLabel = DifficultyLabels[difficultyIndex];
@@ -36,6 +19,7 @@ export function BilibiliSearchPanel({ songId, songTitle, musicType, difficultyIn
   const allLinks = useBilibiliStore(s => s.links);
   const addLink = useBilibiliStore(s => s.addLink);
   const updateLink = useBilibiliStore(s => s.updateLink);
+  const refreshMetadata = useBilibiliStore(s => s.refreshMetadata);
   const removeLink = useBilibiliStore(s => s.removeLink);
   const links = useMemo(
     () => allLinks.filter(link => getBilibiliLinkChartKey(link) === getChartKey(songId, musicType, difficultyIndex)),
@@ -44,6 +28,7 @@ export function BilibiliSearchPanel({ songId, songTitle, musicType, difficultyIn
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [url, setUrl] = useState('');
+  const [shareTitle, setShareTitle] = useState('');
   const [remark, setRemark] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [customTag, setCustomTag] = useState('');
@@ -52,6 +37,7 @@ export function BilibiliSearchPanel({ songId, songTitle, musicType, difficultyIn
   const openAdd = () => {
     setEditingId(null);
     setUrl('');
+    setShareTitle('');
     setRemark('');
     setTags([]);
     setCustomTag('');
@@ -62,11 +48,18 @@ export function BilibiliSearchPanel({ songId, songTitle, musicType, difficultyIn
   const openEdit = (link: typeof links[number]) => {
     setEditingId(link.id);
     setUrl(link.url);
+    setShareTitle(link.shareTitle || link.title || '');
     setRemark(link.remark);
     setTags(link.tags);
     setCustomTag('');
     setError(null);
     setModalVisible(true);
+  };
+
+  const handleShareTextChange = (value: string) => {
+    setUrl(value);
+    const parsed = parseBilibiliShare(value);
+    setShareTitle(parsed?.title || '');
   };
 
   const toggleTag = (tag: string) => {
@@ -81,15 +74,18 @@ export function BilibiliSearchPanel({ songId, songTitle, musicType, difficultyIn
   };
 
   const submit = async () => {
+    const parsed = parseBilibiliShare(url);
     if (!normalizeBilibiliVideoUrl(url)) {
       setError('请输入 bilibili.com/video 或 b23.tv 视频分享链接');
       return;
     }
     try {
       if (editingId) {
-        await updateLink(editingId, { url, remark, tags });
+        await updateLink(editingId, { url, shareTitle: shareTitle || parsed?.title, remark, tags });
+        void refreshMetadata(editingId);
       } else {
-        await addLink({ songId, musicType, difficultyIndex, url, remark, tags });
+        const link = await addLink({ songId, musicType, difficultyIndex, url, shareTitle: shareTitle || parsed?.title, remark, tags });
+        void refreshMetadata(link.id);
       }
       setModalVisible(false);
     } catch (submitError) {
@@ -116,16 +112,21 @@ export function BilibiliSearchPanel({ songId, songTitle, musicType, difficultyIn
         </Pressable>
       </View>
       {links.length === 0 ? (
-        <Text style={styles.emptyText}>可粘贴 B 站分享链接，保存手元、邪道或研究视频。</Text>
+        <Text style={styles.emptyText}>可粘贴 B 站分享文本，自动提取标题、链接并尝试缓存封面。</Text>
       ) : links.map(link => (
         <View key={link.id} style={styles.linkRow}>
-          <Pressable style={styles.linkMain} onPress={() => void Linking.openURL(link.url)}>
+          {link.coverUri ? <Image source={{ uri: link.coverUri }} style={styles.cover} /> : <View style={styles.coverPlaceholder}><Text style={styles.coverPlaceholderText}>B</Text></View>}
+          <Pressable style={styles.linkMain} onPress={() => void openBilibiliVideo(link.url)}>
+            <Text style={styles.linkTitle} numberOfLines={2}>{link.title || link.shareTitle || '未命名视频'}</Text>
             <Text style={styles.linkUrl} numberOfLines={1}>{link.url}</Text>
             {!!link.remark && <Text style={styles.remark} numberOfLines={2}>{link.remark}</Text>}
             {link.tags.length > 0 && <Text style={styles.tags}>{link.tags.map(tag => `#${tag}`).join(' ')}</Text>}
+            {link.metadataStatus === 'loading' && <Text style={styles.metadataHint}>正在解析视频信息…</Text>}
+            {link.metadataStatus === 'error' && <Text style={styles.metadataHint}>解析失败，仍可正常打开视频</Text>}
           </Pressable>
           <View style={styles.linkActions}>
             <Pressable onPress={() => openEdit(link)}><Text style={styles.actionText}>编辑</Text></Pressable>
+            <Pressable onPress={() => void refreshMetadata(link.id)}><Text style={styles.actionText}>{link.metadataStatus === 'loading' ? '…' : '解析'}</Text></Pressable>
             <Pressable onPress={() => void removeLink(link.id)}><Text style={styles.deleteText}>删除</Text></Pressable>
           </View>
         </View>
@@ -135,7 +136,17 @@ export function BilibiliSearchPanel({ songId, songTitle, musicType, difficultyIn
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>{editingId ? '编辑 B 站视频' : '添加 B 站视频'}</Text>
-            <TextInput style={styles.input} value={url} onChangeText={setUrl} placeholder="粘贴 bilibili 视频分享链接" placeholderTextColor={Colors.text.muted} autoCapitalize="none" autoCorrect={false} />
+            <TextInput
+              style={styles.input}
+              value={url}
+              onChangeText={handleShareTextChange}
+              placeholder="粘贴完整分享文本或 bilibili 视频链接"
+              placeholderTextColor={Colors.text.muted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              multiline
+            />
+            {!!shareTitle && <Text style={styles.parsedTitle}>识别标题：{shareTitle}</Text>}
             <TextInput style={[styles.input, styles.remarkInput]} value={remark} onChangeText={setRemark} placeholder="备注（可选）" placeholderTextColor={Colors.text.muted} multiline />
             <Text style={styles.tagLabel}>快捷关键词</Text>
             <View style={styles.tagRow}>
@@ -150,6 +161,7 @@ export function BilibiliSearchPanel({ songId, songTitle, musicType, difficultyIn
               <Pressable style={styles.addTagButton} onPress={addCustomTag}><Text style={styles.addTagText}>添加</Text></Pressable>
             </View>
             {tags.length > 0 && <Text style={styles.selectedTags}>已选：{tags.join('、')}</Text>}
+            <Text style={styles.metadataNote}>保存后仅尝试获取这一条视频的公开标题和封面，不下载视频。</Text>
             {!!error && <Text style={styles.errorText}>{error}</Text>}
             <View style={styles.modalActions}>
               <Pressable style={styles.cancelButton} onPress={() => setModalVisible(false)}><Text style={styles.cancelText}>取消</Text></Pressable>
@@ -175,17 +187,23 @@ const styles = StyleSheet.create({
   addText: { fontSize: 11, fontWeight: '800', color: Colors.accent.primary },
   emptyText: { fontSize: 10, lineHeight: 15, color: Colors.text.muted },
   linkRow: { flexDirection: 'row', gap: 8, padding: 9, borderRadius: 9, backgroundColor: Colors.bg.secondary },
+  cover: { width: 54, height: 54, borderRadius: 7, backgroundColor: Colors.bg.tertiary },
+  coverPlaceholder: { width: 54, height: 54, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: `${Colors.accent.secondary}33` },
+  coverPlaceholderText: { fontSize: 22, fontWeight: '900', color: Colors.accent.secondary },
   linkMain: { flex: 1, gap: 3 },
-  linkUrl: { fontSize: 10, color: Colors.accent.secondary },
+  linkTitle: { fontSize: 11, fontWeight: '700', color: Colors.text.primary },
+  linkUrl: { fontSize: 9, color: Colors.accent.secondary },
   remark: { fontSize: 11, color: Colors.text.primary },
   tags: { fontSize: 10, color: Colors.text.muted },
+  metadataHint: { fontSize: 9, color: Colors.text.muted },
   linkActions: { justifyContent: 'space-around', alignItems: 'flex-end' },
   actionText: { fontSize: 10, color: Colors.accent.primary },
   deleteText: { fontSize: 10, color: Colors.functional.danger },
   modalBackdrop: { flex: 1, justifyContent: 'center', padding: 20, backgroundColor: 'rgba(0, 0, 0, 0.68)' },
-  modalCard: { borderRadius: 16, padding: 16, backgroundColor: Colors.bg.primary, gap: 10 },
+  modalCard: { maxHeight: '92%', borderRadius: 16, padding: 16, backgroundColor: Colors.bg.primary, gap: 10 },
   modalTitle: { fontSize: 17, fontWeight: '800', color: Colors.text.primary },
-  input: { minHeight: 42, paddingHorizontal: 11, paddingVertical: 9, borderRadius: 9, borderWidth: 1, borderColor: Colors.border.light, backgroundColor: Colors.bg.secondary, color: Colors.text.primary, fontSize: 12 },
+  input: { minHeight: 42, maxHeight: 120, paddingHorizontal: 11, paddingVertical: 9, borderRadius: 9, borderWidth: 1, borderColor: Colors.border.light, backgroundColor: Colors.bg.secondary, color: Colors.text.primary, fontSize: 12 },
+  parsedTitle: { fontSize: 11, color: Colors.accent.secondary },
   remarkInput: { minHeight: 70, textAlignVertical: 'top' },
   tagLabel: { fontSize: 11, fontWeight: '800', color: Colors.text.secondary },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
@@ -198,6 +216,7 @@ const styles = StyleSheet.create({
   addTagButton: { justifyContent: 'center', paddingHorizontal: 10, borderRadius: 9, backgroundColor: `${Colors.accent.secondary}22`, borderWidth: 1, borderColor: Colors.accent.secondary },
   addTagText: { fontSize: 11, color: Colors.accent.secondary, fontWeight: '800' },
   selectedTags: { fontSize: 10, color: Colors.text.muted },
+  metadataNote: { fontSize: 10, lineHeight: 14, color: Colors.text.muted },
   errorText: { fontSize: 11, color: Colors.functional.danger },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4 },
   cancelButton: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 9, backgroundColor: Colors.bg.tertiary },

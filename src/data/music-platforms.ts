@@ -6,11 +6,15 @@ export const MUSIC_PLATFORM_LABELS: Record<MusicPlatform, string> = {
   kugou: '酷狗音乐',
 };
 
-function encodeQuery(title: string, artist?: string): string {
-  return encodeURIComponent([title, artist].filter(Boolean).join(' ').trim());
+function rawQuery(title: string, artist?: string): string {
+  return [title, artist].filter(Boolean).join(' ').trim();
 }
 
-/** Stable HTTPS search pages; native private schemes are intentionally not used. */
+function encodeQuery(title: string, artist?: string): string {
+  return encodeURIComponent(rawQuery(title, artist));
+}
+
+/** Stable HTTPS search pages used whenever the native client cannot handle a route. */
 export function getMusicPlatformSearchUrl(platform: MusicPlatform, title: string, artist?: string): string {
   const query = encodeQuery(title, artist);
   switch (platform) {
@@ -21,5 +25,31 @@ export function getMusicPlatformSearchUrl(platform: MusicPlatform, title: string
     case 'netease':
     default:
       return `https://music.163.com/#/search/m/?s=${query}&type=1`;
+  }
+}
+
+/**
+ * Best-effort native search routes. These are undocumented client routes and
+ * therefore always need the HTTPS fallback supplied by the caller.
+ */
+export function getMusicPlatformAppUrls(platform: MusicPlatform, title: string, artist?: string): string[] {
+  const query = encodeURIComponent(rawQuery(title, artist));
+  switch (platform) {
+    case 'qq':
+      return [
+        `qqmusic://qq.com/ui/search?key=${query}`,
+        `qqmusic://search?keyword=${query}`,
+      ];
+    case 'kugou':
+      return [
+        `kugou://search?keyword=${query}`,
+        `kugou://search/song?keyword=${query}`,
+      ];
+    case 'netease':
+    default:
+      return [
+        `orpheus://search?keyword=${query}`,
+        `orpheus://search/m/?s=${query}&type=1`,
+      ];
   }
 }

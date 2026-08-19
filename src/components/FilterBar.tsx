@@ -28,6 +28,7 @@ interface Props {
   getPreviewCount?: (filters: FilterOptions) => number;
   genres: string[];
   versionOptions: VersionOption[];
+  chinaVersionOptions?: VersionOption[];
   artists: string[];
   charters: string[];
 }
@@ -65,6 +66,7 @@ export function FilterBar({
   getPreviewCount,
   genres,
   versionOptions,
+  chinaVersionOptions = [],
   artists,
   charters,
 }: Props) {
@@ -120,6 +122,10 @@ export function FilterBar({
 
   const toggleVersion = (version: string) => {
     update({ ...localFilters, version: toggleValue(localFilters.version, version) as FilterOptions['version'] });
+  };
+
+  const toggleChinaVersion = (version: string) => {
+    update({ ...localFilters, chinaVersion: toggleValue(localFilters.chinaVersion, version) as FilterOptions['chinaVersion'] });
   };
 
   const setText = (key: 'artist' | 'charter', value: string) => {
@@ -305,7 +311,7 @@ export function FilterBar({
               </View>
 
               <View style={styles.expandHeader}>
-                <Text style={styles.sectionTitle}>版本</Text>
+                <Text style={styles.sectionTitle}>日服 / 原始版本</Text>
                 <Pressable onPress={() => setShowVersions(value => !value)}>
                   <Text style={styles.expandText}>{showVersions ? '收起' : `展开全部（${versionOptions.length}）`}</Text>
                 </Pressable>
@@ -328,6 +334,25 @@ export function FilterBar({
                 <Text style={styles.collapsedHint}>
                   {Array.isArray(localFilters.version) ? `${localFilters.version.length} 个版本已选择` : localFilters.version || '未选择版本'}
                 </Text>
+              )}
+
+              {chinaVersionOptions.length > 0 && (
+                <>
+                  <Text style={styles.sectionTitle}>中国区版本</Text>
+                  <View style={styles.chipRow}>
+                    {chinaVersionOptions.map(option => {
+                      const active = Array.isArray(localFilters.chinaVersion)
+                        ? localFilters.chinaVersion.includes(option.rawValue)
+                        : localFilters.chinaVersion === option.rawValue;
+                      return (
+                        <Pressable key={option.rawValue} style={[styles.chip, active && styles.chipActive]} onPress={() => toggleChinaVersion(option.rawValue)}>
+                          <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
+                          <Text style={[styles.versionCount, active && styles.chipTextActive]}>{option.count || '暂无'}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </>
               )}
 
               <Text style={styles.sectionTitle}>曲师</Text>

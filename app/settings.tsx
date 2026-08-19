@@ -1,21 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Colors } from '../src/constants';
 import { useScoreStore, useSettingsStore } from '../src/store';
-import type { MusicPlatform, SortMode } from '../src/data/types';
-
-const MUSIC_PLATFORM_OPTIONS: Array<{ value: MusicPlatform; label: string }> = [
-  { value: 'netease', label: '网易云音乐' },
-  { value: 'qq', label: 'QQ 音乐' },
-  { value: 'kugou', label: '酷狗音乐' },
-];
-const SORT_OPTIONS: Array<{ mode: SortMode; label: string }> = [
-  { mode: 'relevance', label: '搜索相关度' },
-  { mode: 'titleAsc', label: '歌曲名 A → Z' },
-  { mode: 'constantDesc', label: '官方定数高 → 低' },
-];
+import { MUSIC_PLATFORM_OPTIONS, getSortLabel } from '../src/data/settings-options';
 
 export default function SettingsPage() {
+  const router = useRouter();
   const settings = useSettingsStore(s => s.settings);
   const updateSettings = useSettingsStore(s => s.updateSettings);
   const resetSettings = useSettingsStore(s => s.resetSettings);
@@ -34,8 +25,6 @@ export default function SettingsPage() {
   useEffect(() => {
     if (tokenConfigured) setTokenInput('');
   }, [tokenConfigured]);
-
-  const currentSortIndex = Math.max(0, SORT_OPTIONS.findIndex(option => option.mode === settings.defaultSort.mode));
 
   const handleVerify = async () => {
     if (!tokenInput.trim()) {
@@ -91,37 +80,31 @@ export default function SettingsPage() {
         <Text style={styles.sectionTitle}>显示偏好</Text>
         <SettingRow title="显示国区版本名" description="同时保留并显示 Diving-Fish 原始版本名" value={settings.showChinaVersion} onChange={value => void updateSettings({ showChinaVersion: value })} />
         <SettingRow title="显示目标 Rating" description="在推分计划中显示按官方定数计算的目标值" value={settings.showProjectedRating} onChange={value => void updateSettings({ showProjectedRating: value })} />
-        <View style={styles.preferenceRow}>
+        <Pressable style={styles.preferenceRow} onPress={() => router.push('/settings/music-platform' as any)}>
           <View style={styles.preferenceText}>
             <Text style={styles.preferenceTitle}>默认音乐平台</Text>
             <Text style={styles.preferenceDescription}>歌曲详情页的音乐搜索默认打开平台</Text>
           </View>
-          <Pressable
-            style={styles.valueButton}
-            onPress={() => {
-              const index = MUSIC_PLATFORM_OPTIONS.findIndex(option => option.value === settings.defaultMusicPlatform);
-              const next = MUSIC_PLATFORM_OPTIONS[(Math.max(index, 0) + 1) % MUSIC_PLATFORM_OPTIONS.length];
-              void updateSettings({ defaultMusicPlatform: next.value });
-            }}
-          >
-            <Text style={styles.valueButtonText}>{MUSIC_PLATFORM_OPTIONS.find(option => option.value === settings.defaultMusicPlatform)?.label || '网易云音乐'}</Text>
-          </Pressable>
-        </View>
-        <View style={styles.preferenceRow}>
+          <Text style={styles.valueButtonText}>{MUSIC_PLATFORM_OPTIONS.find(option => option.value === settings.defaultMusicPlatform)?.label || '网易云音乐'}　›</Text>
+        </Pressable>
+        <Pressable style={styles.preferenceRow} onPress={() => router.push('/settings/sort' as any)}>
           <View style={styles.preferenceText}>
             <Text style={styles.preferenceTitle}>默认排序</Text>
             <Text style={styles.preferenceDescription}>曲库打开后可在筛选栏中临时切换</Text>
           </View>
-          <Pressable
-            style={styles.valueButton}
-            onPress={() => {
-              const next = SORT_OPTIONS[(currentSortIndex + 1) % SORT_OPTIONS.length];
-              void updateSettings({ defaultSort: { ...settings.defaultSort, mode: next.mode } });
-            }}
-          >
-            <Text style={styles.valueButtonText}>{SORT_OPTIONS[currentSortIndex].label}</Text>
-          </Pressable>
-        </View>
+          <Text style={styles.valueButtonText}>{getSortLabel(settings.defaultSort.mode)}　›</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>本地成绩工具</Text>
+        <Pressable style={styles.toolButton} onPress={() => router.push('/plates' as any)}>
+          <View style={styles.preferenceText}>
+            <Text style={styles.preferenceTitle}>牌子查询</Text>
+            <Text style={styles.preferenceDescription}>按本机导入成绩统计 FC、SSS、FS DX 和 AP</Text>
+          </View>
+          <Text style={styles.valueButtonText}>›</Text>
+        </Pressable>
       </View>
 
       <View style={styles.section}>
@@ -209,6 +192,7 @@ const styles = StyleSheet.create({
   section: { padding: 14, borderRadius: 16, backgroundColor: Colors.bg.secondary, gap: 10 },
   sectionTitle: { fontSize: 15, fontWeight: '800', color: Colors.text.primary },
   preferenceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 4 },
+  toolButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: 10, borderRadius: 10, backgroundColor: Colors.bg.tertiary },
   preferenceText: { flex: 1, gap: 2 },
   preferenceTitle: { fontSize: 13, fontWeight: '700', color: Colors.text.primary },
   preferenceDescription: { fontSize: 11, lineHeight: 16, color: Colors.text.muted },

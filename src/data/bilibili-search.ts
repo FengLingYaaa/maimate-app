@@ -1,8 +1,9 @@
 /**
  * Bilibili 外部搜索链接。
  *
- * MaiMate 不抓取、不缓存、也不内置 Bilibili 视频；这里只根据本地歌曲
- * 标题和当前谱面难度生成客户端深链与网页搜索回退地址。
+ * MaiMate 不抓取视频、不内置视频目录；这里只根据本地歌曲标题和当前谱面
+ * 难度生成客户端深链与网页搜索回退地址。单条用户主动保存的视频元数据
+ * 由 bilibili-metadata.ts 另行按需缓存。
  */
 
 export type BilibiliDifficultyIndex = 2 | 3 | 4;
