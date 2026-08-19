@@ -4,6 +4,7 @@ import { getMusicPlatformAppUrls, getMusicPlatformSearchUrl } from '../src/data/
 import { getChinaVersionOptions, getVersionOptions } from '../src/data/version-catalog.ts';
 import { buildPlateEntries, getPlateMask, getPlateChinaVersionOptions, summarizePlates, PLATE_BITS } from '../src/data/plates.ts';
 import { canDragPlanRows, reorderVisibleEntries } from '../src/data/plan-order.ts';
+import { getBilibiliCoverCacheFilename, getBilibiliCoverExtension, isBilibiliCoverCacheFileForLink } from '../src/data/bilibili-cover-cache.ts';
 
 const share = parseBilibiliShare('【第一人称maimai/舞萌 Trick tear 紫14.4 sss+ 手元-哔哩哔哩】 https://b23.tv/TdQjEN6');
 assert.equal(share?.url, 'https://b23.tv/TdQjEN6');
@@ -14,6 +15,16 @@ assert.match(getMusicPlatformAppUrls('netease', '晴天', '周杰伦')[0], /^orp
 assert.match(getMusicPlatformAppUrls('qq', '晴天')[0], /^qqmusic:\/\//);
 assert.match(getMusicPlatformAppUrls('kugou', '晴天')[0], /^kugou:\/\//);
 assert.match(getMusicPlatformSearchUrl('netease', '晴天'), /^https:\/\//);
+
+const coverLinkId = 'bilibili-link-1';
+const coverA = 'https://i0.hdslb.com/bfs/archive/cover-a.jpg?x=1';
+const coverB = 'https://i0.hdslb.com/bfs/archive/cover-b.jpg?x=2';
+assert.notEqual(getBilibiliCoverCacheFilename(coverLinkId, coverA), getBilibiliCoverCacheFilename(coverLinkId, coverB));
+assert.equal(getBilibiliCoverCacheFilename(coverLinkId, coverA), getBilibiliCoverCacheFilename(coverLinkId, coverA));
+assert.equal(getBilibiliCoverExtension('https://example.com/cover.webp?width=400'), '.webp');
+assert.equal(isBilibiliCoverCacheFileForLink(`${encodeURIComponent(coverLinkId)}.jpg`, coverLinkId), true);
+assert.equal(isBilibiliCoverCacheFileForLink(getBilibiliCoverCacheFilename(coverLinkId, coverA), coverLinkId), true);
+assert.equal(isBilibiliCoverCacheFileForLink('other-link-deadbeef.jpg', coverLinkId), false);
 
 const chart = { notes: [1, 1, 1, 1], charter: 'tester' };
 const makeMusic = (id, from, type = 'DX') => ({

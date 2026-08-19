@@ -13,6 +13,7 @@ import {
   downloadBilibiliCover,
   fetchBilibiliMetadata,
   removeBilibiliCover,
+  removeBilibiliCoversForLink,
 } from '../data/bilibili-metadata';
 
 interface BilibiliStore {
@@ -93,6 +94,9 @@ export const useBilibiliStore = create<BilibiliStore>((set, get) => ({
     const normalizedUrl = patch.url === undefined ? current.url : normalizeBilibiliVideoUrl(patch.url);
     if (!normalizedUrl) throw new Error('请输入有效的 Bilibili 视频分享链接');
     const urlChanged = normalizedUrl !== current.url;
+    // Clear every legacy and source-keyed cover before changing the URL. This prevents an
+    // in-flight metadata request for the old URL from leaving a reusable stale file behind.
+    if (urlChanged) await removeBilibiliCoversForLink(id);
     const links = get().links.map(link => {
       if (link.id !== id) return link;
       return {
@@ -111,34 +115,45 @@ export const useBilibiliStore = create<BilibiliStore>((set, get) => ({
     });
     set({ links });
     await persist(links);
-    if (urlChanged) await removeBilibiliCover(current.coverUri);
   },
 
   refreshMetadata: async id => {
     const current = get().links.find(link => link.id === id);
     if (!current) return;
+    const requestUrl = current.url;
     const loading = get().links.map(link => link.id === id ? { ...link, metadataStatus: 'loading' as const } : link);
     set({ links: loading });
     await persist(loading);
     try {
-      const metadata = await fetchBilibiliMetadata(current.url);
-      const coverChanged = Boolean(current.coverUri && current.coverSourceUrl && metadata.coverUrl && current.coverSourceUrl !== metadata.coverUrl);
-      if (coverChanged) await removeBilibiliCover(current.coverUri);
-      const coverUri = metadata.coverUrl
+      const metadata = await fetchBilibiliMetadata(requestUrl);
+      const latest = get().links.find(link => link.id === id);
+      // Editing or deleting a link invalidates any metadata request started for its old URL.
+      if (!latest || latest.url !== requestUrl) return;
+      const coverChanged = Boolean(latest.coverUri && latest.coverSourceUrl && metadata.coverUrl && latest.coverSourceUrl !== metadata.coverUrl);
+      if (coverChanged) await removeBilibiliCover(latest.coverUri);
+      const downloadedCoverUri = metadata.coverUrl
         ? await downloadBilibiliCover(id, metadata.coverUrl).catch(() => undefined)
-        : current.coverUri;
+        : latest.coverUri;
+      const afterDownload = get().links.find(link => link.id === id);
+      if (!afterDownload || afterDownload.url !== requestUrl) {
+        if (downloadedCoverUri && downloadedCoverUri !== afterDownload?.coverUri) await removeBilibiliCover(downloadedCoverUri);
+        return;
+      }
+      const nextCoverUri = coverChanged ? downloadedCoverUri : (downloadedCoverUri || afterDownload.coverUri);
       const next = get().links.map(link => link.id === id ? {
         ...link,
         title: metadata.title || link.title,
-        coverUri: coverUri || link.coverUri,
+        coverUri: nextCoverUri,
         coverSourceUrl: metadata.coverUrl || link.coverSourceUrl,
-        metadataStatus: metadata.title || coverUri ? 'success' as const : 'partial' as const,
+        metadataStatus: metadata.title || nextCoverUri ? 'success' as const : 'partial' as const,
         metadataFetchedAt: Date.now(),
         updatedAt: Date.now(),
       } : link);
       set({ links: next });
       await persist(next);
     } catch {
+      const latest = get().links.find(link => link.id === id);
+      if (!latest || latest.url !== requestUrl) return;
       const next = get().links.map(link => link.id === id ? {
         ...link,
         metadataStatus: 'error' as const,
@@ -151,11 +166,10 @@ export const useBilibiliStore = create<BilibiliStore>((set, get) => ({
   },
 
   removeLink: async id => {
-    const removed = get().links.find(link => link.id === id);
     const links = get().links.filter(link => link.id !== id);
     set({ links });
     await persist(links);
-    await removeBilibiliCover(removed?.coverUri);
+    await removeBilibiliCoversForLink(id);
   },
 
   getLinksForChart: (songId, musicType, difficultyIndex) => {

@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import { getBilibiliCoverCacheFilename, isBilibiliCoverCacheFileForLink } from './bilibili-cover-cache';
 
 export interface BilibiliMetadata {
   canonicalUrl?: string;
@@ -88,12 +89,25 @@ export async function downloadBilibiliCover(linkId: string, coverUrl: string): P
   if (!cacheDirectory || !/^https:\/\//i.test(coverUrl)) return undefined;
   const directory = `${cacheDirectory}bilibili-covers/`;
   await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
-  const extension = coverUrl.match(/\.(?:png|webp|jpeg|jpg)(?:\?|$)/i)?.[0]?.split('?')[0] || '.jpg';
-  const destination = `${directory}${encodeURIComponent(linkId)}${extension}`;
+  const destination = `${directory}${getBilibiliCoverCacheFilename(linkId, coverUrl)}`;
   const existing = await FileSystem.getInfoAsync(destination);
   if (existing.exists) return destination;
   const result = await FileSystem.downloadAsync(coverUrl, destination);
   return result.status >= 200 && result.status < 300 ? result.uri : undefined;
+}
+
+export async function removeBilibiliCoversForLink(linkId: string): Promise<void> {
+  const cacheDirectory = FileSystem.cacheDirectory;
+  if (!cacheDirectory) return;
+  const directory = `${cacheDirectory}bilibili-covers/`;
+  try {
+    const files = await FileSystem.readDirectoryAsync(directory);
+    await Promise.all(files
+      .filter(fileName => isBilibiliCoverCacheFileForLink(fileName, linkId))
+      .map(fileName => FileSystem.deleteAsync(`${directory}${fileName}`, { idempotent: true })));
+  } catch {
+    // Cache cleanup is best effort and must not block editing or deleting the link.
+  }
 }
 
 export async function removeBilibiliCover(uri: string | undefined): Promise<void> {
