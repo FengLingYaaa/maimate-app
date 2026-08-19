@@ -31,6 +31,7 @@ assert.ok(tree, 'Expo Router route tree should be generated');
 const rootRoutes = new Map(tree.children.map(route => [route.route, route]));
 assert.equal(rootRoutes.get('settings')?.type, 'layout', 'settings must be a nested layout route');
 assert.equal(rootRoutes.get('song')?.type, 'layout', 'song must be a nested layout route');
+assert.equal(rootRoutes.get('plates')?.type, 'layout', 'plates must be a nested layout route');
 assert.equal(rootRoutes.has('settings/music-platform'), false, 'settings child must not be a root route');
 assert.equal(rootRoutes.has('settings/sort'), false, 'settings child must not be a root route');
 assert.equal(rootRoutes.has('song/[id]'), false, 'song detail must not be a root route');
@@ -39,5 +40,6 @@ assert.deepEqual(
   ['index', 'music-platform', 'sort'],
 );
 assert.deepEqual(rootRoutes.get('song')?.children.map(route => route.route), ['[id]']);
+assert.deepEqual(rootRoutes.get('plates')?.children.map(route => route.route), ['index']);
 
-console.log('Route checks passed (settings and song children are owned by nested Stack layouts)');
+console.log('Route checks passed (settings, song, and plates routes use nested Stack layouts)');
