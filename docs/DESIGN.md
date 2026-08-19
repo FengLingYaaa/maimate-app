@@ -3,7 +3,7 @@
 > 文档性质：项目事实基线、产品设计、工程约束和持续变更记录。
 > 最后更新：2026-08-19
 > 当前版本：`v1.4.0-alpha`
-> 当前状态：Phase1–Phase4 功能代码已提交并触发 GitHub Actions 云构建；个人站同步和真机验收待完成。
+> 当前状态：Phase1–Phase4 已完成；v1.4.0-alpha 云构建、Release、个人站同步和线上校验已完成，真机验收仍待设备。
 > GitHub：<https://github.com/FengLingYaaa/maimate-app>
 
 这份文档的目标不是只描述“理想中的产品”，而是让人类或新对话中的智能体能够回答：
@@ -96,13 +96,15 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | `8d6f51b45fbcdaf565f6c21a46e42a6386f7509f`（Phase1–Phase4） |
-| 当前标签 | `v1.4.0-alpha`（云构建运行中） |
+| 当前提交 | release implementation `8d6f51b45fbcdaf565f6c21a46e42a6386f7509f`；发布记录 `cb9f984e89dbb8aff0b2df7a0474aff5ee1c7722` |
+| 当前标签 | `v1.4.0-alpha`（云构建与个人站已完成） |
 | Android applicationId | `cc.flya.maimate` |
 | App 版本 | `1.4.0`（Android versionCode `2`） |
 | 下载站 | <https://maimate.flya.ccwu.cc/> |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
-| APK 来源 | GitHub Release `v1.4.0-alpha`，由 `landing/_worker.js` 代理/转发（待同步） |
+| APK 来源 | GitHub Release `v1.4.0-alpha`，由 `landing/_worker.js` 代理/转发 |
+| APK SHA-256 | `109d4b04a1217814f355d01fa20804108500ab85a25df5e22762814210f74170` |
+| APK 大小 | `60,097,909` bytes（约 57.3 MiB） |
 | APK 构建方式 | GitHub Actions 云构建，arm64-v8a，内部测试使用 debug keystore |
 
 当前 App Git 仓库在第三阶段提交之后应保持干净；设计文档本身位于仓库外的工作区镜像和 App 仓库内的文档副本中，更新文档会让 App 仓库产生文档变更，这是预期行为。
@@ -745,3 +747,11 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 运行时边界：`@react-native-ml-kit/text-recognition` 是原生模块，最终验证应使用云构建 APK 而不是 Expo Go；本次 `npm run lint` 通过，App Git 工作树干净，设计副本同步，`git diff --check` 通过。
 - 人类需要确认：仍无 Android 设备，因此不能把 OCR 相机、详情返回、Bilibili 深链/HTTPS 回退等宣称为真机验收完成；不新增视频目录或 Bilibili 自动化抓取。
 - 下一步：接入 Android 设备后执行最后的 OCR、路由、深链和回退回归。
+
+### 2026-08-19 — Phase1–Phase4 v1.4.0-alpha 云构建与个人站同步完成
+
+- 用户目标：实施 Phase1–Phase4，完成校验、云端 Android 构建，并把可测试 APK 同步到个人站；用户提供的测试 Token 不得进入应用、日志、文档或构建环境。
+- 实际修改：完整 Diving-Fish Rating 系数表；宴会場/缺失定数边界；原始/国区版本名；歌曲名与选定难度定数排序；只显示计划选定难度、目标达成率/Rating 和导入成绩；本地确定性今日运势；SecureStore 只读成绩同步与设置页；OCR 候选优先显示。实现提交为 `8d6f51b45fbcdaf565f6c21a46e42a6386f7509f`。
+- 验证证据：`npm run lint`、`npm run test:rating`（28 个系数边界）、`git diff --check`、`npx expo export --platform android` 和 `npx expo prebuild --platform android --no-install` 成功。GitHub Actions run `32213629250` success；Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.4.0-alpha>；APK `60,097,909` bytes，SHA-256 `109d4b04a1217814f355d01fa20804108500ab85a25df5e22762814210f74170`。
+- 个人站：`landing/_worker.js` 指向 `v1.4.0-alpha/MaiMate-latest.apk`；Cloudflare Pages 部署成功，预览部署地址为 <https://30d572c9.maimate-landing.pages.dev>；生产首页显示 v1.4.0-alpha 和同一 SHA；APK URL 返回 HTTP 200、`application/vnd.android.package-archive`、`content-length: 60097909`、固定附件名；完整下载后与本地 APK 字节一致。
+- 人类需要确认：`adb devices` 没有 Android 设备，因此不把安装、OCR 相机/返回、Bilibili 深链/HTTPS 回退或五个新 Tab 的真机行为宣称为已验收。APK 是 GitHub Actions 生成的 arm64-v8a debug-signed 内测包；正式分发前仍应配置稳定的 release keystore。
