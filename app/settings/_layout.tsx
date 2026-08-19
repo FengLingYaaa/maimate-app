@@ -12,6 +12,8 @@ export default function SettingsStackLayout() {
         headerTitleStyle: { fontWeight: '700' },
         contentStyle: { backgroundColor: Colors.bg.primary },
       }}
-    />
+    >
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+    </Stack>
   );
 }
