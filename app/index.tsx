@@ -3,10 +3,10 @@
  * 支持筛选、搜索、列表展示
  */
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, Pressable, Linking } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useMusicStore } from '../src/store';
+import { useMusicStore, useSettingsStore } from '../src/store';
 import { SongCard, FilterBar, TitleRecognizer } from '../src/components';
 import { Colors } from '../src/constants';
 import { getMatchingDifficultyIndices, MusicList } from '../src/data/music-list';
@@ -29,6 +29,14 @@ export default function SongBrowser() {
   const filters = useMusicStore(s => s.filters);
   const applyFilters = useMusicStore(s => s.applyFilters);
   const clearFilters = useMusicStore(s => s.clearFilters);
+  const settings = useSettingsStore(s => s.settings);
+  const settingsLoaded = useSettingsStore(s => s.loaded);
+
+  useEffect(() => {
+    if (settingsLoaded && settings.defaultSort.mode !== 'relevance' && filters.sort === undefined) {
+      applyFilters({ ...filters, sort: settings.defaultSort });
+    }
+  }, [settingsLoaded, settings.defaultSort, filters, applyFilters]);
 
   useFocusEffect(useCallback(() => {
     if (restoreTitleRecognizerOnFocus.current) {
@@ -72,11 +80,15 @@ export default function SongBrowser() {
     router.push(`/song/${music.id}` as any);
   }, [router]);
 
+  const sortDifficultyIndex = filters.sort?.mode === 'constantAsc' || filters.sort?.mode === 'constantDesc'
+    ? (filters.sort.difficultyIndex ?? 3)
+    : undefined;
   const hasChartHighlightFilter = Boolean(
     filters.charter?.trim()
       || filters.difficulty !== undefined
       || filters.level !== undefined
-      || filters.dsRange !== undefined,
+      || filters.dsRange !== undefined
+      || sortDifficultyIndex !== undefined,
   );
 
   return (
@@ -116,17 +128,22 @@ export default function SongBrowser() {
       {/* 歌曲列表 */}
       <FlatList
         data={songs}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.cardWrapper}>
-            <SongCard
-              music={item}
-              onPress={handleSongPress}
-              onLongPress={handleSongLongPress}
-              highlightedDifficulties={hasChartHighlightFilter ? getMatchingDifficultyIndices(item, filters) : undefined}
-            />
-          </View>
-        )}
+        keyExtractor={item => `${item.id}-${item.type}`}
+        renderItem={({ item }) => {
+          const highlighted = new Set(hasChartHighlightFilter ? getMatchingDifficultyIndices(item, filters) : []);
+          if (sortDifficultyIndex !== undefined) highlighted.add(sortDifficultyIndex);
+          return (
+            <View style={styles.cardWrapper}>
+              <SongCard
+                music={item}
+                onPress={handleSongPress}
+                onLongPress={handleSongLongPress}
+                showChinaVersion={settings.showChinaVersion}
+                highlightedDifficulties={highlighted.size > 0 ? [...highlighted] : undefined}
+              />
+            </View>
+          );
+        }}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.empty}>

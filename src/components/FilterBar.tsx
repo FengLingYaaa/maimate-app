@@ -126,6 +126,21 @@ export function FilterBar({
     update({ ...localFilters, [key]: value || undefined });
   };
 
+  const setSortMode = (mode: NonNullable<FilterOptions['sort']>['mode']) => {
+    const difficultyIndex = localFilters.sort?.difficultyIndex
+      ?? (typeof localFilters.difficulty === 'number' ? localFilters.difficulty : 3);
+    update({
+      ...localFilters,
+      sort: mode === 'constantAsc' || mode === 'constantDesc'
+        ? { mode, difficultyIndex }
+        : { mode },
+    });
+  };
+
+  const setSortDifficulty = (difficultyIndex: number) => {
+    update({ ...localFilters, sort: { mode: localFilters.sort?.mode || 'constantDesc', difficultyIndex } });
+  };
+
   const handleSearchChange = (text: string) => {
     const next = cleanFilters({ ...localFilters, titleSearch: text || undefined });
     setLocalFilters(next);
@@ -200,6 +215,39 @@ export function FilterBar({
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
+              <Text style={styles.sectionTitle}>排序</Text>
+              <View style={styles.chipRow}>
+                {[
+                  ['relevance', '相关度'],
+                  ['titleAsc', '歌曲名 A→Z'],
+                  ['titleDesc', '歌曲名 Z→A'],
+                  ['constantAsc', '定数低→高'],
+                  ['constantDesc', '定数高→低'],
+                ].map(([mode, label]) => {
+                  const active = localFilters.sort?.mode === mode || (!localFilters.sort && mode === 'relevance');
+                  return (
+                    <Pressable key={mode} style={[styles.chip, active && styles.chipActive]} onPress={() => setSortMode(mode as NonNullable<FilterOptions['sort']>['mode'])}>
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {(localFilters.sort?.mode === 'constantAsc' || localFilters.sort?.mode === 'constantDesc') && (
+                <>
+                  <Text style={styles.sortHint}>按官方定数排序使用的难度（列表会高亮该难度）</Text>
+                  <View style={styles.chipRow}>
+                    {DifficultyLabels.map((label, index) => {
+                      const active = localFilters.sort?.difficultyIndex === index;
+                      return (
+                        <Pressable key={index} style={[styles.chip, active && { backgroundColor: `${DifficultyColorMap[index]}33`, borderColor: DifficultyColorMap[index] }]} onPress={() => setSortDifficulty(index)}>
+                          <Text style={[styles.chipText, active && { color: DifficultyColorMap[index] }]}>{label}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+
               <Text style={styles.sectionTitle}>分类</Text>
               <View style={styles.chipRow}>
                 {genres.map(genre => {
@@ -427,6 +475,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.text.secondary,
     marginTop: 14,
+    marginBottom: 8,
+  },
+  sortHint: {
+    fontSize: 11,
+    lineHeight: 16,
+    color: Colors.text.muted,
     marginBottom: 8,
   },
   chipRow: {

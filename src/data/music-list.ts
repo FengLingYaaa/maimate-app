@@ -5,7 +5,19 @@
  * 因此连续切换分类、SD/DX、版本和搜索条件不会互相污染。
  */
 
-import type { FilterOptions, MusicData, ChartData } from './types';
+import type { FilterOptions, MusicData, ChartData, SortOptions } from './types';
+import { isBanquetGenre } from '../constants/game';
+
+/** 返回可用于官方定数筛选/排序/Rating 的定数；宴会場保留为缺失。 */
+export function getOfficialChartConstant(music: MusicData, index: number): number | null {
+  if (isBanquetGenre(music.basic_info.genre)) return null;
+  const value = music.ds[index];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+export function hasOfficialChartConstant(music: MusicData, index: number): boolean {
+  return getOfficialChartConstant(music, index) !== null;
+}
 
 /** 将用户输入和曲库文本统一成适合搜索的形式。 */
 export function normalizeSearchText(value: string): string {
@@ -113,7 +125,7 @@ function inOrEqual<T extends string | number>(
 }
 
 function getRequestedDifficultyIndices(music: MusicData, difficulty: FilterOptions['difficulty']): number[] {
-  const chartCount = Math.min(music.charts.length, music.ds.length, music.level.length);
+  const chartCount = Math.min(music.charts.length, music.level.length);
   if (difficulty === undefined) {
     return Array.from({ length: chartCount }, (_, index) => index);
   }
@@ -134,7 +146,10 @@ function matchesChart(
   const chart: ChartData | undefined = music.charts[index];
   if (!chart) return false;
   if (opts.level !== undefined && !inOrEqual(music.level[index], opts.level)) return false;
-  if (opts.dsRange !== undefined && !inOrEqual(music.ds[index], opts.dsRange)) return false;
+  if (opts.dsRange !== undefined) {
+    const constant = getOfficialChartConstant(music, index);
+    if (constant === null || !inOrEqual(constant, opts.dsRange)) return false;
+  }
   if (opts.charter !== undefined && opts.charter.trim() !== '') {
     const query = normalizeSearchText(opts.charter);
     if (!normalizeSearchText(chart.charter).includes(query)) return false;
@@ -180,6 +195,47 @@ export function getNoteBreakdown(
   return { tap: notes[0] || 0, hold: notes[1] || 0, slide: notes[2] || 0, touch: 0, brk: notes[3] || 0 };
 }
 
+/** 比较排序结果时让缺少官方定数的歌曲始终排在末尾。 */
+function compareNullableConstants(left: number | null, right: number | null, descending: boolean): number {
+  if (left === null && right === null) return 0;
+  if (left === null) return 1;
+  if (right === null) return -1;
+  return descending ? right - left : left - right;
+}
+
+function compareTitles(left: MusicData, right: MusicData, descending: boolean): number {
+  const titleResult = left.title.localeCompare(right.title);
+  if (titleResult !== 0) return descending ? -titleResult : titleResult;
+  return parseInt(left.id, 10) - parseInt(right.id, 10);
+}
+
+function sortMusicItems(items: MusicData[], sort: SortOptions | undefined, query?: string): MusicData[] {
+  const mode = sort?.mode || (query?.trim() ? 'relevance' : null);
+  if (!mode || mode === 'relevance') {
+    if (!query?.trim()) return items;
+    return items.sort((left, right) => {
+      const leftScore = getMusicSearchScore(left, query) ?? -1;
+      const rightScore = getMusicSearchScore(right, query) ?? -1;
+      if (rightScore !== leftScore) return rightScore - leftScore;
+      return compareTitles(left, right, false);
+    });
+  }
+
+  if (mode === 'titleAsc') return items.sort((left, right) => compareTitles(left, right, false));
+  if (mode === 'titleDesc') return items.sort((left, right) => compareTitles(left, right, true));
+
+  const difficultyIndex = Number.isInteger(sort?.difficultyIndex) ? sort!.difficultyIndex! : 3;
+  const descending = mode === 'constantDesc';
+  return items.sort((left, right) => {
+    const constantResult = compareNullableConstants(
+      getOfficialChartConstant(left, difficultyIndex),
+      getOfficialChartConstant(right, difficultyIndex),
+      descending,
+    );
+    return constantResult !== 0 ? constantResult : compareTitles(left, right, false);
+  });
+}
+
 /** 曲库包装类。所有方法均返回新数组，不修改输入对象。 */
 export class MusicList {
   private items: MusicData[];
@@ -212,15 +268,7 @@ export class MusicList {
 
   filter(opts: FilterOptions): MusicList {
     const result = this.items.filter(music => matchesMusic(music, opts));
-    if (opts.titleSearch !== undefined && opts.titleSearch.trim() !== '') {
-      result.sort((left, right) => {
-        const leftScore = getMusicSearchScore(left, opts.titleSearch!) ?? -1;
-        const rightScore = getMusicSearchScore(right, opts.titleSearch!) ?? -1;
-        if (rightScore !== leftScore) return rightScore - leftScore;
-        return left.title.localeCompare(right.title);
-      });
-    }
-    return new MusicList(result);
+    return new MusicList(sortMusicItems(result, opts.sort, opts.titleSearch));
   }
 
   sortById(asc = true): MusicList {

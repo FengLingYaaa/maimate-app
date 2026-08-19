@@ -48,28 +48,66 @@ export interface MusicData {
 /** Diving-Fish /chart_stats 的按歌曲 ID 索引结果 */
 export type ChartStatsMap = Record<string, Array<ChartStats | null>>;
 
+/** 曲库排序模式。定数排序时使用 difficultyIndex 指定目标难度。 */
+export type SortMode = 'relevance' | 'titleAsc' | 'titleDesc' | 'constantAsc' | 'constantDesc';
+
+export interface SortOptions {
+  mode: SortMode;
+  difficultyIndex?: number;
+}
+
 /** 筛选条件 */
 export interface FilterOptions {
   genre?: string | string[];
   difficulty?: number | number[];    // 难度索引 0-4
   level?: string | string[];         // 等级标签如 "12+"
   dsRange?: [number, number];        // 官方定数范围
-  version?: string | string[];       // 版本
+  version?: string | string[];       // 原始版本名
   type?: 'SD' | 'DX' | ('SD' | 'DX')[];
   artist?: string;                   // 曲师关键词
   charter?: string;                  // 谱师关键词
   bpmRange?: [number, number];       // BPM 范围
   titleSearch?: string;              // 标题/曲师/谱师模糊搜索
+  sort?: SortOptions;
 }
 
 /** 推分计划条目 */
 export interface PlanEntry {
   songId: string;
   difficultyIndex: number;  // 目标练习的难度
+  /** 兼容旧计划；新条目保存 SD/DX，避免同 ID 曲目混淆。 */
+  musicType?: 'SD' | 'DX';
   addedAt: number;          // 添加时间戳
   order: number;            // 排序权重
   note?: string;            // 用户备注
   targetScore?: number;     // 目标达成率
+}
+
+/** 已从 Diving-Fish 导入的单曲成绩。 */
+export interface PlayerScore {
+  songId: string;
+  type: 'SD' | 'DX';
+  difficultyIndex: number;
+  achievement: number;
+  dxScore: number;
+  fc?: string;
+  fs?: string;
+  serverRating?: number;
+  importedAt: number;
+}
+
+export interface ScoreSyncState {
+  status: 'idle' | 'syncing' | 'success' | 'invalid' | 'error';
+  lastSyncedAt: number | null;
+  recordCount: number;
+  serverRating: number | null;
+  message: string | null;
+}
+
+export interface AppSettings {
+  showChinaVersion: boolean;
+  defaultSort: SortOptions;
+  showProjectedRating: boolean;
 }
 
 /** 推分计划 */

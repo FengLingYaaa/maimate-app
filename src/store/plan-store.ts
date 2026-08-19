@@ -21,17 +21,23 @@ interface PlanStore {
   /** 添加/更新推分条目 */
   addEntry: (entry: Omit<PlanEntry, 'addedAt' | 'order'>) => void;
   /** 移除推分条目 */
-  removeEntry: (songId: string, difficultyIndex: number) => void;
+  removeEntry: (songId: string, difficultyIndex: number, musicType?: 'SD' | 'DX') => void;
   /** 更新条目备注 */
-  updateNote: (songId: string, difficultyIndex: number, note: string) => void;
-  /** 更新目标分数 */
-  updateTargetScore: (songId: string, difficultyIndex: number, score: number) => void;
+  updateNote: (songId: string, difficultyIndex: number, note: string, musicType?: 'SD' | 'DX') => void;
+  /** 更新目标分数；传 null 清除目标。 */
+  updateTargetScore: (songId: string, difficultyIndex: number, score: number | null, musicType?: 'SD' | 'DX') => void;
   /** 重新排序 */
   reorder: (entries: PlanEntry[]) => void;
   /** 检查某歌曲是否在计划中 */
-  isInPlan: (songId: string, difficultyIndex: number) => boolean;
+  isInPlan: (songId: string, difficultyIndex: number, musicType?: 'SD' | 'DX') => boolean;
   /** 清空计划 */
   clearPlan: () => Promise<void>;
+}
+
+function matchesPlanEntry(entry: PlanEntry, songId: string, difficultyIndex: number, musicType?: 'SD' | 'DX'): boolean {
+  return entry.songId === songId
+    && entry.difficultyIndex === difficultyIndex
+    && (!musicType || !entry.musicType || entry.musicType === musicType);
 }
 
 export const usePlanStore = create<PlanStore>((set, get) => ({
@@ -60,9 +66,7 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
 
   addEntry: (entry) => {
     const { entries } = get();
-    const exists = entries.find(
-      e => e.songId === entry.songId && e.difficultyIndex === entry.difficultyIndex
-    );
+    const exists = entries.find(e => matchesPlanEntry(e, entry.songId, entry.difficultyIndex, entry.musicType));
     if (exists) return;
 
     const newEntry: PlanEntry = {
@@ -75,19 +79,17 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
     get().savePlan();
   },
 
-  removeEntry: (songId, difficultyIndex) => {
+  removeEntry: (songId, difficultyIndex, musicType) => {
     const { entries } = get();
-    const newEntries = entries.filter(
-      e => !(e.songId === songId && e.difficultyIndex === difficultyIndex)
-    );
+    const newEntries = entries.filter(e => !matchesPlanEntry(e, songId, difficultyIndex, musicType));
     set({ entries: newEntries });
     get().savePlan();
   },
 
-  updateNote: (songId, difficultyIndex, note) => {
+  updateNote: (songId, difficultyIndex, note, musicType) => {
     const { entries } = get();
     const newEntries = entries.map(e =>
-      e.songId === songId && e.difficultyIndex === difficultyIndex
+      matchesPlanEntry(e, songId, difficultyIndex, musicType)
         ? { ...e, note }
         : e
     );
@@ -95,13 +97,16 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
     get().savePlan();
   },
 
-  updateTargetScore: (songId, difficultyIndex, score) => {
+  updateTargetScore: (songId, difficultyIndex, score, musicType) => {
     const { entries } = get();
-    const newEntries = entries.map(e =>
-      e.songId === songId && e.difficultyIndex === difficultyIndex
-        ? { ...e, targetScore: score }
-        : e
-    );
+    const newEntries = entries.map(e => {
+      if (!matchesPlanEntry(e, songId, difficultyIndex, musicType)) return e;
+      if (score === null) {
+        const { targetScore: _targetScore, ...withoutTarget } = e;
+        return withoutTarget;
+      }
+      return { ...e, targetScore: score };
+    });
     set({ entries: newEntries });
     get().savePlan();
   },
@@ -112,10 +117,8 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
     get().savePlan();
   },
 
-  isInPlan: (songId, difficultyIndex) => {
-    return get().entries.some(
-      e => e.songId === songId && e.difficultyIndex === difficultyIndex
-    );
+  isInPlan: (songId, difficultyIndex, musicType) => {
+    return get().entries.some(e => matchesPlanEntry(e, songId, difficultyIndex, musicType));
   },
 
   clearPlan: async () => {

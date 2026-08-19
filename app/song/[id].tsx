@@ -14,11 +14,12 @@ import {
   Modal,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { useMusicStore, usePlanStore } from '../../src/store';
+import { useMusicStore, usePlanStore, useScoreStore } from '../../src/store';
 import { BilibiliSearchPanel, DifficultyBadge, NoteBar, RatingPanel } from '../../src/components';
 import { Colors } from '../../src/constants';
-import { DifficultyLabels, getCoverUrl } from '../../src/constants/game';
-import { getTotalNotes } from '../../src/data/music-list';
+import { DifficultyLabels, getChinaVersionName, getCoverUrl } from '../../src/constants/game';
+import { getOfficialChartConstant, getTotalNotes } from '../../src/data/music-list';
+import { formatAchievement } from '../../src/data/rating';
 import type { ChartData } from '../../src/data/types';
 
 export default function SongDetail() {
@@ -27,6 +28,7 @@ export default function SongDetail() {
   const rawData = useMusicStore(s => s.rawData);
   const chartStats = useMusicStore(s => s.chartStats);
   const chartStatsLoading = useMusicStore(s => s.chartStatsLoading);
+  const scores = useScoreStore(s => s.scores);
   const isInPlan = usePlanStore(s => s.isInPlan);
   const addEntry = usePlanStore(s => s.addEntry);
   const removeEntry = usePlanStore(s => s.removeEntry);
@@ -40,9 +42,9 @@ export default function SongDetail() {
 
   useEffect(() => {
     if (!music) return;
-    const highestAvailable = Math.min(music.charts.length, music.ds.length, music.level.length) - 1;
+    const highestAvailable = Math.min(music.charts.length, music.level.length) - 1;
     setSelectedDiff(Math.max(0, highestAvailable));
-  }, [music?.id, music?.charts.length, music?.ds.length, music?.level.length]);
+  }, [music?.id, music?.charts.length, music?.level.length]);
 
   useEffect(() => () => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -61,12 +63,13 @@ export default function SongDetail() {
 
   const handlePlanConfirm = useCallback(() => {
     if (!music) return;
-    if (isInPlan(music.id, selectedDiff)) {
-      removeEntry(music.id, selectedDiff);
+    if (isInPlan(music.id, selectedDiff, music.type)) {
+      removeEntry(music.id, selectedDiff, music.type);
       showToast('已从推分计划移除');
     } else {
       addEntry({
         songId: music.id,
+        musicType: music.type,
         difficultyIndex: selectedDiff,
       });
       showToast('已添加到推分计划');
@@ -86,11 +89,14 @@ export default function SongDetail() {
   }
 
   const chart: ChartData | undefined = music.charts[selectedDiff];
-  const ds = music.ds[selectedDiff];
+  const ds = getOfficialChartConstant(music, selectedDiff) ?? undefined;
   const level = music.level[selectedDiff];
   const isDX = music.type === 'DX';
   const stats = chartStats[music.id]?.[selectedDiff] || undefined;
-  const inPlan = isInPlan(music.id, selectedDiff);
+  const currentScore = scores.find(score =>
+    score.songId === music.id && score.type === music.type && score.difficultyIndex === selectedDiff,
+  );
+  const inPlan = isInPlan(music.id, selectedDiff, music.type);
 
   return (
     <>
@@ -122,7 +128,8 @@ export default function SongDetail() {
                 {music.type}
               </Text>
             </View>
-            <Text style={styles.heroVersion}>{music.basic_info.from}</Text>
+            <Text style={styles.heroVersion}>原始版本：{music.basic_info.from}</Text>
+            <Text style={styles.heroVersion}>国区版本：{getChinaVersionName(music.basic_info.from)}</Text>
           </View>
         </View>
 
@@ -139,7 +146,7 @@ export default function SongDetail() {
                 <DifficultyBadge
                   index={i}
                   level={lv}
-                  ds={music.ds[i]}
+                  ds={getOfficialChartConstant(music, i) ?? undefined}
                   size="lg"
                   highlighted={selectedDiff === i}
                 />
@@ -160,7 +167,9 @@ export default function SongDetail() {
                     <Text style={styles.chartLevel}>
                       {DifficultyLabels[selectedDiff]} {level}
                     </Text>
-                    <Text style={styles.chartDs}>官方定数: {ds}</Text>
+                    <Text style={styles.chartDs}>
+                      {ds === undefined ? '官方定数: 无详细定数（宴会场或数据缺失）' : `官方定数: ${ds.toFixed(1)}`}
+                    </Text>
                     <Text style={styles.chartDs}>
                       {stats ? `拟合定数: ${stats.fit_diff.toFixed(2)} · 样本 ${stats.cnt}` : chartStatsLoading ? '拟合定数加载中…' : '暂无拟合定数'}
                     </Text>
@@ -199,6 +208,18 @@ export default function SongDetail() {
                 </View>
 
                 <RatingPanel ds={ds} fitDiff={stats?.fit_diff} loading={chartStatsLoading} />
+                {currentScore ? (
+                  <View style={styles.importedScoreCard}>
+                    <Text style={styles.importedScoreTitle}>已导入成绩</Text>
+                    <Text style={styles.importedScoreValue}>{formatAchievement(currentScore.achievement)} · DX Score {currentScore.dxScore}</Text>
+                    <Text style={styles.importedScoreMeta}>
+                      {currentScore.fc ? `${currentScore.fc} ` : ''}{currentScore.fs ? `${currentScore.fs} ` : ''}
+                      {currentScore.serverRating === undefined ? '' : `· 服务器 RA ${currentScore.serverRating}`}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.importedScoreEmpty}>尚未导入该难度成绩</Text>
+                )}
                 <BilibiliSearchPanel
                   songTitle={music.title}
                   difficultyIndex={selectedDiff}
@@ -394,6 +415,32 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.text.secondary,
     marginTop: 2,
+  },
+  importedScoreCard: {
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: `${Colors.functional.success}16`,
+    borderWidth: 1,
+    borderColor: `${Colors.functional.success}55`,
+    gap: 3,
+  },
+  importedScoreTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Colors.functional.success,
+  },
+  importedScoreValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.text.primary,
+  },
+  importedScoreMeta: {
+    fontSize: 11,
+    color: Colors.text.secondary,
+  },
+  importedScoreEmpty: {
+    fontSize: 11,
+    color: Colors.text.muted,
   },
   totalNotes: {
     alignItems: 'center',

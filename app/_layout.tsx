@@ -4,22 +4,24 @@
  */
 
 import React, { useEffect } from 'react';
-import { Stack, Tabs } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text, StyleSheet } from 'react-native';
 import { Colors } from '../src/constants';
-import { useMusicStore } from '../src/store';
-import { usePlanStore } from '../src/store/plan-store';
+import { useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '../src/store';
 
 export default function RootLayout() {
   const loadData = useMusicStore(s => s.loadData);
   const loading = useMusicStore(s => s.loading);
-  const error = useMusicStore(s => s.error);
   const loadPlan = usePlanStore(s => s.loadPlan);
+  const loadScores = useScoreStore(s => s.loadScores);
+  const loadSettings = useSettingsStore(s => s.loadSettings);
 
   useEffect(() => {
     loadData();
     loadPlan();
+    loadScores();
+    loadSettings();
   }, []);
 
   if (loading) {
@@ -73,6 +75,20 @@ export default function RootLayout() {
           options={{
             title: '推分计划',
             tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📋</Text>,
+          }}
+        />
+        <Tabs.Screen
+          name="fortune"
+          options={{
+            title: '今日运势',
+            tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🔮</Text>,
+          }}
+        />
+        <Tabs.Screen
+          name="settings"
+          options={{
+            title: '设置',
+            tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>⚙️</Text>,
           }}
         />
       </Tabs>

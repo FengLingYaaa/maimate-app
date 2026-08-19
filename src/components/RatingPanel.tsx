@@ -5,7 +5,7 @@ import { Colors } from '../constants';
 import { calculateRating, RATING_CHECKPOINTS } from '../data/rating';
 
 interface Props {
-  ds: number;
+  ds?: number;
   fitDiff?: number;
   loading?: boolean;
 }
@@ -29,6 +29,16 @@ export function RatingPanel({ ds, fitDiff, loading = false }: Props) {
     if (showLowRate && achievement < 97) setAchievement(97);
     setShowLowRate(value => !value);
   };
+
+  if (ds === undefined) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>DX Rating 预估</Text>
+        <Text style={styles.caption}>该谱面没有可用于官方 Rating 的详细定数（宴会場或数据缺失）。统计拟合值仅供参考。</Text>
+        {fitDiff !== undefined && <Text style={styles.caption}>统计拟合定数：{fitDiff.toFixed(2)}</Text>}
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

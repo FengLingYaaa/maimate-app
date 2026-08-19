@@ -16,7 +16,7 @@ interface Props {
 }
 
 function getQuickAddDifficulty(music: MusicData): number | null {
-  const count = Math.min(music.charts.length, music.ds.length, music.level.length);
+  const count = Math.min(music.charts.length, music.level.length);
   return count > 0 ? count - 1 : null;
 }
 
@@ -124,12 +124,12 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
     }
 
     const difficultyLabel = DifficultyLabels[difficultyIndex];
-    if (isInPlan(music.id, difficultyIndex)) {
+    if (isInPlan(music.id, difficultyIndex, music.type)) {
       setPlanFeedback(`已在推分计划：${music.title} · ${difficultyLabel}`);
       return;
     }
 
-    addEntry({ songId: music.id, difficultyIndex });
+    addEntry({ songId: music.id, musicType: music.type, difficultyIndex });
     setPlanFeedback(`已加入推分计划：${music.title} · ${difficultyLabel}`);
   };
 
@@ -154,22 +154,15 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
               <Text style={styles.captureText}>{working ? '识别中…' : imageUri ? '重新拍摄' : '打开相机拍摄'}</Text>
             </Pressable>
 
-            {recognizedText && (
-              <View style={styles.ocrBox}>
-                <Text style={styles.sectionTitle}>识别到的文字</Text>
-                <Text style={styles.ocrText}>{recognizedText}</Text>
-              </View>
-            )}
-
             {matches.length > 0 && (
               <View style={styles.results}>
-                <Text style={styles.sectionTitle}>可能的歌曲</Text>
+                <Text style={styles.sectionTitle}>可能的歌曲（优先处理匹配结果）</Text>
                 {matches.map(match => {
                   const difficultyIndex = getQuickAddDifficulty(match.music);
                   const difficultyLabel = difficultyIndex === null ? null : DifficultyLabels[difficultyIndex];
-                  const alreadyInPlan = difficultyIndex !== null && planLoaded && isInPlan(match.music.id, difficultyIndex);
+                  const alreadyInPlan = difficultyIndex !== null && planLoaded && isInPlan(match.music.id, difficultyIndex, match.music.type);
                   return (
-                    <View key={match.music.id} style={styles.resultRow}>
+                    <View key={`${match.music.id}-${match.music.type}`} style={styles.resultRow}>
                       <Pressable
                         style={styles.resultMain}
                         onPress={() => handleOpenSong(match.music)}
@@ -199,6 +192,13 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
                     </View>
                   );
                 })}
+              </View>
+            )}
+
+            {recognizedText && (
+              <View style={styles.ocrBox}>
+                <Text style={styles.sectionTitle}>识别到的原始文字</Text>
+                <Text style={styles.ocrText}>{recognizedText}</Text>
               </View>
             )}
 

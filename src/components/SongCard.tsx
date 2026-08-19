@@ -1,12 +1,13 @@
 /**
  * SongCard — 歌曲卡片组件
- * 在列表中展示单首歌曲的概览信息
+ * 在列表中展示单首歌曲的概览信息。
  */
 
 import React, { memo } from 'react';
 import { View, Text, Image, StyleSheet, Pressable } from 'react-native';
 import { Colors } from '../constants';
 import { DifficultyBadge } from './DifficultyBadge';
+import { getChinaVersionName } from '../constants/game';
 import type { MusicData } from '../data/types';
 
 interface Props {
@@ -14,14 +15,30 @@ interface Props {
   onPress?: (music: MusicData) => void;
   onLongPress?: (music: MusicData) => void;
   highlightedDifficulties?: number[];
+  /** 计划页使用：只展示这个条目的选中难度。 */
+  selectedDifficultyIndex?: number;
+  showChinaVersion?: boolean;
 }
 
-export const SongCard = memo(function SongCard({ music, onPress, onLongPress, highlightedDifficulties }: Props) {
+export const SongCard = memo(function SongCard({
+  music,
+  onPress,
+  onLongPress,
+  highlightedDifficulties,
+  selectedDifficultyIndex,
+  showChinaVersion = true,
+}: Props) {
   const coverId = parseInt(music.id, 10);
   const len5 = coverId > 10000 && coverId <= 11000
     ? (coverId - 10000).toString().padStart(5, '0')
     : coverId.toString().padStart(5, '0');
   const coverUrl = `https://www.diving-fish.com/covers/${len5}.png`;
+  const selected = selectedDifficultyIndex !== undefined
+    ? music.level[selectedDifficultyIndex] !== undefined
+      ? [selectedDifficultyIndex]
+      : []
+    : music.level.map((_, index) => index);
+  const chinaVersion = getChinaVersionName(music.basic_info.from);
 
   return (
     <Pressable
@@ -50,16 +67,21 @@ export const SongCard = memo(function SongCard({ music, onPress, onLongPress, hi
             {music.type}
           </Text>
         </View>
+        <Text style={styles.version} numberOfLines={1}>原始：{music.basic_info.from}</Text>
+        {showChinaVersion && chinaVersion !== music.basic_info.from && (
+          <Text style={styles.version} numberOfLines={1}>国区：{chinaVersion}</Text>
+        )}
         <View style={styles.difficulties}>
-          {music.level.map((lv, i) => (
+          {selected.map(index => (
             <DifficultyBadge
-              key={i}
-              index={i}
-              level={lv}
+              key={index}
+              index={index}
+              level={music.level[index]}
               size="sm"
-              highlighted={highlightedDifficulties?.includes(i) ?? false}
+              highlighted={highlightedDifficulties?.includes(index) ?? selectedDifficultyIndex !== undefined}
             />
           ))}
+          {selected.length === 0 && <Text style={styles.missingDifficulty}>该难度已不在当前曲库</Text>}
         </View>
       </View>
     </Pressable>
@@ -119,9 +141,18 @@ const styles = StyleSheet.create({
   typeDx: {
     color: Colors.accent.secondary,
   },
+  version: {
+    fontSize: 10,
+    color: Colors.text.muted,
+  },
   difficulties: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
     marginTop: 4,
+  },
+  missingDifficulty: {
+    fontSize: 10,
+    color: Colors.functional.warning,
   },
 });

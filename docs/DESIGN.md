@@ -3,7 +3,7 @@
 > 文档性质：项目事实基线、产品设计、工程约束和持续变更记录。
 > 最后更新：2026-08-18
 > 当前版本：`v1.3.0-alpha`
-> 当前状态：第一、第二阶段完成；第三阶段基础代码和 v1.3.0-alpha 云端发布完成；外部 Bilibili 搜索和交互修订已实现，真机验收仍待设备。
+> 当前状态：Phase1–Phase4 功能代码已实现并完成 TypeScript 校验；待提交后执行 GitHub Actions 云构建、个人站同步和真机验收。
 > GitHub：<https://github.com/FengLingYaaa/maimate-app>
 
 这份文档的目标不是只描述“理想中的产品”，而是让人类或新对话中的智能体能够回答：
@@ -66,7 +66,7 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 1. **离线优先**：先显示本地缓存，网络只负责更新，不应让已有曲库因网络失败而不可用。
 2. **数据来源透明**：Diving-Fish 曲库数据标注来源；Bilibili 只作为外部跳转目标，不复制视频资料。
 3. **外部内容不内置**：不在 App 展示未经核验的视频，不在手机端直接爬取 Bilibili；需要观看时交给 Bilibili 应用或网页。
-4. **隐私最小化**：OCR 只识别照片中的文字，不识别曲绘；不申请麦克风；不接入玩家成绩，除非未来明确设计授权流程。
+4. **隐私最小化**：OCR 只识别照片中的文字，不识别曲绘；不申请麦克风。玩家成绩只通过用户主动输入的 Import-Token 只读同步，Token 使用 SecureStore，不写入 AsyncStorage、日志或源码。
 5. **研究和产品解耦**：Bilibili 研究资料可以保留在研究区，但不作为 App 构建、发布或运行时数据源。
 6. **事实和计划分开**：设计案中的“已完成”必须有代码、提交、构建或线上验证证据；计划不能写成完成。
 
@@ -80,7 +80,7 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 - 不在客户端抓取 Bilibili 搜索结果或 UP 主主页；
 - 不自动把未经人工审核的 Bilibili 视频加入正式目录；
 - 暂不做玩家通过 Bilibili 链接投稿的第四阶段审核系统；
-- 暂不接入 Diving-Fish 玩家成绩、Import-Token、Developer-Token、B40/B50；
+- 不接入 Developer-Token、B40/B50 或任何成绩写入；玩家成绩仅允许用户主动配置 Import-Token 后进行只读导入；
 - 不提供游戏音频、ROM、模拟器或任何与官方机台交互的作弊功能；
 - 不把 Bilibili 反爬虫当作需要绕过验证码的目标。遇到风控时应降低频率、换合法网络环境或由用户在本地完成抓取。
 
@@ -119,13 +119,18 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 | 歌曲详情 | 已完成基础版本 | 定数、等级、Note 分布、谱师、封面、Rating 预估 |
 | 推分计划 | 已完成基础版本 | 添加、删除、顺序、备注/目标分数字段和本地持久化 |
 | 随机抽歌 | 已完成基础版本 | 推分计划、全曲、按条件三种模式；结果与动画目标一致 |
-| Rating 预估 | 已完成基础版本 | 官方定数/拟合定数分别估算；主要显示 97%～100.5% 区间 |
+| Rating 预估 | Phase1 已完成 | 使用完整 Diving-Fish 系数表；官方定数与 fit_diff 严格分开；宴会場不计算官方 Rating |
+| 版本显示 | Phase1 已完成 | 保留 Diving-Fish 原始 `from`，并提供舞萌DX/年份国区展示名 |
+| 曲库排序 | Phase2 已完成 | 歌曲名升/降序与选定难度官方定数升/降序；缺失定数末尾并高亮排序难度 |
+| 推分计划目标 | Phase2 已完成 | 只展示条目选定难度；支持目标达成率、目标 Rating 和导入成绩 |
 | 自定义推分弹窗/Toast | 已完成 | 不使用 Android 原生确认弹窗 |
 | 更新/下载入口 | 已完成 | 曲库页可打开下载站 |
 | 顺时针曲绘滚筒 | 已完成基础版本 | `src/components/DrumRoll.tsx`，动画中多次切换封面 |
 | Bilibili 外部搜索入口 | 本轮已实现 | 优先尝试 `bilibili://search`，失败回退 HTTPS 搜索；不在 App 内置视频目录 |
-| OCR 拍照识别 | 已完成基础版本 | ML Kit；中文/日文/拉丁文字；只匹配曲名 |
-| APK 发布链路 | v1.3.0-alpha 已完成 | GitHub Actions → GitHub Release `MaiMate-latest.apk` → Cloudflare Worker 下载站 |
+| OCR 拍照识别 | 已完成基础版本 | ML Kit；中文/日文/拉丁文字；候选歌曲现在置于原始识别文字之前 |
+| 今日舞萌运势 | Phase3 已完成 | 本地安装种子 + 上海日期的确定性娱乐结果；不读取 Token、不上传运势 |
+| 个人设置 | Phase4 已完成 | SecureStore Token 管理、只读成绩同步、显示/排序偏好和本地数据清理 |
+| APK 发布链路 | 待本轮云构建 | GitHub Actions → GitHub Release `MaiMate-latest.apk` → Cloudflare Worker 下载站 |
 
 ### 3.3 已完成但仍需人工验收的能力
 
@@ -154,6 +159,7 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
   ├─ 点击歌曲 → 歌曲详情
   ├─ 长按歌曲 → 当前版本仍进入详情；推分操作由详情页完成
   ├─ 拍照识别 → OCR 模态页
+  ├─ 排序 → 歌曲名或选定难度官方定数；排序难度高亮
   └─ 更新/下载 → MaiMate 下载站
 ```
 
@@ -169,7 +175,26 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
   └─ 加入/移出推分计划
 ```
 
-### 4.3 随机抽歌流程
+### 4.3 推分计划、运势与设置流程
+
+```text
+歌曲详情 → 选择难度 → 加入推分计划
+  ├─ 计划卡只显示该条目的选中难度
+  ├─ 输入目标达成率 → 计算官方目标 Rating（缺失/宴会場定数显示 —）
+  └─ 若已同步成绩 → 显示当前达成率、DX Score、FC/FS 和服务器 RA
+
+今日运势 Tab
+  ├─ 本地生成/读取安装种子
+  ├─ 使用上海日期生成当天稳定的人品值、宜/忌和推荐歌曲
+  └─ 娱乐功能，不读取成绩 Token、不上传数据
+
+设置 Tab
+  ├─ SecureStore 保存/删除用户主动输入的 Import-Token
+  ├─ 只读验证并同步 Diving-Fish 成绩
+  └─ 控制国区版本名、默认排序和目标 Rating 显示
+```
+
+### 4.4 随机抽歌流程
 
 ```text
 推分计划 / 全曲随机 / 按条件
@@ -185,7 +210,7 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 点击结果卡片进入歌曲详情
 ```
 
-### 4.4 OCR 流程
+### 4.5 OCR 流程
 
 ```text
 曲库页 → 拍照识别
@@ -214,7 +239,8 @@ ML Kit 分别尝试日文、中文、拉丁文字模型
 - TypeScript；
 - Expo Router；
 - Zustand；
-- AsyncStorage；
+- AsyncStorage（曲库、计划、偏好和已导入成绩）；
+- `expo-secure-store`（仅保存用户主动配置的 Import-Token）；
 - `@react-native-ml-kit/text-recognition`；
 - `expo-image-picker`、`expo-file-system`、`expo-sqlite` 等 Expo 模块；
 - `react-native-reanimated`、`react-native-worklets`；
@@ -232,19 +258,25 @@ ML Kit 分别尝试日文、中文、拉丁文字模型
 │   │   ├── index.tsx                 曲库首页
 │   │   ├── random.tsx                随机抽歌
 │   │   ├── plan.tsx                  推分计划
+│   │   ├── fortune.tsx               今日舞萌运势
+│   │   ├── settings.tsx              个人设置和成绩导入
 │   │   └── song/[id].tsx             歌曲详情
 │   ├── src/api/
 │   │   ├── prober.ts                 music_data 和曲库缓存
-│   │   └── chart-stats.ts            chart_stats 和统计缓存
+│   │   ├── chart-stats.ts            chart_stats 和统计缓存
+│   │   └── score-import.ts            SecureStore Token、只读成绩 API 和归一化
 │   ├── src/data/
 │   │   ├── types.ts                  MusicData/ChartStats 等类型
 │   │   ├── music-list.ts              纯函数筛选和搜索引擎
-│   │   ├── rating.ts                  Rating 计算
+│   │   ├── rating.ts                  完整 Diving-Fish Rating 计算
+│   │   ├── fortune.ts                 本地确定性今日运势
 │   │   ├── bilibili-search.ts         外部客户端深链和 HTTPS 搜索 URL
 │   │   └── title-search.ts            OCR 曲名匹配
 │   ├── src/store/
 │   │   ├── music-store.ts             曲库、缓存、筛选、chart_stats 状态
-│   │   └── plan-store.ts              推分计划持久化
+│   │   ├── plan-store.ts              推分计划持久化
+│   │   ├── score-store.ts             SecureStore Token 与本地成绩状态
+│   │   └── settings-store.ts          显示偏好持久化
 │   ├── src/components/
 │   │   ├── FilterBar.tsx
 │   │   ├── SongCard.tsx
@@ -306,7 +338,34 @@ interface ChartData {
 
 `fit_diff` 是 Diving-Fish 统计接口的拟合定数，不等同于官方定数。界面必须同时标明“官方定数”和“拟合定数”，不能把拟合值伪装成官方数据。
 
-### 6.3 Bilibili 外部搜索参数
+### 6.3 Rating、官方定数和宴会場边界
+
+`src/data/rating.ts` 使用完整的 Diving-Fish 系数表，计算为：
+
+```text
+floor(ds × min(achievement, 100.5) / 100 × coefficient)
+```
+
+`MusicData.ds[index]` 是官方定数；`ChartStats.fit_diff` 只是统计拟合参考。`basic_info.genre === 宴会場` 或定数缺失时，界面显示“无详细定数”，不计算官方目标 Rating；拟合值必须单独标注。
+
+### 6.4 版本展示边界
+
+`basic_info.from` 原始字符串永远保留，用于 API 数据完整性和版本筛选。`src/constants/game.ts` 的 `getChinaVersionName()` 只负责展示舞萌DX、Splash/UNiVERSE/FESTiVAL/BUDDiES/PRiSM 年份名；未知未来版本回退原始字符串。
+
+### 6.5 PlayerScore 与 Token 边界
+
+成绩同步只调用：
+
+- `GET /api/maimaidxprober/player/validate`；
+- `GET /api/maimaidxprober/player/records`。
+
+请求使用用户在设置页主动输入的 `Import-Token`；Token 只进 `expo-secure-store`，不进入 AsyncStorage 成绩 JSON、日志、测试 fixture、文档或构建参数。成绩记录归一化为 `songId + type + difficultyIndex + achievement + dxScore + fc/fs + serverRating`，App 不执行任何写入接口。
+
+### 6.6 今日舞萌运势边界
+
+运势由安装种子和上海日期在本地确定性生成，结果包含人品值、宜/忌和推荐歌曲。每天结果稳定，不依赖玩家成绩、不调用远程运势接口，也不上传安装种子。
+
+### 6.7 Bilibili 外部搜索参数
 
 新方案不把任何 Bilibili 视频条目写入 App，不维护 `ChartVideo[]` 正式目录，也不保存 BV 号、UP 主、标题、审核状态或视频 URL。歌曲详情页只使用本地已经存在的歌曲信息构造搜索内容：
 

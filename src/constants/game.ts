@@ -58,6 +58,31 @@ export const Versions = [
   'maimai でらっくす PRiSM',
 ] as const;
 
+/** 原始版本名 → 舞萌中国区展示名。原始值始终保留用于筛选与数据匹配。 */
+export const ChinaVersionMap: Record<string, string> = {
+  'maimai でらっくす': '舞萌DX',
+  'maimai でらっくす PLUS': '舞萌DX',
+  'maimai でらっくす Splash': '舞萌DX 2021',
+  'maimai でらっくす Splash PLUS': '舞萌DX 2021',
+  'maimai でらっくす UNiVERSE': '舞萌DX 2022',
+  'maimai でらっくす UNiVERSE PLUS': '舞萌DX 2022',
+  'maimai でらっくす FESTiVAL': '舞萌DX 2023',
+  'maimai でらっくす FESTiVAL PLUS': '舞萌DX 2023',
+  'maimai でらっくす BUDDiES': '舞萌DX 2024',
+  'maimai でらっくす BUDDiES PLUS': '舞萌DX 2024',
+  'maimai でらっくす PRiSM': '舞萌DX 2025',
+  'maimai でらっくす PRiSM PLUS': '舞萌DX 2026',
+};
+
+export function getChinaVersionName(rawVersion: string): string {
+  return ChinaVersionMap[rawVersion] || rawVersion;
+}
+
+/** 宴会場谱面上的数字不作为正式官方详细定数使用。 */
+export function isBanquetGenre(genre: string | undefined): boolean {
+  return genre === '宴会場' || genre === '宴会场';
+}
+
 /** Prober API 基础 URL */
 export const PROBER_API_BASE = 'https://www.diving-fish.com/api/maimaidxprober';
 
@@ -83,4 +108,7 @@ export const CACHE_KEYS = {
   chartStatsVersion: 'maimate_chart_stats_version',
   planData: 'maimate_plan_data',
   settings: 'maimate_settings',
+  scoreData: 'maimate_score_data',
+  scoreSync: 'maimate_score_sync',
+  fortuneSeed: 'maimate_fortune_seed',
 } as const;
