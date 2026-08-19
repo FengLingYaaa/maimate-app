@@ -29,7 +29,7 @@ export function getChinaVersionOptions(rawData: MusicData[]): VersionOption[] {
   for (const music of rawData) {
     const rawValue = music.basic_info.from;
     const chinaName = getChinaVersionName(rawValue);
-    if (!/^舞萌DX\s+20\d{2}$/.test(chinaName)) continue;
+    if (!/^舞萌DX(?:\s+20\d{2})?$/.test(chinaName)) continue;
     const group = groups.get(chinaName) || { count: 0, rawValues: [] };
     group.count += 1;
     if (!group.rawValues.includes(rawValue)) group.rawValues.push(rawValue);

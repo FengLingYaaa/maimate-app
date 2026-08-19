@@ -41,7 +41,9 @@ function normalizeLoadedLink(value: unknown): BilibiliVideoLink | null {
     url,
     remark: typeof link.remark === 'string' ? link.remark : '',
     tags: link.tags.map(tag => String(tag).trim()).filter(Boolean),
-    metadataStatus: link.metadataStatus || 'idle',
+    metadataStatus: link.metadataStatus === 'success' || link.metadataStatus === 'partial' || link.metadataStatus === 'error'
+      ? link.metadataStatus
+      : 'idle',
   };
 }
 

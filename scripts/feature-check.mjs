@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { parseBilibiliShare, normalizeBilibiliVideoUrl } from '../src/data/bilibili-links.ts';
 import { getMusicPlatformAppUrls, getMusicPlatformSearchUrl } from '../src/data/music-platforms.ts';
 import { getChinaVersionOptions, getVersionOptions } from '../src/data/version-catalog.ts';
-import { buildPlateEntries, getPlateMask, summarizePlates, PLATE_BITS } from '../src/data/plates.ts';
+import { buildPlateEntries, getPlateMask, getPlateChinaVersionOptions, summarizePlates, PLATE_BITS } from '../src/data/plates.ts';
+import { canDragPlanRows, reorderVisibleEntries } from '../src/data/plan-order.ts';
 
 const share = parseBilibiliShare('【第一人称maimai/舞萌 Trick tear 紫14.4 sss+ 手元-哔哩哔哩】 https://b23.tv/TdQjEN6');
 assert.equal(share?.url, 'https://b23.tv/TdQjEN6');
@@ -20,16 +21,23 @@ const makeMusic = (id, from, type = 'DX') => ({
   charts: [chart, chart, chart, chart, chart],
   basic_info: { title: `Song ${id}`, artist: 'Artist', genre: '流行&动漫', bpm: 120, release_date: '', from, is_new: false },
 });
-const rawData = [makeMusic('1', 'maimai でらっくす Splash'), makeMusic('2', 'maimai PiNK')];
+const rawData = [makeMusic('1', 'maimai でらっくす Splash'), makeMusic('2', 'maimai PiNK'), makeMusic('3', 'maimai でらっくす')];
 const japan = getVersionOptions(rawData);
 const china = getChinaVersionOptions(rawData);
 assert.equal(japan.find(option => option.rawValue.includes('Splash'))?.label, 'maimai でらっくす Splash');
 assert.equal(china.find(option => option.rawValue === '舞萌DX 2021')?.rawValues?.[0], 'maimai でらっくす Splash');
+assert.equal(china.some(option => option.label === '舞萌DX'), true);
+
+assert.equal(canDragPlanRows({}), true);
+assert.equal(canDragPlanRows({ titleSearch: 'Song 1' }), false);
+assert.equal(canDragPlanRows({ sort: { mode: 'titleAsc' } }), false);
+assert.deepEqual(reorderVisibleEntries(['A', 'B', 'C'], [0, 2], ['C', 'A']), ['C', 'B', 'A']);
 
 const score = { songId: '1', type: 'DX', difficultyIndex: 3, achievement: 100.5, dxScore: 1000, fc: 'ap', fs: 'fsd', importedAt: 1 };
 assert.equal(getPlateMask(score), PLATE_BITS.FC | PLATE_BITS.SSS | PLATE_BITS.FSD | PLATE_BITS.AP);
 const entries = buildPlateEntries(rawData, [score]);
 const summary = summarizePlates(entries.filter(entry => entry.music.id === '1' && entry.difficultyIndex === 3));
 assert.deepEqual(summary, { total: 1, counts: { FC: 1, SSS: 1, FSD: 1, AP: 1 } });
+assert.equal(getPlateChinaVersionOptions(entries).includes('舞萌DX'), true);
 
 console.log('Feature checks passed (deep links, Bilibili parsing, version groups, local plates)');

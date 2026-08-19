@@ -9,6 +9,7 @@ import { FilterBar, PlanEntryCard } from '../src/components';
 import { Colors } from '../src/constants';
 import { getChinaVersionOptions, getVersionOptions } from '../src/data/version-catalog';
 import { getMusicSearchScore, getOfficialChartConstant, matchesMusic } from '../src/data/music-list';
+import { canDragPlanRows, reorderVisibleEntries } from '../src/data/plan-order';
 import type { FilterOptions, MusicData, PlanEntry, PlayerScore, SortOptions } from '../src/data/types';
 import { useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '../src/store';
 
@@ -76,6 +77,7 @@ export default function PushPlan() {
     const rows = plannedRows.filter(row => matchesPlanRow(row, filters));
     return sortPlanRows(rows, filters.sort, filters.titleSearch);
   }, [plannedRows, filters]);
+  const manualOrderView = canDragPlanRows(filters);
 
   const genres = useMemo(() => [...new Set(plannedRows.map(row => row.music.basic_info.genre))].sort(), [plannedRows]);
   const versionOptions = useMemo(() => getVersionOptions(plannedRows.map(row => row.music)), [plannedRows]);
@@ -101,16 +103,15 @@ export default function PushPlan() {
   }, [clearPlan]);
 
   const handleDragEnd = useCallback((data: PlanRow[]) => {
-    if (data.length === 0) return;
+    if (!manualOrderView || data.length === 0) return;
     const visibleKeys = new Set(data.map(rowKey));
-    const positions = entries.map((entry, index) => {
+    const orderedEntries = [...entries].sort((left, right) => left.order - right.order);
+    const visibleIndices = orderedEntries.map((entry, index) => {
       const music = rawData.find(item => item.id === entry.songId && (!entry.musicType || item.type === entry.musicType)) || rawData.find(item => item.id === entry.songId);
       return music && visibleKeys.has(rowKey({ music, entry })) ? index : -1;
     }).filter(index => index >= 0);
-    const next = [...entries];
-    data.forEach((row, index) => { if (positions[index] !== undefined) next[positions[index]] = row.entry; });
-    reorder(next);
-  }, [entries, rawData, reorder]);
+    reorder(reorderVisibleEntries(orderedEntries, visibleIndices, data.map(row => row.entry)));
+  }, [entries, manualOrderView, rawData, reorder]);
 
   return (
     <View style={styles.container}>
@@ -119,7 +120,7 @@ export default function PushPlan() {
           <Text style={styles.headerTitle}>📋 推分计划</Text>
           {entries.length > 0 && <Pressable onPress={handleClear}><Text style={styles.clearBtn}>清空</Text></Pressable>}
         </View>
-        <Text style={styles.headerSub}>{entries.length > 0 ? `${entries.length} 首待练习` : '还没有添加歌曲'} · 长按拖拽，左滑显示置顶/置底</Text>
+        <Text style={styles.headerSub}>{entries.length > 0 ? `${entries.length} 首待练习` : '还没有添加歌曲'} · {manualOrderView ? '长按拖拽，左滑显示置顶/置底' : '当前搜索/排序视图不可拖拽，清除后可调整顺序'}</Text>
       </View>
       <FilterBar
         filters={filters}
@@ -145,14 +146,15 @@ export default function PushPlan() {
           onDragEnd={({ data }) => handleDragEnd(data)}
           activationDistance={8}
           contentContainerStyle={styles.listContent}
-          renderItem={(params) => <SortablePlanRow {...params} showChinaVersion={settings.showChinaVersion} showProjectedRating={settings.showProjectedRating} rawData={rawData} getScore={getScore} onOpen={row => router.push({ pathname: '/song/[id]' as any, params: { id: row.music.id, type: row.music.type, difficultyIndex: String(row.entry.difficultyIndex), source: 'plan' } })} onRemove={handleRemove} onTarget={(row, value) => updateTargetScore(row.music.id, row.entry.difficultyIndex, value, row.music.type)} onTop={row => moveToTop(row.music.id, row.entry.difficultyIndex, row.music.type)} onBottom={row => moveToBottom(row.music.id, row.entry.difficultyIndex, row.music.type)} />}
+          renderItem={(params) => <SortablePlanRow {...params} canDrag={manualOrderView} showChinaVersion={settings.showChinaVersion} showProjectedRating={settings.showProjectedRating} rawData={rawData} getScore={getScore} onOpen={row => router.push({ pathname: '/song/[id]' as any, params: { id: row.music.id, type: row.music.type, difficultyIndex: String(row.entry.difficultyIndex), source: 'plan' } })} onRemove={handleRemove} onTarget={(row, value) => updateTargetScore(row.music.id, row.entry.difficultyIndex, value, row.music.type)} onTop={row => moveToTop(row.music.id, row.entry.difficultyIndex, row.music.type)} onBottom={row => moveToBottom(row.music.id, row.entry.difficultyIndex, row.music.type)} />}
         />
       )}
     </View>
   );
 }
 
-function SortablePlanRow({ item, getIndex, drag, isActive, showChinaVersion, showProjectedRating, rawData, getScore, onOpen, onRemove, onTarget, onTop, onBottom }: RenderItemParams<PlanRow> & {
+function SortablePlanRow({ item, getIndex, drag, isActive, canDrag, showChinaVersion, showProjectedRating, rawData, getScore, onOpen, onRemove, onTarget, onTop, onBottom }: RenderItemParams<PlanRow> & {
+  canDrag: boolean;
   showChinaVersion: boolean;
   showProjectedRating: boolean;
   rawData: MusicData[];
@@ -173,7 +175,7 @@ function SortablePlanRow({ item, getIndex, drag, isActive, showChinaVersion, sho
         </View>
       )}>
         <View style={[styles.draggableRow, isActive && styles.activeRow]}>
-          <PlanEntryCard music={item.music} entry={item.entry} index={getIndex() ?? 0} allSongs={rawData} importedScore={getScore(item.music, item.entry)} showChinaVersion={showChinaVersion} showProjectedRating={showProjectedRating} onPress={() => onOpen(item)} onLongPress={drag} onRemove={() => onRemove(item)} onTarget={value => onTarget(item, value)} />
+          <PlanEntryCard music={item.music} entry={item.entry} index={getIndex() ?? 0} allSongs={rawData} importedScore={getScore(item.music, item.entry)} showChinaVersion={showChinaVersion} showProjectedRating={showProjectedRating} onPress={() => onOpen(item)} onLongPress={canDrag ? drag : () => undefined} onRemove={() => onRemove(item)} onTarget={value => onTarget(item, value)} />
         </View>
       </Swipeable>
     </ScaleDecorator>

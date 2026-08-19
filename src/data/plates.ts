@@ -93,5 +93,6 @@ export function getPlateVersionOptions(entries: PlateEntry[]): string[] {
 }
 
 export function getPlateChinaVersionOptions(entries: PlateEntry[]): string[] {
-  return [...new Set(entries.map(entry => entry.chinaVersion).filter(value => /^舞萌DX\s+20\d{2}$/.test(value)))];
+  return [...new Set(entries.map(entry => entry.chinaVersion).filter(value => /^舞萌DX(?:\s+20\d{2})?$/.test(value)))]
+    .sort((left, right) => left.localeCompare(right, 'zh-CN', { numeric: true }));
 }
