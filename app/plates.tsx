@@ -29,7 +29,17 @@ export default function PlatesPage() {
     <View style={styles.container}>
       <Stack.Screen options={{ title: '牌子查询', headerStyle: { backgroundColor: Colors.bg.primary }, headerTintColor: Colors.text.primary }} />
       <View style={styles.header}>
-        <Text style={styles.title}>🏅 本地牌子查询</Text>
+        <View style={styles.headerRow}>
+          <Pressable
+            style={styles.backButton}
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+            accessibilityRole="button"
+            accessibilityLabel="返回"
+          >
+            <Text style={styles.backText}>‹ 返回</Text>
+          </Pressable>
+          <Text style={styles.title}>🏅 本地牌子查询</Text>
+        </View>
         <Text style={styles.subtitle}>根据本机已导入成绩计算，不会上传成绩，也不是逐局游玩历史。</Text>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
@@ -85,7 +95,10 @@ function PlateRow({ entry, onPress }: { entry: PlateEntry; onPress: () => void }
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg.primary },
   header: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8, gap: 4 },
-  title: { fontSize: 23, fontWeight: '800', color: Colors.text.primary },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  backButton: { paddingVertical: 6, paddingRight: 2 },
+  backText: { color: Colors.accent.primary, fontSize: 14, fontWeight: '800' },
+  title: { flex: 1, fontSize: 23, fontWeight: '800', color: Colors.text.primary },
   subtitle: { fontSize: 11, lineHeight: 16, color: Colors.text.muted },
   chips: { gap: 7, paddingHorizontal: 12, paddingVertical: 5 },
   chip: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 9, borderWidth: 1, borderColor: Colors.border.light, backgroundColor: Colors.bg.secondary },
