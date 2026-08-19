@@ -13,13 +13,14 @@ interface Props {
   allSongs: MusicData[];
   importedScore?: PlayerScore;
   showChinaVersion: boolean;
+  showProjectedRating: boolean;
   onPress: () => void;
   onLongPress: () => void;
   onRemove: () => void;
   onTarget: (score: number | null) => void;
 }
 
-export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, allSongs, importedScore, showChinaVersion, onPress, onLongPress, onRemove, onTarget }: Props) {
+export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, allSongs, importedScore, showChinaVersion, showProjectedRating, onPress, onLongPress, onRemove, onTarget }: Props) {
   const officialConstant = getOfficialChartConstant(music, entry.difficultyIndex);
   const targetRating = entry.targetScore === undefined ? null : calculateRating(officialConstant ?? undefined, entry.targetScore);
   const chinaName = getChinaVersionName(music.basic_info.from);
@@ -56,7 +57,7 @@ export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, 
         ) : (
           <Pressable style={styles.targetSummary} onPress={() => setEditingTarget(true)}>
             <Text style={styles.targetSummaryText}>目标：{entry.targetScore!.toFixed(4)}%</Text>
-            <Text style={styles.targetRating}>目标 Rating：{targetRating ?? '—'}</Text>
+            {showProjectedRating && <Text style={styles.targetRating}>目标 Rating：{targetRating ?? '—'}</Text>}
             <Text style={styles.editHint}>点击重新选择</Text>
           </Pressable>
         )}

@@ -145,15 +145,16 @@ export default function PushPlan() {
           onDragEnd={({ data }) => handleDragEnd(data)}
           activationDistance={8}
           contentContainerStyle={styles.listContent}
-          renderItem={(params) => <SortablePlanRow {...params} showChinaVersion={settings.showChinaVersion} rawData={rawData} getScore={getScore} onOpen={row => router.push({ pathname: '/song/[id]' as any, params: { id: row.music.id, type: row.music.type, difficultyIndex: String(row.entry.difficultyIndex), source: 'plan' } })} onRemove={handleRemove} onTarget={(row, value) => updateTargetScore(row.music.id, row.entry.difficultyIndex, value, row.music.type)} onTop={row => moveToTop(row.music.id, row.entry.difficultyIndex, row.music.type)} onBottom={row => moveToBottom(row.music.id, row.entry.difficultyIndex, row.music.type)} />}
+          renderItem={(params) => <SortablePlanRow {...params} showChinaVersion={settings.showChinaVersion} showProjectedRating={settings.showProjectedRating} rawData={rawData} getScore={getScore} onOpen={row => router.push({ pathname: '/song/[id]' as any, params: { id: row.music.id, type: row.music.type, difficultyIndex: String(row.entry.difficultyIndex), source: 'plan' } })} onRemove={handleRemove} onTarget={(row, value) => updateTargetScore(row.music.id, row.entry.difficultyIndex, value, row.music.type)} onTop={row => moveToTop(row.music.id, row.entry.difficultyIndex, row.music.type)} onBottom={row => moveToBottom(row.music.id, row.entry.difficultyIndex, row.music.type)} />}
         />
       )}
     </View>
   );
 }
 
-function SortablePlanRow({ item, getIndex, drag, isActive, showChinaVersion, rawData, getScore, onOpen, onRemove, onTarget, onTop, onBottom }: RenderItemParams<PlanRow> & {
+function SortablePlanRow({ item, getIndex, drag, isActive, showChinaVersion, showProjectedRating, rawData, getScore, onOpen, onRemove, onTarget, onTop, onBottom }: RenderItemParams<PlanRow> & {
   showChinaVersion: boolean;
+  showProjectedRating: boolean;
   rawData: MusicData[];
   getScore: (music: MusicData, entry: PlanEntry) => PlayerScore | undefined;
   onOpen: (row: PlanRow) => void;
@@ -172,7 +173,7 @@ function SortablePlanRow({ item, getIndex, drag, isActive, showChinaVersion, raw
         </View>
       )}>
         <View style={[styles.draggableRow, isActive && styles.activeRow]}>
-          <PlanEntryCard music={item.music} entry={item.entry} index={getIndex() ?? 0} allSongs={rawData} importedScore={getScore(item.music, item.entry)} showChinaVersion={showChinaVersion} onPress={() => onOpen(item)} onLongPress={drag} onRemove={() => onRemove(item)} onTarget={value => onTarget(item, value)} />
+          <PlanEntryCard music={item.music} entry={item.entry} index={getIndex() ?? 0} allSongs={rawData} importedScore={getScore(item.music, item.entry)} showChinaVersion={showChinaVersion} showProjectedRating={showProjectedRating} onPress={() => onOpen(item)} onLongPress={drag} onRemove={() => onRemove(item)} onTarget={value => onTarget(item, value)} />
         </View>
       </Swipeable>
     </ScaleDecorator>

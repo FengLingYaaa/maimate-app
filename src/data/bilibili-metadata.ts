@@ -21,6 +21,14 @@ function decodeHtml(value: string): string {
     .trim();
 }
 
+function normalizeCoverUrl(value: string | undefined): string | undefined {
+  const candidate = value?.trim();
+  if (!candidate) return undefined;
+  if (candidate.startsWith('//')) return `https:${candidate}`;
+  if (candidate.startsWith('http://')) return `https://${candidate.slice('http://'.length)}`;
+  return /^https:\/\//i.test(candidate) ? candidate : undefined;
+}
+
 function readMeta(html: string, property: string): string | undefined {
   const escaped = property.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${escaped}["'][^>]+content=["']([^"']+)["']`, 'i'))
@@ -41,7 +49,7 @@ async function readBilibiliApi(bvid: string): Promise<BilibiliMetadata> {
   return {
     canonicalUrl: payload.data.bvid ? `https://www.bilibili.com/video/${payload.data.bvid}` : undefined,
     title: payload.data.title?.trim() || undefined,
-    coverUrl: payload.data.pic?.trim() || undefined,
+    coverUrl: normalizeCoverUrl(payload.data.pic),
   };
 }
 
@@ -70,7 +78,7 @@ export async function fetchBilibiliMetadata(url: string): Promise<BilibiliMetada
   }
 
   const title = readMeta(html, 'og:title') || readMeta(html, 'twitter:title');
-  const coverUrl = readMeta(html, 'og:image') || readMeta(html, 'twitter:image');
+  const coverUrl = normalizeCoverUrl(readMeta(html, 'og:image') || readMeta(html, 'twitter:image'));
   if (!title && !coverUrl) throw new Error('metadata unavailable');
   return { canonicalUrl: finalUrl, title, coverUrl };
 }

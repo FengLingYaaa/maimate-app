@@ -94,6 +94,7 @@ export async function openMusicPlatformSearch(
 }
 
 export async function openBilibiliVideo(url: string): Promise<void> {
+  if (await tryAndroidIntent({ url, packageName: ANDROID_PACKAGES.bilibili })) return;
   await Linking.openURL(url);
 }
 
