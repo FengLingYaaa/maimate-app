@@ -95,6 +95,9 @@ export default function RootLayout() {
           }}
         />
         <Tabs.Screen name="plates" options={{ href: null }} />
+        <Tabs.Screen name="settings/music-platform" options={{ href: null }} />
+        <Tabs.Screen name="settings/sort" options={{ href: null }} />
+        <Tabs.Screen name="song/[id]" options={{ href: null }} />
       </Tabs>
     </GestureHandlerRootView>
   );

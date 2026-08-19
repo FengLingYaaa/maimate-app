@@ -85,12 +85,14 @@ export const useBilibiliStore = create<BilibiliStore>((set, get) => ({
   },
 
   updateLink: async (id, patch) => {
+    const current = get().links.find(link => link.id === id);
+    if (!current) return;
+    const parsed = patch.url ? parseBilibiliShare(patch.url) : null;
+    const normalizedUrl = patch.url === undefined ? current.url : normalizeBilibiliVideoUrl(patch.url);
+    if (!normalizedUrl) throw new Error('请输入有效的 Bilibili 视频分享链接');
+    const urlChanged = normalizedUrl !== current.url;
     const links = get().links.map(link => {
       if (link.id !== id) return link;
-      const parsed = patch.url ? parseBilibiliShare(patch.url) : null;
-      const normalizedUrl = patch.url === undefined ? link.url : normalizeBilibiliVideoUrl(patch.url);
-      if (!normalizedUrl) throw new Error('请输入有效的 Bilibili 视频分享链接');
-      const urlChanged = normalizedUrl !== link.url;
       return {
         ...link,
         ...patch,
@@ -107,6 +109,7 @@ export const useBilibiliStore = create<BilibiliStore>((set, get) => ({
     });
     set({ links });
     await persist(links);
+    if (urlChanged) await removeBilibiliCover(current.coverUri);
   },
 
   refreshMetadata: async id => {
@@ -117,6 +120,8 @@ export const useBilibiliStore = create<BilibiliStore>((set, get) => ({
     await persist(loading);
     try {
       const metadata = await fetchBilibiliMetadata(current.url);
+      const coverChanged = Boolean(current.coverUri && current.coverSourceUrl && metadata.coverUrl && current.coverSourceUrl !== metadata.coverUrl);
+      if (coverChanged) await removeBilibiliCover(current.coverUri);
       const coverUri = metadata.coverUrl
         ? await downloadBilibiliCover(id, metadata.coverUrl).catch(() => undefined)
         : current.coverUri;
