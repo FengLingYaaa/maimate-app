@@ -3,7 +3,7 @@
 > 文档性质：项目事实基线、产品设计、工程约束和持续变更记录。
 > 最后更新：2026-08-20
 > 当前版本：`v1.5.0-alpha`
-> 当前状态：Phase A-F 已实现，待 v1.5.0-alpha 云构建、Release、个人站同步和真机验收。
+> 当前状态：Phase A-F 已实现；v1.5.0-alpha 云构建、Release、个人站同步和线上校验已完成，真机验收仍待设备。
 > GitHub：<https://github.com/FengLingYaaa/maimate-app>
 
 这份文档的目标不是只描述“理想中的产品”，而是让人类或新对话中的智能体能够回答：
@@ -756,7 +756,7 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 个人站：`landing/_worker.js` 指向 `v1.4.0-alpha/MaiMate-latest.apk`；Cloudflare Pages 部署成功，预览部署地址为 <https://30d572c9.maimate-landing.pages.dev>；生产首页显示 v1.4.0-alpha 和同一 SHA；APK URL 返回 HTTP 200、`application/vnd.android.package-archive`、`content-length: 60097909`、固定附件名；完整下载后与本地 APK 字节一致。
 - 人类需要确认：`adb devices` 没有 Android 设备，因此不把安装、OCR 相机/返回、Bilibili 深链/HTTPS 回退或五个新 Tab 的真机行为宣称为已验收。APK 是 GitHub Actions 生成的 arm64-v8a debug-signed 内测包；正式分发前仍应配置稳定的 release keystore。
 
-### 2026-08-20 — Phase A-F v1.5.0-alpha 实现完成，待云构建
+### 2026-08-20 — Phase A-F v1.5.0-alpha 实现、云构建与下载站同步完成
 
 - 独立别名层：新增 `src/data/song-aliases.ts`，当前不预置别名表；普通搜索和 OCR 通过该层扩展，Diving-Fish 原始标题保持不变。
 - 曲绘与版本：新增统一 `CoverImage`/`cover-resolver`；宴会場同标题谱面优先使用普通同名歌曲封面，并处理六位数 ID、404 和本地占位图；版本筛选保留原始值，同时展示中国区名称、PLUS 版本和暂无记录状态。
@@ -764,4 +764,7 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - Bilibili：视频链接按 `SD/DX + songId + difficultyIndex` 本地保存，支持备注、快捷标签、编辑和删除；不抓取 Bilibili 页面或 API。
 - 推分计划：详情路由传递来源、类型和难度；从计划详情返回计划页；计划列表提供 `100`/`100.5` 快捷目标，自定义目标移到详情页。
 - OCR/运势/音乐平台：支持连续拍摄、相册多选、逐图识别、合并去重、删除和 Android pending result；运势推荐保存 SD/DX 身份并直接显示曲绘；音乐搜索支持网易云、QQ 音乐、酷狗，默认网易云且仅使用 HTTPS 搜索页。
-- 验证：`npm run lint`、`npm run test:rating` 和 `git diff --check` 已通过；Expo Android 导出和云构建、Release、下载站同步仍待完成；没有使用或写入任何 Diving-Fish 测试 Token。
+- 验证：`npm run lint`、`npm run test:rating`、`npm run test:phase-af`、`git diff --check`、`npx expo export --platform android` 和 `npx expo prebuild --platform android --no-install` 均通过；没有使用或写入任何 Diving-Fish 测试 Token。
+- 云构建：GitHub Actions run `32259141373` 成功，Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.5.0-alpha>；arm64-v8a APK `60,134,005` bytes，SHA-256 `f748ae60535ecc2e58f1b7aec17ab3e4bc78d176af2ef8d02ca56f2ad62e73b1`。
+- 下载站：Cloudflare Pages 预览部署为 <https://c7259680.maimate-landing.pages.dev>；生产入口 <https://maimate.flya.ccwu.cc/> 显示 v1.5.0-alpha，APK URL 返回 HTTP 200、`application/vnd.android.package-archive`、`content-length: 60134005`、固定附件名；完整下载与本地 APK 字节一致。
+- 人类需要确认：仍无 Android 设备，不能把安装、OCR 相机/相册生命周期、计划返回、SecureStore 导入、Bilibili 深链或音乐平台页面宣称为真机验收完成；APK 为 arm64-v8a debug-signed 内测包，正式分发仍需稳定 release keystore。
