@@ -3,7 +3,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -12,21 +12,23 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { Colors, getCoverUrl } from '../constants';
-import type { DrawCandidate } from '../data/types';
+import { Colors } from '../constants';
+import { CoverImage } from './CoverImage';
+import type { DrawCandidate, MusicData } from '../data/types';
 
 interface Props {
   items: DrawCandidate[];
   resultIndex: number | null;
   spinning: boolean;
   onSpinEnd?: () => void;
-  onResultPress?: (musicId: string) => void;
+  onResultPress?: (candidate: DrawCandidate) => void;
+  allSongs?: MusicData[];
 }
 
 const COVER_SIZE = 104;
 const SIDE_COVER_SIZE = 54;
 
-export function DrumRoll({ items, resultIndex, spinning, onSpinEnd, onResultPress }: Props) {
+export function DrumRoll({ items, resultIndex, spinning, onSpinEnd, onResultPress, allSongs = [] }: Props) {
   const rotation = useSharedValue(0);
   const [activeIndex, setActiveIndex] = useState(0);
   const finishRef = useRef<(() => void) | null>(null);
@@ -108,39 +110,23 @@ export function DrumRoll({ items, resultIndex, spinning, onSpinEnd, onResultPres
         accessibilityLabel={spinning ? '点击停止抽选' : undefined}
       >
         <View style={styles.orbit} />
-        <Image
-          source={{ uri: getCoverUrl(previous.music.id) }}
-          style={[styles.sideCover, styles.leftCover]}
-          defaultSource={require('../../assets/icon.png')}
-        />
+        <CoverImage music={previous.music} allSongs={allSongs} style={[styles.sideCover, styles.leftCover]} />
         <Animated.View style={[styles.mainCoverFrame, rotatingStyle]}>
-          <Image
-            source={{ uri: getCoverUrl(active.music.id) }}
-            style={styles.mainCover}
-            defaultSource={require('../../assets/icon.png')}
-          />
+          <CoverImage music={active.music} allSongs={allSongs} style={styles.mainCover} />
         </Animated.View>
-        <Image
-          source={{ uri: getCoverUrl(next.music.id) }}
-          style={[styles.sideCover, styles.rightCover]}
-          defaultSource={require('../../assets/icon.png')}
-        />
+        <CoverImage music={next.music} allSongs={allSongs} style={[styles.sideCover, styles.rightCover]} />
         <Text style={styles.switchLabel}>{spinning ? '旋转中…点击此处停止' : '抽选完成'}</Text>
       </Pressable>
 
       {!spinning && result && (
         <Pressable
           style={({ pressed }) => [styles.resultCard, pressed && styles.resultCardPressed]}
-          onPress={() => onResultPress?.(result.music.id)}
+          onPress={() => onResultPress?.(result)}
           disabled={!onResultPress}
           accessibilityRole={onResultPress ? 'button' : undefined}
           accessibilityLabel="查看歌曲详情"
         >
-          <Image
-            source={{ uri: getCoverUrl(result.music.id) }}
-            style={styles.resultCover}
-            defaultSource={require('../../assets/icon.png')}
-          />
+          <CoverImage music={result.music} allSongs={allSongs} style={styles.resultCover} />
           <View style={styles.resultInfo}>
             <Text style={styles.resultTitle}>{result.music.title}</Text>
             <Text style={styles.resultArtist}>{result.music.basic_info.artist}</Text>

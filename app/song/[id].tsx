@@ -5,46 +5,75 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  BackHandler,
+  Linking,
   View,
   Text,
-  Image,
   ScrollView,
   Pressable,
   StyleSheet,
   Modal,
+  TextInput,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { useMusicStore, usePlanStore, useScoreStore } from '../../src/store';
-import { BilibiliSearchPanel, DifficultyBadge, NoteBar, RatingPanel } from '../../src/components';
+import { useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '../../src/store';
+import { BilibiliSearchPanel, CoverImage, DifficultyBadge, NoteBar, RatingPanel } from '../../src/components';
 import { Colors } from '../../src/constants';
-import { DifficultyLabels, getChinaVersionName, getCoverUrl } from '../../src/constants/game';
+import { DifficultyLabels, getChinaVersionName } from '../../src/constants/game';
 import { getOfficialChartConstant, getTotalNotes } from '../../src/data/music-list';
-import { formatAchievement } from '../../src/data/rating';
-import type { ChartData } from '../../src/data/types';
+import { formatAchievement, normalizeAchievement } from '../../src/data/rating';
+import { getMusicPlatformSearchUrl, MUSIC_PLATFORM_LABELS } from '../../src/data/music-platforms';
+import type { ChartData, MusicPlatform } from '../../src/data/types';
 
 export default function SongDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, type, difficultyIndex, source } = useLocalSearchParams<{ id: string; type?: 'SD' | 'DX'; difficultyIndex?: string; source?: string }>();
   const router = useRouter();
   const rawData = useMusicStore(s => s.rawData);
   const chartStats = useMusicStore(s => s.chartStats);
   const chartStatsLoading = useMusicStore(s => s.chartStatsLoading);
   const scores = useScoreStore(s => s.scores);
+  const settings = useSettingsStore(s => s.settings);
   const isInPlan = usePlanStore(s => s.isInPlan);
   const addEntry = usePlanStore(s => s.addEntry);
   const removeEntry = usePlanStore(s => s.removeEntry);
+  const updateTargetScore = usePlanStore(s => s.updateTargetScore);
+  const entries = usePlanStore(s => s.entries);
 
-  const music = rawData.find(m => m.id === id);
+  const music = rawData.find(m => m.id === id && (!type || m.type === type)) || rawData.find(m => m.id === id);
+  const sourceValue = Array.isArray(source) ? source[0] : source;
+  const requestedDifficulty = Number(Array.isArray(difficultyIndex) ? difficultyIndex[0] : difficultyIndex);
 
   const [selectedDiff, setSelectedDiff] = useState(0);
   const [planModalVisible, setPlanModalVisible] = useState(false);
+  const [customTarget, setCustomTarget] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleBack = useCallback(() => {
+    if (sourceValue === 'plan') {
+      router.replace('/plan');
+    } else {
+      router.back();
+    }
+  }, [router, sourceValue]);
 
   useEffect(() => {
     if (!music) return;
     const highestAvailable = Math.min(music.charts.length, music.level.length) - 1;
-    setSelectedDiff(Math.max(0, highestAvailable));
-  }, [music?.id, music?.charts.length, music?.level.length]);
+    const nextDifficulty = Number.isInteger(requestedDifficulty) && requestedDifficulty >= 0
+      ? Math.min(requestedDifficulty, Math.max(0, highestAvailable))
+      : Math.max(0, highestAvailable);
+    setSelectedDiff(nextDifficulty);
+  }, [music?.id, music?.type, music?.charts.length, music?.level.length, requestedDifficulty]);
+
+  useEffect(() => {
+    if (sourceValue !== 'plan') return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleBack();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [handleBack, sourceValue]);
 
   useEffect(() => () => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -77,6 +106,14 @@ export default function SongDetail() {
     setPlanModalVisible(false);
   }, [music, selectedDiff, isInPlan, addEntry, removeEntry, showToast]);
 
+  const targetEntry = music
+    ? entries.find(entry => entry.songId === music.id && entry.difficultyIndex === selectedDiff && entry.musicType === music.type)
+    : undefined;
+
+  useEffect(() => {
+    setCustomTarget(targetEntry?.targetScore === undefined ? '' : String(targetEntry.targetScore));
+  }, [targetEntry?.targetScore, music?.id, selectedDiff]);
+
   if (!music) {
     return (
       <View style={styles.notFound}>
@@ -97,6 +134,28 @@ export default function SongDetail() {
     score.songId === music.id && score.type === music.type && score.difficultyIndex === selectedDiff,
   );
   const inPlan = isInPlan(music.id, selectedDiff, music.type);
+  const commitCustomTarget = () => {
+    const normalized = customTarget.trim().replace(',', '.');
+    if (!normalized) {
+      updateTargetScore(music.id, selectedDiff, null, music.type);
+      return;
+    }
+    const value = normalizeAchievement(Number(normalized));
+    if (value === null) {
+      showToast('目标需要是 0–100.5 之间的数字');
+      return;
+    }
+    updateTargetScore(music.id, selectedDiff, Math.min(100.5, value), music.type);
+    showToast(`已设置目标 ${Math.min(100.5, value)}`);
+  };
+
+  const openMusicPlatform = async (platform: MusicPlatform) => {
+    try {
+      await Linking.openURL(getMusicPlatformSearchUrl(platform, music.title, music.basic_info.artist));
+    } catch {
+      showToast('无法打开音乐平台网页');
+    }
+  };
 
   return (
     <>
@@ -106,16 +165,15 @@ export default function SongDetail() {
           headerStyle: { backgroundColor: Colors.bg.primary },
           headerTintColor: Colors.text.primary,
           headerTitleStyle: { fontWeight: '700' },
+           headerLeft: sourceValue === 'plan'
+             ? () => <Pressable onPress={handleBack} hitSlop={12}><Text style={styles.headerBack}>‹ 计划</Text></Pressable>
+             : undefined,
         }}
       />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         {/* 歌曲基本信息 */}
         <View style={styles.heroCard}>
-          <Image
-            source={{ uri: getCoverUrl(music.id) }}
-            style={styles.heroCover}
-            defaultSource={require('../../assets/icon.png')}
-          />
+          <CoverImage music={music} allSongs={rawData} style={styles.heroCover} accessibilityLabel={`${music.title} 曲绘`} />
           <View style={styles.heroInfo}>
             <Text style={styles.heroTitle}>{music.title}</Text>
             <Text style={styles.heroArtist}>{music.basic_info.artist}</Text>
@@ -221,9 +279,26 @@ export default function SongDetail() {
                   <Text style={styles.importedScoreEmpty}>尚未导入该难度成绩</Text>
                 )}
                 <BilibiliSearchPanel
-                  songTitle={music.title}
+                  songId={music.id}
+                   songTitle={music.title}
+                   musicType={music.type}
                   difficultyIndex={selectedDiff}
-                />
+                 />
+
+                 <View style={styles.platformCard}>
+                   <View style={styles.platformHeader}>
+                     <Text style={styles.platformTitle}>音乐平台搜索</Text>
+                     <Text style={styles.platformDefault}>默认：{MUSIC_PLATFORM_LABELS[settings.defaultMusicPlatform]}</Text>
+                   </View>
+                   <View style={styles.platformRow}>
+                     {(Object.keys(MUSIC_PLATFORM_LABELS) as MusicPlatform[]).map(platform => (
+                       <Pressable key={platform} style={[styles.platformButton, platform === settings.defaultMusicPlatform && styles.platformButtonActive]} onPress={() => void openMusicPlatform(platform)}>
+                         <Text style={[styles.platformButtonText, platform === settings.defaultMusicPlatform && styles.platformButtonTextActive]}>{MUSIC_PLATFORM_LABELS[platform]}</Text>
+                       </Pressable>
+                     ))}
+                   </View>
+                   <Text style={styles.platformNote}>使用歌曲名和曲师打开网页搜索，结果仍需手动确认版本。</Text>
+                 </View>
               </View>
             </View>
 
@@ -241,6 +316,23 @@ export default function SongDetail() {
             </Text>
           </Pressable>
         </View>
+
+        {inPlan && (
+          <View style={styles.targetEditorCard}>
+            <Text style={styles.targetEditorTitle}>推分目标</Text>
+            <Text style={styles.targetEditorHint}>计划页提供 100 / 100.5 快捷目标；其他目标可在这里自定义。</Text>
+            <View style={styles.targetPresetRow}>
+              {[100, 100.5].map(target => (
+                <Pressable key={target} style={[styles.detailTargetPreset, targetEntry?.targetScore === target && styles.detailTargetPresetActive]} onPress={() => { updateTargetScore(music.id, selectedDiff, targetEntry?.targetScore === target ? null : target, music.type); setCustomTarget(targetEntry?.targetScore === target ? '' : String(target)); }}>
+                  <Text style={[styles.detailTargetText, targetEntry?.targetScore === target && styles.detailTargetTextActive]}>{target}</Text>
+                </Pressable>
+              ))}
+              <TextInput style={styles.customTargetInput} value={customTarget} onChangeText={setCustomTarget} onEndEditing={commitCustomTarget} keyboardType="decimal-pad" placeholder="自定义，如 99.8" placeholderTextColor={Colors.text.muted} />
+              <Pressable style={styles.customTargetButton} onPress={commitCustomTarget}><Text style={styles.customTargetButtonText}>保存</Text></Pressable>
+            </View>
+            {!!targetEntry?.targetScore && <Text style={styles.targetSavedText}>当前目标：{targetEntry.targetScore}</Text>}
+          </View>
+        )}
 
         {/* 数据来源标注 */}
         <Text style={styles.attribution}>
@@ -498,6 +590,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.text.primary,
   },
+  headerBack: { fontSize: 15, fontWeight: '800', color: Colors.accent.primary },
+  platformCard: { marginTop: 10, padding: 12, borderRadius: 12, backgroundColor: Colors.bg.tertiary, gap: 8 },
+  platformHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  platformTitle: { fontSize: 12, fontWeight: '800', color: Colors.text.primary },
+  platformDefault: { fontSize: 10, color: Colors.text.muted },
+  platformRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  platformButton: { paddingHorizontal: 9, paddingVertical: 7, borderRadius: 8, backgroundColor: Colors.bg.secondary, borderWidth: 1, borderColor: Colors.border.light },
+  platformButtonActive: { borderColor: Colors.accent.primary, backgroundColor: `${Colors.accent.primary}22` },
+  platformButtonText: { fontSize: 10, color: Colors.text.secondary },
+  platformButtonTextActive: { color: Colors.accent.primary, fontWeight: '800' },
+  platformNote: { fontSize: 10, lineHeight: 15, color: Colors.text.muted },
+  targetEditorCard: { marginTop: 14, marginHorizontal: 16, padding: 12, borderRadius: 12, backgroundColor: Colors.bg.secondary, gap: 7 },
+  targetEditorTitle: { fontSize: 13, fontWeight: '800', color: Colors.text.primary },
+  targetEditorHint: { fontSize: 10, lineHeight: 15, color: Colors.text.muted },
+  targetPresetRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 7 },
+  detailTargetPreset: { minWidth: 52, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.light, alignItems: 'center' },
+  detailTargetPresetActive: { borderColor: Colors.accent.primary, backgroundColor: `${Colors.accent.primary}22` },
+  detailTargetText: { fontSize: 11, color: Colors.text.secondary, fontWeight: '700' },
+  detailTargetTextActive: { color: Colors.accent.primary },
+  customTargetInput: { flex: 1, minWidth: 100, height: 36, paddingHorizontal: 8, borderRadius: 7, backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.light, color: Colors.text.primary, fontSize: 11 },
+  customTargetButton: { paddingHorizontal: 10, paddingVertical: 9, borderRadius: 7, backgroundColor: Colors.accent.secondary },
+  customTargetButtonText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  targetSavedText: { fontSize: 10, color: Colors.accent.primary },
   // Actions
   actions: {
     marginTop: 20,

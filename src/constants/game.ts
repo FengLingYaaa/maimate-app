@@ -56,6 +56,7 @@ export const Versions = [
   'maimai でらっくす BUDDiES',
   'maimai でらっくす BUDDiES PLUS',
   'maimai でらっくす PRiSM',
+  'maimai でらっくす PRiSM PLUS',
 ] as const;
 
 /** 原始版本名 → 舞萌中国区展示名。原始值始终保留用于筛选与数据匹配。 */
@@ -110,5 +111,8 @@ export const CACHE_KEYS = {
   settings: 'maimate_settings',
   scoreData: 'maimate_score_data',
   scoreSync: 'maimate_score_sync',
+  scoreSnapshots: 'maimate_score_snapshots',
+  scoreChanges: 'maimate_score_changes',
+  bilibiliLinks: 'maimate_bilibili_links',
   fortuneSeed: 'maimate_fortune_seed',
 } as const;

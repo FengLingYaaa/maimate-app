@@ -7,6 +7,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showChinaVersion: true,
   defaultSort: { mode: 'relevance', difficultyIndex: 3 },
   showProjectedRating: true,
+  defaultMusicPlatform: 'netease',
 };
 
 interface SettingsStore {

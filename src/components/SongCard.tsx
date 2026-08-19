@@ -4,9 +4,10 @@
  */
 
 import React, { memo } from 'react';
-import { View, Text, Image, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Colors } from '../constants';
 import { DifficultyBadge } from './DifficultyBadge';
+import { CoverImage } from './CoverImage';
 import { getChinaVersionName } from '../constants/game';
 import type { MusicData } from '../data/types';
 
@@ -18,6 +19,7 @@ interface Props {
   /** 计划页使用：只展示这个条目的选中难度。 */
   selectedDifficultyIndex?: number;
   showChinaVersion?: boolean;
+  allSongs?: MusicData[];
 }
 
 export const SongCard = memo(function SongCard({
@@ -27,12 +29,8 @@ export const SongCard = memo(function SongCard({
   highlightedDifficulties,
   selectedDifficultyIndex,
   showChinaVersion = true,
+  allSongs = [],
 }: Props) {
-  const coverId = parseInt(music.id, 10);
-  const len5 = coverId > 10000 && coverId <= 11000
-    ? (coverId - 10000).toString().padStart(5, '0')
-    : coverId.toString().padStart(5, '0');
-  const coverUrl = `https://www.diving-fish.com/covers/${len5}.png`;
   const selected = selectedDifficultyIndex !== undefined
     ? music.level[selectedDifficultyIndex] !== undefined
       ? [selectedDifficultyIndex]
@@ -46,11 +44,7 @@ export const SongCard = memo(function SongCard({
       onPress={() => onPress?.(music)}
       onLongPress={() => onLongPress?.(music)}
     >
-      <Image
-        source={{ uri: coverUrl }}
-        style={styles.cover}
-        defaultSource={require('../../assets/icon.png')}
-      />
+      <CoverImage music={music} allSongs={allSongs} style={styles.cover} accessibilityLabel={`${music.title} 曲绘`} />
       <View style={styles.info}>
         <Text style={styles.title} numberOfLines={1}>
           {music.title}

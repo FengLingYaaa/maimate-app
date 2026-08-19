@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMusicStore } from '../src/store';
+import { CoverImage } from '../src/components';
 import { Colors, DifficultyLabels, getChinaVersionName } from '../src/constants';
 import { generateFortune, getChinaDateKey, getFortuneSeed, type FortuneResult } from '../src/data/fortune';
 import { getOfficialChartConstant } from '../src/data/music-list';
@@ -33,8 +34,11 @@ export default function FortunePage() {
     [seed, rawData, dateKey],
   );
   const recommendedSong = useMemo(
-    () => result?.recommendedSongId ? rawData.find(song => song.id === result.recommendedSongId) : undefined,
-    [result?.recommendedSongId, rawData],
+    () => result?.recommendedSongId
+      ? rawData.find(song => song.id === result.recommendedSongId && song.type === result.recommendedMusicType)
+        || rawData.find(song => song.id === result.recommendedSongId)
+      : undefined,
+    [result?.recommendedSongId, result?.recommendedMusicType, rawData],
   );
 
   return (
@@ -62,6 +66,7 @@ export default function FortunePage() {
           {recommendedSong && (
             <View style={styles.songCard}>
               <Text style={styles.sectionTitle}>今日推荐歌曲</Text>
+               <CoverImage music={recommendedSong} allSongs={rawData} style={styles.songCover} accessibilityLabel={`${recommendedSong.title} 曲绘`} />
               <Text style={styles.songTitle} numberOfLines={2}>{recommendedSong.title}</Text>
               <Text style={styles.songMeta}>{recommendedSong.basic_info.artist} · {recommendedSong.type}</Text>
               <Text style={styles.songVersion} numberOfLines={2}>
@@ -77,14 +82,14 @@ export default function FortunePage() {
                   );
                 })}
               </View>
-              <Pressable style={styles.openButton} onPress={() => router.push(`/song/${recommendedSong.id}` as any)}>
+              <Pressable style={styles.openButton} onPress={() => router.push({ pathname: '/song/[id]' as any, params: { id: recommendedSong.id, type: recommendedSong.type, source: 'fortune' } })}>
                 <Text style={styles.openButtonText}>查看歌曲详情</Text>
               </Pressable>
             </View>
           )}
 
           <Text style={styles.note}>
-            今日运势由本地种子和中国区日期生成，不读取成绩 Token，也不会上传运势数据。曲库更新不会改变当天的推荐结果。
+            今日运势由本地种子和中国区日期生成，不读取成绩 Token，也不会上传运势数据。推荐按稳定的歌曲 ID、类型和标题排序生成；曲库内容发生变化时仍可能改变候选集。
           </Text>
         </>
       )}
@@ -126,6 +131,7 @@ const styles = StyleSheet.create({
   listEmpty: { fontSize: 12, color: Colors.text.muted },
   songCard: { padding: 14, borderRadius: 16, backgroundColor: Colors.bg.tertiary, gap: 5 },
   sectionTitle: { fontSize: 13, fontWeight: '800', color: Colors.text.primary },
+   songCover: { width: '100%', height: 180, borderRadius: 12, marginTop: 4, backgroundColor: Colors.bg.secondary },
   songTitle: { fontSize: 18, fontWeight: '800', color: Colors.accent.secondary },
   songMeta: { fontSize: 12, color: Colors.text.secondary },
   songVersion: { fontSize: 10, lineHeight: 15, color: Colors.text.muted },

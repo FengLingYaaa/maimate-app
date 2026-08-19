@@ -7,6 +7,7 @@
 
 import type { FilterOptions, MusicData, ChartData, SortOptions } from './types';
 import { isBanquetGenre } from '../constants/game';
+import { getSearchTitles } from './song-aliases';
 
 /** 返回可用于官方定数筛选/排序/Rating 的定数；宴会場保留为缺失。 */
 export function getOfficialChartConstant(music: MusicData, index: number): number | null {
@@ -102,7 +103,7 @@ function scoreText(text: string, query: string): number | null {
 /** 返回歌曲与标题搜索词的相关度，供筛选结果排序。 */
 export function getMusicSearchScore(music: MusicData, query: string): number | null {
   const values = [
-    scoreText(music.title, query),
+    ...getSearchTitles(music).map(title => scoreText(title, query)),
     scoreText(music.basic_info.artist, query),
     ...music.charts.map(chart => scoreText(chart.charter, query)),
   ].filter((score): score is number => score !== null);

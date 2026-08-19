@@ -1,9 +1,9 @@
 # MaiMate（舞萌伴侣）项目设计案
 
 > 文档性质：项目事实基线、产品设计、工程约束和持续变更记录。
-> 最后更新：2026-08-19
-> 当前版本：`v1.4.0-alpha`
-> 当前状态：Phase1–Phase4 已完成；v1.4.0-alpha 云构建、Release、个人站同步和线上校验已完成，真机验收仍待设备。
+> 最后更新：2026-08-20
+> 当前版本：`v1.5.0-alpha`
+> 当前状态：Phase A-F 已实现，待 v1.5.0-alpha 云构建、Release、个人站同步和真机验收。
 > GitHub：<https://github.com/FengLingYaaa/maimate-app>
 
 这份文档的目标不是只描述“理想中的产品”，而是让人类或新对话中的智能体能够回答：
@@ -119,7 +119,7 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 | 曲库缓存 | 已完成 | AsyncStorage；缓存优先；超过 12 小时后台刷新 |
 | `chart_stats` | 已接入 | 独立缓存和后台刷新；详情页显示拟合定数 |
 | 歌曲详情 | 已完成基础版本 | 定数、等级、Note 分布、谱师、封面、Rating 预估 |
-| 推分计划 | 已完成基础版本 | 添加、删除、顺序、备注/目标分数字段和本地持久化 |
+| 推分计划 | 已完成基础版本 | 添加、删除、目标分数和本地持久化；详情页支持自定义目标，顺序/备注字段仍兼容旧数据 |
 | 随机抽歌 | 已完成基础版本 | 推分计划、全曲、按条件三种模式；结果与动画目标一致 |
 | Rating 预估 | Phase1 已完成 | 使用完整 Diving-Fish 系数表；官方定数与 fit_diff 严格分开；宴会場不计算官方 Rating |
 | 版本显示 | Phase1 已完成 | 保留 Diving-Fish 原始 `from`，并提供舞萌DX/年份国区展示名 |
@@ -128,9 +128,9 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 | 自定义推分弹窗/Toast | 已完成 | 不使用 Android 原生确认弹窗 |
 | 更新/下载入口 | 已完成 | 曲库页可打开下载站 |
 | 顺时针曲绘滚筒 | 已完成基础版本 | `src/components/DrumRoll.tsx`，动画中多次切换封面 |
-| Bilibili 外部搜索入口 | 本轮已实现 | 优先尝试 `bilibili://search`，失败回退 HTTPS 搜索；不在 App 内置视频目录 |
-| OCR 拍照识别 | 已完成基础版本 | ML Kit；中文/日文/拉丁文字；候选歌曲现在置于原始识别文字之前 |
-| 今日舞萌运势 | Phase3 已完成 | 本地安装种子 + 上海日期的确定性娱乐结果；不读取 Token、不上传运势 |
+| Bilibili 外部搜索入口 | 本轮已实现 | 优先尝试 `bilibili://search`，失败回退 HTTPS 搜索；用户可按谱面本地保存视频链接、备注和标签，不抓取目录 |
+| OCR 拍照识别 | Phase E 已实现 | ML Kit；中文/日文/拉丁文字；连续拍摄、相册多选、逐图识别、合并去重和删除图片 |
+| 今日舞萌运势 | Phase F 已实现 | 稳定 SD/DX 推荐键、推荐曲绘、上海日期本地娱乐结果；不读取 Token、不上传运势 |
 | 个人设置 | Phase4 已完成 | SecureStore Token 管理、只读成绩同步、显示/排序偏好和本地数据清理 |
 | APK 发布链路 | 云构建中 | GitHub Actions run `32213629250` → GitHub Release `MaiMate-latest.apk` → Cloudflare Worker 下载站 |
 
@@ -755,3 +755,13 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 验证证据：`npm run lint`、`npm run test:rating`（28 个系数边界）、`git diff --check`、`npx expo export --platform android` 和 `npx expo prebuild --platform android --no-install` 成功。GitHub Actions run `32213629250` success；Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.4.0-alpha>；APK `60,097,909` bytes，SHA-256 `109d4b04a1217814f355d01fa20804108500ab85a25df5e22762814210f74170`。
 - 个人站：`landing/_worker.js` 指向 `v1.4.0-alpha/MaiMate-latest.apk`；Cloudflare Pages 部署成功，预览部署地址为 <https://30d572c9.maimate-landing.pages.dev>；生产首页显示 v1.4.0-alpha 和同一 SHA；APK URL 返回 HTTP 200、`application/vnd.android.package-archive`、`content-length: 60097909`、固定附件名；完整下载后与本地 APK 字节一致。
 - 人类需要确认：`adb devices` 没有 Android 设备，因此不把安装、OCR 相机/返回、Bilibili 深链/HTTPS 回退或五个新 Tab 的真机行为宣称为已验收。APK 是 GitHub Actions 生成的 arm64-v8a debug-signed 内测包；正式分发前仍应配置稳定的 release keystore。
+
+### 2026-08-20 — Phase A-F v1.5.0-alpha 实现完成，待云构建
+
+- 独立别名层：新增 `src/data/song-aliases.ts`，当前不预置别名表；普通搜索和 OCR 通过该层扩展，Diving-Fish 原始标题保持不变。
+- 曲绘与版本：新增统一 `CoverImage`/`cover-resolver`；宴会場同标题谱面优先使用普通同名歌曲封面，并处理六位数 ID、404 和本地占位图；版本筛选保留原始值，同时展示中国区名称、PLUS 版本和暂无记录状态。
+- 成绩：导入保留标题、定数、等级、Rate 等字段；新增最多 6 次本地同步快照与变化记录。快照不是官方游玩次数或逐局历史，Token 仍只存 SecureStore。
+- Bilibili：视频链接按 `SD/DX + songId + difficultyIndex` 本地保存，支持备注、快捷标签、编辑和删除；不抓取 Bilibili 页面或 API。
+- 推分计划：详情路由传递来源、类型和难度；从计划详情返回计划页；计划列表提供 `100`/`100.5` 快捷目标，自定义目标移到详情页。
+- OCR/运势/音乐平台：支持连续拍摄、相册多选、逐图识别、合并去重、删除和 Android pending result；运势推荐保存 SD/DX 身份并直接显示曲绘；音乐搜索支持网易云、QQ 音乐、酷狗，默认网易云且仅使用 HTTPS 搜索页。
+- 验证：`npm run lint`、`npm run test:rating` 和 `git diff --check` 已通过；Expo Android 导出和云构建、Release、下载站同步仍待完成；没有使用或写入任何 Diving-Fish 测试 Token。

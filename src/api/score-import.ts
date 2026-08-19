@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import type { PlayerScore } from '../data/types';
+import type { PlayerProfile, PlayerScore } from '../data/types';
 import { PROBER_API_BASE } from '../constants/game';
 
 const TOKEN_KEY = 'maimate_diving_fish_import_token';
@@ -93,13 +93,28 @@ export async function validateImportToken(value: string): Promise<void> {
 
 interface DivingFishRecord {
   song_id?: unknown;
+  title?: unknown;
   type?: unknown;
+  ds?: unknown;
+  level?: unknown;
   level_index?: unknown;
+  level_label?: unknown;
   achievements?: unknown;
   dxScore?: unknown;
+  rate?: unknown;
   fc?: unknown;
   fs?: unknown;
   ra?: unknown;
+}
+
+interface DivingFishResponse {
+  username?: unknown;
+  nickname?: unknown;
+  rating?: unknown;
+  additional_rating?: unknown;
+  plate?: unknown;
+  records?: unknown;
+  ratingSummary?: unknown;
 }
 
 function normalizeRecord(value: unknown, importedAt: number): PlayerScore | null {
@@ -119,6 +134,11 @@ function normalizeRecord(value: unknown, importedAt: number): PlayerScore | null
     difficultyIndex,
     achievement,
     dxScore,
+    title: typeof record.title === 'string' ? record.title : undefined,
+    ds: Number.isFinite(Number(record.ds)) ? Number(record.ds) : undefined,
+    level: typeof record.level === 'string' ? record.level : undefined,
+    levelLabel: typeof record.level_label === 'string' ? record.level_label : undefined,
+    rate: typeof record.rate === 'string' ? record.rate : undefined,
     fc: typeof record.fc === 'string' && record.fc ? record.fc : undefined,
     fs: typeof record.fs === 'string' && record.fs ? record.fs : undefined,
     serverRating: Number.isFinite(Number(record.ra)) ? Number(record.ra) : undefined,
@@ -129,6 +149,7 @@ function normalizeRecord(value: unknown, importedAt: number): PlayerScore | null
 export interface ImportedScoresResult {
   scores: PlayerScore[];
   serverRating: number | null;
+  profile: PlayerProfile;
 }
 
 export async function fetchImportedScores(value: string): Promise<ImportedScoresResult> {
@@ -138,9 +159,9 @@ export async function fetchImportedScores(value: string): Promise<ImportedScores
   if (!payload || typeof payload !== 'object') {
     throw new ScoreImportError('invalid-response', '成绩响应格式无法识别');
   }
-  const body = Array.isArray(payload)
+  const body: DivingFishResponse = Array.isArray(payload)
     ? { records: payload, rating: null }
-    : payload as { records?: unknown; rating?: unknown };
+    : payload as DivingFishResponse;
   if (!Array.isArray(body.records)) {
     throw new ScoreImportError('invalid-response', '成绩响应中没有 records 列表');
   }
@@ -152,8 +173,17 @@ export async function fetchImportedScores(value: string): Promise<ImportedScores
     throw new ScoreImportError('invalid-response', '没有可识别的成绩记录');
   }
 
+  const profile: PlayerProfile = {
+    username: typeof body.username === 'string' ? body.username : undefined,
+    nickname: typeof body.nickname === 'string' ? body.nickname : undefined,
+    rating: Number.isFinite(Number(body.rating)) ? Number(body.rating) : undefined,
+    additionalRating: Number.isFinite(Number(body.additional_rating)) ? Number(body.additional_rating) : undefined,
+    plate: typeof body.plate === 'string' ? body.plate : undefined,
+  };
+
   return {
     scores,
-    serverRating: Number.isFinite(Number(body.rating)) ? Number(body.rating) : null,
+    serverRating: profile.rating ?? null,
+    profile,
   };
 }

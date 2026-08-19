@@ -2,7 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Colors } from '../src/constants';
 import { useScoreStore, useSettingsStore } from '../src/store';
-import type { SortMode } from '../src/data/types';
+import type { MusicPlatform, SortMode } from '../src/data/types';
+
+const MUSIC_PLATFORM_OPTIONS: Array<{ value: MusicPlatform; label: string }> = [
+  { value: 'netease', label: '网易云音乐' },
+  { value: 'qq', label: 'QQ 音乐' },
+  { value: 'kugou', label: '酷狗音乐' },
+];
 const SORT_OPTIONS: Array<{ mode: SortMode; label: string }> = [
   { mode: 'relevance', label: '搜索相关度' },
   { mode: 'titleAsc', label: '歌曲名 A → Z' },
@@ -19,6 +25,8 @@ export default function SettingsPage() {
   const clearToken = useScoreStore(s => s.clearToken);
   const syncScores = useScoreStore(s => s.syncScores);
   const clearScores = useScoreStore(s => s.clearScores);
+  const snapshots = useScoreStore(s => s.snapshots);
+  const changes = useScoreStore(s => s.changes);
   const [tokenInput, setTokenInput] = useState('');
   const [tokenMessage, setTokenMessage] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
@@ -85,6 +93,22 @@ export default function SettingsPage() {
         <SettingRow title="显示目标 Rating" description="在推分计划中显示按官方定数计算的目标值" value={settings.showProjectedRating} onChange={value => void updateSettings({ showProjectedRating: value })} />
         <View style={styles.preferenceRow}>
           <View style={styles.preferenceText}>
+            <Text style={styles.preferenceTitle}>默认音乐平台</Text>
+            <Text style={styles.preferenceDescription}>歌曲详情页的音乐搜索默认打开平台</Text>
+          </View>
+          <Pressable
+            style={styles.valueButton}
+            onPress={() => {
+              const index = MUSIC_PLATFORM_OPTIONS.findIndex(option => option.value === settings.defaultMusicPlatform);
+              const next = MUSIC_PLATFORM_OPTIONS[(Math.max(index, 0) + 1) % MUSIC_PLATFORM_OPTIONS.length];
+              void updateSettings({ defaultMusicPlatform: next.value });
+            }}
+          >
+            <Text style={styles.valueButtonText}>{MUSIC_PLATFORM_OPTIONS.find(option => option.value === settings.defaultMusicPlatform)?.label || '网易云音乐'}</Text>
+          </Pressable>
+        </View>
+        <View style={styles.preferenceRow}>
+          <View style={styles.preferenceText}>
             <Text style={styles.preferenceTitle}>默认排序</Text>
             <Text style={styles.preferenceDescription}>曲库打开后可在筛选栏中临时切换</Text>
           </View>
@@ -130,10 +154,22 @@ export default function SettingsPage() {
           <Text style={styles.syncTitle}>同步状态：{getSyncLabel(sync.status)}</Text>
           <Text style={styles.syncText}>本地记录：{sync.recordCount} 条</Text>
           <Text style={styles.syncText}>Diving-Fish Rating：{sync.serverRating ?? '—'}</Text>
+           <Text style={styles.syncText}>本次变化：{sync.changedCount} 条（不是游玩次数）</Text>
+           <Text style={styles.syncText}>本地快照：{snapshots.length} 次（最多保留最近 6 次）</Text>
           <Text style={styles.syncText}>上次同步：{sync.lastSyncedAt ? new Date(sync.lastSyncedAt).toLocaleString() : '尚未同步'}</Text>
           {!!sync.message && <Text style={styles.messageText}>{sync.message}</Text>}
         </View>
-        <Pressable style={styles.secondaryButton} onPress={handleClearScores}>
+        {changes.length > 0 && (
+           <View style={styles.syncCard}>
+             <Text style={styles.syncTitle}>最近成绩变化</Text>
+             {changes.slice(0, 5).map(change => (
+               <Text key={`${change.chartKey}-${change.changedAt}`} style={styles.syncText}>
+                 {change.chartKey}：{change.current ? `${change.current.achievement.toFixed(4)}%` : '当前记录已消失'}
+               </Text>
+             ))}
+           </View>
+         )}
+         <Pressable style={styles.secondaryButton} onPress={handleClearScores}>
           <Text style={styles.secondaryButtonText}>清除本地成绩</Text>
         </Pressable>
       </View>

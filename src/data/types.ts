@@ -56,6 +56,22 @@ export interface SortOptions {
   difficultyIndex?: number;
 }
 
+/** 版本筛选项：rawValue 用于真实筛选，label 用于 UI 展示。 */
+export interface VersionOption {
+  rawValue: string;
+  chinaName: string;
+  label: string;
+  count: number;
+}
+
+/** 独立别名层的条目；不修改 Diving-Fish 原始标题。 */
+export interface SongAliasEntry {
+  songId: string;
+  musicType?: 'SD' | 'DX';
+  aliases: string[];
+  source: 'curated' | 'user';
+}
+
 /** 筛选条件 */
 export interface FilterOptions {
   genre?: string | string[];
@@ -90,10 +106,40 @@ export interface PlayerScore {
   difficultyIndex: number;
   achievement: number;
   dxScore: number;
+  title?: string;
+  ds?: number;
+  level?: string;
+  levelLabel?: string;
+  rate?: string;
   fc?: string;
   fs?: string;
   serverRating?: number;
   importedAt: number;
+}
+
+/** Diving-Fish 成绩接口返回的用户摘要；不包含 Token。 */
+export interface PlayerProfile {
+  username?: string;
+  nickname?: string;
+  rating?: number;
+  additionalRating?: number;
+  plate?: string;
+}
+
+/** 一次成功同步时保存的本地成绩快照。不是官方逐局游玩历史。 */
+export interface ScoreSnapshot {
+  id: string;
+  syncedAt: number;
+  recordCount: number;
+  serverRating: number | null;
+  scores: PlayerScore[];
+}
+
+export interface ScoreChange {
+  chartKey: string;
+  previous: PlayerScore | null;
+  current: PlayerScore | null;
+  changedAt: number;
 }
 
 export interface ScoreSyncState {
@@ -101,13 +147,29 @@ export interface ScoreSyncState {
   lastSyncedAt: number | null;
   recordCount: number;
   serverRating: number | null;
+  changedCount: number;
   message: string | null;
+}
+
+export type MusicPlatform = 'netease' | 'qq' | 'kugou';
+
+export interface BilibiliVideoLink {
+  id: string;
+  songId: string;
+  musicType: 'SD' | 'DX';
+  difficultyIndex: number;
+  url: string;
+  remark: string;
+  tags: string[];
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface AppSettings {
   showChinaVersion: boolean;
   defaultSort: SortOptions;
   showProjectedRating: boolean;
+  defaultMusicPlatform: MusicPlatform;
 }
 
 /** 推分计划 */

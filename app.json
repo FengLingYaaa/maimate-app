@@ -2,7 +2,7 @@
   "expo": {
     "name": "MaiMate",
     "slug": "maimate-app",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -20,7 +20,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "package": "cc.flya.maimate",
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": ["android.permission.CAMERA"],
       "blockedPermissions": ["android.permission.RECORD_AUDIO"],
       "predictiveBackGestureEnabled": false
@@ -33,7 +33,9 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "允许 MaiMate 读取用于识别曲名的照片"
+          "photosPermission": "允许 MaiMate 读取用于识别曲名的照片",
+          "cameraPermission": "允许 MaiMate 拍摄用于识别曲名的照片",
+          "microphonePermission": false
         }
       ],
       "expo-secure-store"

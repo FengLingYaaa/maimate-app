@@ -3,13 +3,13 @@
  * 展示用户标记的推分歌曲、选中难度、目标成绩与导入成绩。
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, FlatList, Pressable, StyleSheet, Alert, TextInput } from 'react-native';
+import React, { useCallback, useMemo } from 'react';
+import { View, Text, FlatList, Pressable, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { usePlanStore, useMusicStore, useScoreStore, useSettingsStore } from '../src/store';
 import { SongCard } from '../src/components';
 import { Colors, DifficultyLabels } from '../src/constants';
-import { calculateRating, formatAchievement, normalizeAchievement } from '../src/data/rating';
+import { calculateRating, formatAchievement } from '../src/data/rating';
 import { getOfficialChartConstant } from '../src/data/music-list';
 import type { PlanEntry, MusicData, PlayerScore } from '../src/data/types';
 
@@ -94,7 +94,8 @@ export default function PushPlan() {
                       music={music}
                       selectedDifficultyIndex={entry.difficultyIndex}
                       showChinaVersion={settings.showChinaVersion}
-                      onPress={() => router.push(`/song/${music.id}` as any)}
+                      allSongs={rawData}
+                       onPress={() => router.push({ pathname: '/song/[id]' as any, params: { id: music.id, type: music.type, difficultyIndex: String(entry.difficultyIndex), source: 'plan' } })}
                     />
                     <View style={styles.detailBox}>
                       <Text style={styles.detailTitle}>
@@ -105,7 +106,16 @@ export default function PushPlan() {
                       {officialConstant === null && <Text style={styles.warningText}>宴会場或数据缺失：不计算官方目标 Rating；拟合值也仅作参考。</Text>}
                       <View style={styles.targetRow}>
                         <Text style={styles.targetLabel}>目标达成率</Text>
-                        <TargetScoreEditor initial={entry.targetScore} onCommit={score => updateTargetScore(music.id, entry.difficultyIndex, score, music.type)} />
+                        {[100, 100.5].map(target => (
+                           <Pressable
+                             key={target}
+                             style={[styles.targetPreset, entry.targetScore === target && styles.targetPresetActive]}
+                             onPress={() => updateTargetScore(music.id, entry.difficultyIndex, entry.targetScore === target ? null : target, music.type)}
+                           >
+                             <Text style={[styles.targetPresetText, entry.targetScore === target && styles.targetPresetTextActive]}>{target}</Text>
+                           </Pressable>
+                         ))}
+                         {entry.targetScore !== undefined && <Text style={styles.targetCurrent}>当前 {entry.targetScore}</Text>}
                         {settings.showProjectedRating && <Text style={styles.projectedRating}>目标 Rating：{targetRating ?? '—'}</Text>}
                       </View>
                       {importedScore ? (
@@ -143,43 +153,6 @@ export default function PushPlan() {
   );
 }
 
-function TargetScoreEditor({ initial, onCommit }: { initial?: number; onCommit: (score: number | null) => void }) {
-  const [value, setValue] = useState(initial === undefined ? '' : String(initial));
-
-  useEffect(() => {
-    setValue(initial === undefined ? '' : String(initial));
-  }, [initial]);
-
-  const commit = (text: string) => {
-    const normalizedText = text.trim().replace(',', '.');
-    if (!normalizedText) {
-      setValue('');
-      onCommit(null);
-      return;
-    }
-    const parsed = normalizeAchievement(Number(normalizedText));
-    if (parsed === null) {
-      setValue(initial === undefined ? '' : String(initial));
-      return;
-    }
-    const clamped = Math.min(100.5, parsed);
-    setValue(String(clamped));
-    onCommit(clamped);
-  };
-
-  return (
-    <TextInput
-      style={styles.targetInput}
-      value={value}
-      onChangeText={setValue}
-      onEndEditing={event => commit(event.nativeEvent.text)}
-      keyboardType="decimal-pad"
-      placeholder="例如 100.5"
-      placeholderTextColor={Colors.text.muted}
-      maxLength={7}
-    />
-  );
-}
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg.primary },
@@ -200,7 +173,11 @@ const styles = StyleSheet.create({
   warningText: { fontSize: 10, lineHeight: 15, color: Colors.functional.warning },
   targetRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
   targetLabel: { fontSize: 11, color: Colors.text.secondary },
-  targetInput: { width: 88, height: 34, paddingHorizontal: 8, borderRadius: 7, backgroundColor: Colors.bg.secondary, color: Colors.text.primary, borderWidth: 1, borderColor: Colors.border.light, fontSize: 12 },
+  targetPreset: { minWidth: 46, paddingHorizontal: 8, paddingVertical: 7, borderRadius: 7, backgroundColor: Colors.bg.secondary, borderWidth: 1, borderColor: Colors.border.light, alignItems: 'center' },
+  targetPresetActive: { backgroundColor: `${Colors.accent.primary}22`, borderColor: Colors.accent.primary },
+  targetPresetText: { fontSize: 11, color: Colors.text.secondary, fontWeight: '700' },
+  targetPresetTextActive: { color: Colors.accent.primary },
+  targetCurrent: { fontSize: 10, color: Colors.text.muted },
   projectedRating: { fontSize: 11, color: Colors.accent.primary, fontWeight: '700' },
   scoreText: { fontSize: 11, lineHeight: 16, color: Colors.functional.success },
   scoreMuted: { fontSize: 11, color: Colors.text.muted },

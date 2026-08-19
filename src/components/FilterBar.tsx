@@ -16,7 +16,7 @@ import {
 import { Colors, DifficultyColorMap } from '../constants';
 import { DifficultyLabels, MusicTypes } from '../constants/game';
 import { normalizeSearchText } from '../data/music-list';
-import type { FilterOptions } from '../data/types';
+import type { FilterOptions, VersionOption } from '../data/types';
 import { RangeSlider } from './RangeSlider';
 
 interface Props {
@@ -27,7 +27,7 @@ interface Props {
   filteredCount: number;
   getPreviewCount?: (filters: FilterOptions) => number;
   genres: string[];
-  versions: string[];
+  versionOptions: VersionOption[];
   artists: string[];
   charters: string[];
 }
@@ -64,7 +64,7 @@ export function FilterBar({
   filteredCount,
   getPreviewCount,
   genres,
-  versions,
+  versionOptions,
   artists,
   charters,
 }: Props) {
@@ -307,18 +307,19 @@ export function FilterBar({
               <View style={styles.expandHeader}>
                 <Text style={styles.sectionTitle}>版本</Text>
                 <Pressable onPress={() => setShowVersions(value => !value)}>
-                  <Text style={styles.expandText}>{showVersions ? '收起' : `展开全部（${versions.length}）`}</Text>
+                  <Text style={styles.expandText}>{showVersions ? '收起' : `展开全部（${versionOptions.length}）`}</Text>
                 </Pressable>
               </View>
               {showVersions ? (
                 <View style={styles.chipRow}>
-                  {versions.map(version => {
+                  {versionOptions.map(option => {
                     const active = Array.isArray(localFilters.version)
-                      ? localFilters.version.includes(version)
-                      : localFilters.version === version;
+                      ? localFilters.version.includes(option.rawValue)
+                      : localFilters.version === option.rawValue;
                     return (
-                      <Pressable key={version} style={[styles.chip, active && styles.chipActive]} onPress={() => toggleVersion(version)}>
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{version}</Text>
+                      <Pressable key={option.rawValue} style={[styles.chip, active && styles.chipActive, option.count === 0 && styles.emptyVersionChip]} onPress={() => toggleVersion(option.rawValue)}>
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
+                        <Text style={[styles.versionCount, active && styles.chipTextActive]}>{option.count === 0 ? '暂无' : option.count}</Text>
                       </Pressable>
                     );
                   })}
@@ -518,6 +519,14 @@ const styles = StyleSheet.create({
   chipActive: {
     backgroundColor: `${Colors.accent.primary}33`,
     borderColor: Colors.accent.primary,
+  },
+  emptyVersionChip: {
+    opacity: 0.72,
+  },
+  versionCount: {
+    marginTop: 2,
+    fontSize: 9,
+    color: Colors.text.muted,
   },
   chipText: {
     fontSize: 12,

@@ -9,6 +9,7 @@ import { useMusicStore, usePlanStore } from '../src/store';
 import { DrumRoll, RangeSlider } from '../src/components';
 import { Colors, DifficultyColorMap, DifficultyLabels, MusicTypes } from '../src/constants';
 import { getMatchingDifficultyIndices, MusicList } from '../src/data/music-list';
+import { getVersionOptions } from '../src/data/version-catalog';
 import type { DrawCandidate, FilterOptions } from '../src/data/types';
 
 type DrawMode = 'plan' | 'any' | 'filtered';
@@ -36,14 +37,14 @@ export default function RandomPicker() {
   const [spinning, setSpinning] = useState(false);
 
   const genres = useMemo(() => [...new Set(rawData.map(music => music.basic_info.genre))].sort(), [rawData]);
-  const versions = useMemo(() => [...new Set(rawData.map(music => music.basic_info.from))].sort(), [rawData]);
+  const versionOptions = useMemo(() => getVersionOptions(rawData), [rawData]);
   const planCandidates = useMemo<DrawCandidate[]>(() => {
-    const byId = new Map(rawData.map(music => [music.id, music]));
+    const byChart = new Map(rawData.map(music => [`${music.type}:${music.id}`, music]));
     return planEntries
       .slice()
       .sort((left, right) => left.order - right.order)
       .flatMap(entry => {
-        const music = byId.get(entry.songId);
+        const music = byChart.get(`${entry.musicType || 'SD'}:${entry.songId}`) || rawData.find(item => item.id === entry.songId);
         if (!music || entry.difficultyIndex < 0 || entry.difficultyIndex >= music.charts.length) return [];
         return [{ music, difficultyIndex: entry.difficultyIndex, planEntry: entry }];
       });
@@ -104,9 +105,17 @@ export default function RandomPicker() {
     setSpinning(false);
   }, []);
 
-  const handleResultPress = useCallback((musicId: string) => {
+  const handleResultPress = useCallback((candidate: DrawCandidate) => {
     if (spinning) return;
-    router.push(`/song/${musicId}` as any);
+    router.push({
+      pathname: '/song/[id]' as any,
+      params: {
+        id: candidate.music.id,
+        type: candidate.music.type,
+        difficultyIndex: candidate.difficultyIndex === undefined ? undefined : String(candidate.difficultyIndex),
+        source: 'random',
+      },
+    });
   }, [router, spinning]);
 
   const activeRange: [number, number] = filters.dsRange || [0, 15];
@@ -195,16 +204,17 @@ export default function RandomPicker() {
           <View style={styles.expandHeader}>
             <Text style={styles.filterLabel}>版本</Text>
             <Pressable onPress={() => setShowVersions(value => !value)}>
-              <Text style={styles.expandText}>{showVersions ? '收起' : `展开全部（${versions.length}）`}</Text>
+              <Text style={styles.expandText}>{showVersions ? '收起' : `展开全部（${versionOptions.length}）`}</Text>
             </Pressable>
           </View>
           {showVersions ? (
             <View style={styles.chipRow}>
-              {versions.map(version => {
-                const active = Array.isArray(filters.version) ? filters.version.includes(version) : filters.version === version;
+              {versionOptions.map(option => {
+                const active = Array.isArray(filters.version) ? filters.version.includes(option.rawValue) : filters.version === option.rawValue;
                 return (
-                  <Pressable key={version} style={[styles.chip, active && styles.chipActive]} onPress={() => updateFilters({ ...filters, version: toggleValue(filters.version, version) as FilterOptions['version'] })}>
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{version}</Text>
+                  <Pressable key={option.rawValue} style={[styles.chip, active && styles.chipActive, option.count === 0 && styles.emptyVersionChip]} onPress={() => updateFilters({ ...filters, version: toggleValue(filters.version, option.rawValue) as FilterOptions['version'] })}>
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
+                     <Text style={[styles.versionCount, active && styles.chipTextActive]}>{option.count === 0 ? '暂无' : option.count}</Text>
                   </Pressable>
                 );
               })}
@@ -242,6 +252,7 @@ export default function RandomPicker() {
             spinning={spinning}
             onSpinEnd={handleSpinEnd}
             onResultPress={handleResultPress}
+             allSongs={rawData}
           />
         ) : (
           <View style={styles.placeholder}>
@@ -390,6 +401,14 @@ const styles = StyleSheet.create({
   chipActive: {
     backgroundColor: `${Colors.accent.primary}33`,
     borderColor: Colors.accent.primary,
+  },
+  emptyVersionChip: {
+    opacity: 0.72,
+  },
+  versionCount: {
+    marginTop: 2,
+    fontSize: 8,
+    color: Colors.text.muted,
   },
   chipText: {
     fontSize: 10,

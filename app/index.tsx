@@ -10,6 +10,7 @@ import { useMusicStore, useSettingsStore } from '../src/store';
 import { SongCard, FilterBar, TitleRecognizer } from '../src/components';
 import { Colors } from '../src/constants';
 import { getMatchingDifficultyIndices, MusicList } from '../src/data/music-list';
+import { getVersionOptions } from '../src/data/version-catalog';
 import type { FilterOptions, MusicData } from '../src/data/types';
 
 function formatCacheTime(timestamp: number | null): string {
@@ -48,7 +49,7 @@ export default function SongBrowser() {
   const songs = useMemo(() => musicList.all(), [musicList]);
 
   const genres = useMemo(() => [...new Set(rawData.map(m => m.basic_info.genre))].sort(), [rawData]);
-  const versions = useMemo(() => [...new Set(rawData.map(m => m.basic_info.from))].sort(), [rawData]);
+  const versionOptions = useMemo(() => getVersionOptions(rawData), [rawData]);
   const artists = useMemo(() => [...new Set(rawData.map(m => m.basic_info.artist))].sort(), [rawData]);
   const charters = useMemo(() => {
     const values = new Set<string>();
@@ -65,7 +66,7 @@ export default function SongBrowser() {
   const openRecognizedSong = useCallback((music: MusicData) => {
     restoreTitleRecognizerOnFocus.current = true;
     setTitleRecognizerVisible(false);
-    router.push(`/song/${music.id}` as any);
+    router.push({ pathname: '/song/[id]' as any, params: { id: music.id, type: music.type, source: 'library' } });
   }, [router]);
 
   const getPreviewCount = useCallback((nextFilters: FilterOptions) => {
@@ -73,11 +74,11 @@ export default function SongBrowser() {
   }, [rawData]);
 
   const handleSongPress = useCallback((music: MusicData) => {
-    router.push(`/song/${music.id}` as any);
+    router.push({ pathname: '/song/[id]' as any, params: { id: music.id, type: music.type, source: 'library' } });
   }, [router]);
 
   const handleSongLongPress = useCallback((music: MusicData) => {
-    router.push(`/song/${music.id}` as any);
+    router.push({ pathname: '/song/[id]' as any, params: { id: music.id, type: music.type, source: 'library' } });
   }, [router]);
 
   const sortDifficultyIndex = filters.sort?.mode === 'constantAsc' || filters.sort?.mode === 'constantDesc'
@@ -120,7 +121,7 @@ export default function SongBrowser() {
         filteredCount={songs.length}
         getPreviewCount={getPreviewCount}
         genres={genres}
-        versions={versions}
+        versionOptions={versionOptions}
         artists={artists}
         charters={charters}
       />
@@ -139,6 +140,7 @@ export default function SongBrowser() {
                 onPress={handleSongPress}
                 onLongPress={handleSongLongPress}
                 showChinaVersion={settings.showChinaVersion}
+                allSongs={rawData}
                 highlightedDifficulties={highlighted.size > 0 ? [...highlighted] : undefined}
               />
             </View>

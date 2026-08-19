@@ -8,7 +8,7 @@ import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text, StyleSheet } from 'react-native';
 import { Colors } from '../src/constants';
-import { useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '../src/store';
+import { useBilibiliStore, useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '../src/store';
 
 export default function RootLayout() {
   const loadData = useMusicStore(s => s.loadData);
@@ -16,12 +16,14 @@ export default function RootLayout() {
   const loadPlan = usePlanStore(s => s.loadPlan);
   const loadScores = useScoreStore(s => s.loadScores);
   const loadSettings = useSettingsStore(s => s.loadSettings);
+  const loadBilibiliLinks = useBilibiliStore(s => s.loadLinks);
 
   useEffect(() => {
     loadData();
     loadPlan();
     loadScores();
     loadSettings();
+    loadBilibiliLinks();
   }, []);
 
   if (loading) {

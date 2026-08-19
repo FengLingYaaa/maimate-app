@@ -24,6 +24,7 @@ export interface FortuneResult {
   should: string[];
   avoid: string[];
   recommendedSongId: string | null;
+  recommendedMusicType: 'SD' | 'DX' | null;
 }
 
 export function getChinaDateKey(date = new Date()): string {
@@ -62,11 +63,19 @@ export function generateFortune(seed: string, songs: MusicData[], dateKey = getC
     if (value === 0) avoid.push(activity);
   }
 
-  const recommendedSongId = songs.length > 0
-    ? songs[Math.floor(nextRandom(state) * songs.length)].id
+  // Sorting by stable chart identity prevents a refresh/reordered API payload from changing today's result.
+  const stableSongs = [...songs].sort((left, right) => {
+    const leftKey = `${left.type}:${left.id}:${left.title}`;
+    const rightKey = `${right.type}:${right.id}:${right.title}`;
+    return leftKey.localeCompare(rightKey);
+  });
+  const recommendedSong = stableSongs.length > 0
+    ? stableSongs[Math.floor(nextRandom(state) * stableSongs.length)]
     : null;
+  const recommendedSongId = recommendedSong?.id || null;
+  const recommendedMusicType = recommendedSong?.type || null;
 
-  return { dateKey, luck, should, avoid, recommendedSongId };
+  return { dateKey, luck, should, avoid, recommendedSongId, recommendedMusicType };
 }
 
 export async function getFortuneSeed(): Promise<string> {

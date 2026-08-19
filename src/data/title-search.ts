@@ -1,4 +1,5 @@
 import { normalizeSearchText } from './music-list';
+import { getSearchTitles } from './song-aliases';
 import type { MusicData } from './types';
 
 export interface TitleMatch {
@@ -47,7 +48,7 @@ function scoreTitle(title: string, recognizedLine: string): number | null {
 }
 
 /**
- * Match OCR text against song titles only.
+ * Match OCR text against official titles and the independent alias layer.
  * Artist, charter, cover artwork, and other metadata are deliberately ignored.
  */
 export function matchSongTitles(rawData: MusicData[], recognizedText: string, limit = 8): TitleMatch[] {
@@ -61,9 +62,11 @@ export function matchSongTitles(rawData: MusicData[], recognizedText: string, li
     .map(music => {
       let best: TitleMatch | null = null;
       for (const line of lines) {
-        const score = scoreTitle(music.title, line);
-        if (score !== null && (!best || score > best.score)) {
-          best = { music, recognizedText: line, score };
+        for (const title of getSearchTitles(music)) {
+          const score = scoreTitle(title, line);
+          if (score !== null && (!best || score > best.score)) {
+            best = { music, recognizedText: line, score };
+          }
         }
       }
       return best;
