@@ -1,6 +1,6 @@
 {
   "name": "maimate-app",
-  "version": "1.6.9",
+  "version": "1.6.10",
   "main": "expo-router/entry",
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -35,6 +35,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "tsx": "^4.19.3",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -43,16 +44,18 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "tsc --noEmit",
-    "test:rating": "node --experimental-strip-types scripts/rating-check.mjs",
-    "test:phase-af": "node --experimental-strip-types scripts/phase-af-check.mjs",
-    "test:features": "node --experimental-strip-types --experimental-specifier-resolution=node scripts/feature-check.mjs",
+    "test:rating": "tsx scripts/rating-check.ts",
+    "test:phase-af": "tsx scripts/phase-af-check.ts",
+    "test:features": "tsx scripts/feature-check.ts",
     "test:routes": "node scripts/route-check.mjs"
   },
   "private": true,
   "expo": {
     "doctor": {
       "reactNativeDirectoryCheck": {
-        "exclude": ["@react-native-ml-kit/text-recognition"]
+        "exclude": [
+          "@react-native-ml-kit/text-recognition"
+        ]
       }
     }
   }

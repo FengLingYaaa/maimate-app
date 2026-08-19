@@ -1,3 +1,4 @@
+// @ts-nocheck
 import assert from 'node:assert/strict';
 import { calculateRating, getRatingFactor } from '../src/data/rating.ts';
 
