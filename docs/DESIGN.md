@@ -1,9 +1,9 @@
 # MaiMate（舞萌伴侣）项目设计案
 
 > 文档性质：项目事实基线、产品设计、工程约束和持续变更记录。
-> 最后更新：2026-08-20
-> 当前版本：`v1.5.0-alpha`
-> 当前状态：Phase A-F 已实现；v1.5.0-alpha 云构建、Release、个人站同步和线上校验已完成，真机验收仍待设备。
+> 最后更新：2026-08-26
+> 当前版本：`v1.6.10`
+> 当前状态：Phase A-F 与 v1.6.x 迭代已实现；v1.6.0–v1.6.10 已全部完成云构建并发布到 GitHub Release；真机验收仍待 Android 设备。
 > GitHub：<https://github.com/FengLingYaaa/maimate-app>
 
 这份文档的目标不是只描述“理想中的产品”，而是让人类或新对话中的智能体能够回答：
@@ -15,7 +15,7 @@
 5. 下一步应该做什么；
 6. 每次对话结束后，应该把什么追加到这里。
 
-`app/docs/DESIGN.md` 是 App 仓库内的同步副本。修改设计时应同时更新这两个文件，避免只更新工作区文档而让新智能体读到旧状态。
+本文件在 App Git 仓库内的路径是 `docs/DESIGN.md`；历史 Linux 工作区还在仓库外维护 `design/DESIGN.md` 镜像，修改设计时应同步两处，避免新智能体读到旧状态。当前 Windows 克隆中只有仓库内这一份。
 
 ---
 
@@ -30,14 +30,14 @@
 5. 只有用户明确要求实施时，才修改 App 代码；
 6. 完成一个步骤后，把意图、修改、验证、产物和遗留问题追加到本文档的“持续变更记录”。
 
-项目工作区和 App Git 根目录不是同一个目录：
+历史 Linux 工作区中，项目工作区和 App Git 根目录不是同一个目录：
 
 ```text
 工作区：/home/agent/dsh-workspace/maimate
 App Git 根：/home/agent/dsh-workspace/maimate/app
 ```
 
-`design/`、`landing/`、`research/` 在 App Git 根之外；修改 App 代码时不要把文件写到错误层级。
+自 2026-08-26 起的 Windows 会话把 App 仓库直接克隆为工作区根（`D:\AGENT\dsh\Workspace\flya-workspace\maimate`），两个层级重合，本文提到的 `app/...` 相对路径即该克隆内的实际路径；`design/`、`landing/`、`research/` 镜像不在该克隆内，仍留在历史工作区和下载站部署中。
 
 ---
 
@@ -88,7 +88,7 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 
 ---
 
-## 3. 当前事实状态（2026-08-18）
+## 3. 当前事实状态（2026-08-26）
 
 ### 3.1 仓库、发布和包信息
 
@@ -96,16 +96,17 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | release implementation `8d6f51b45fbcdaf565f6c21a46e42a6386f7509f`；发布记录 `cb9f984e89dbb8aff0b2df7a0474aff5ee1c7722` |
-| 当前标签 | `v1.4.0-alpha`（云构建与个人站已完成） |
+| 当前提交 | `7ac3a2640d96422472240b6efb5be1107a0e146b`（ci: 回归检查改用 Node 20/tsx） |
+| 当前标签 | `v1.6.10`（最新 Release；v1.6.0–v1.6.9 也均已发布） |
 | Android applicationId | `cc.flya.maimate` |
-| App 版本 | `1.4.0`（Android versionCode `2`） |
+| App 版本 | `1.6.10`（Android versionCode `14`） |
 | 下载站 | <https://maimate.flya.ccwu.cc/> |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
-| APK 来源 | GitHub Release `v1.4.0-alpha`，由 `landing/_worker.js` 代理/转发 |
-| APK SHA-256 | `109d4b04a1217814f355d01fa20804108500ab85a25df5e22762814210f74170` |
-| APK 大小 | `60,097,909` bytes（约 57.3 MiB） |
-| APK 构建方式 | GitHub Actions 云构建，arm64-v8a，内部测试使用 debug keystore |
+| APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`，由 `landing/_worker.js` 代理/转发 |
+| 最新 Release APK SHA-256（v1.6.10） | `86136c0dda907c9dbb3460e63d958c8c05633885bed02ab21fbc34e35e8496cc` |
+| 最新 Release APK 大小 | `62,045,742` bytes（约 59.2 MiB） |
+| 下载站同步状态 | ⚠️ 2026-08-26 线上 HEAD 返回 content-length `62,040,886`，与 v1.6.6 资产一致——下载站仍指向 v1.6.6，落后最新 Release，待重新部署 landing Worker |
+| APK 构建方式 | GitHub Actions 云构建：先跑 lint/route/feature/phase/rating 回归、Expo Doctor 和 Android export 门禁，再出 arm64-v8a debug keystore 内测包 |
 
 当前 App Git 仓库在第三阶段提交之后应保持干净；设计文档本身位于仓库外的工作区镜像和 App 仓库内的文档副本中，更新文档会让 App 仓库产生文档变更，这是预期行为。
 
@@ -132,7 +133,14 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 | OCR 拍照识别 | Phase E 已实现 | ML Kit；中文/日文/拉丁文字；连续拍摄、相册多选、逐图识别、合并去重和删除图片 |
 | 今日舞萌运势 | Phase F 已实现 | 稳定 SD/DX 推荐键、推荐曲绘、上海日期本地娱乐结果；不读取 Token、不上传运势 |
 | 个人设置 | Phase4 已完成 | SecureStore Token 管理、只读成绩同步、显示/排序偏好和本地数据清理 |
-| APK 发布链路 | 云构建中 | GitHub Actions run `32213629250` → GitHub Release `MaiMate-latest.apk` → Cloudflare Worker 下载站 |
+| 本地牌子查询 | v1.6.0 已完成 | `app/plates/index.tsx`、`src/data/plates.ts`：按本机已导入成绩计算 FC/SSS/FS DX/AP 位掩码，支持版本/国区/难度筛选和汇总计数；不上传成绩 |
+| 推分计划排序工具 | v1.6.0 已完成 | 计划卡片化 + 计划内搜索 + 拖拽排序（`react-native-draggable-flatlist`）；派生搜索/显式排序视图禁用拖拽并保留隐藏条目（`src/data/plan-order.ts`） |
+| 版本双轨筛选 | v1.6.0 已完成 | 原始 `from` 与国区年份分组分离筛选（`src/data/version-catalog.ts`）；歌曲与牌子筛选均暴露基础舞萌DX国区分组 |
+| 外部应用优先打开 | v1.6.x 已完成 | `src/data/external-links.ts` + `plugins/with-external-app-queries.js`：bilibili/orpheus(网易云)/qqmusic/kugou 深链优先，失败回退 HTTPS；Android 包可见性与 iOS `LSApplicationQueriesSchemes` 已声明 |
+| Bilibili 单条链接保存增强 | v1.6.x 已完成 | 分享文本容错解析、按源 URL 键控封面缓存、元数据请求代次防串扰、遗留封面扩展名清理（`bilibili-links/-metadata/-cover-cache`、`bilibili-store`） |
+| 音乐平台搜索设置页 | v1.6.0 已完成 | `app/settings/music-platform.tsx`、`src/data/music-platforms.ts`：网易云/QQ音乐/酷狗选择，默认网易云且仅使用 HTTPS 搜索页 |
+| 设置子页与嵌套导航 | v1.6.5–v1.6.6 已完成 | `app/settings/{index,sort,music-platform}`、`app/song/[id]`、`app/plates` 均挂到原生 Stack 子路由并带系统返回；`scripts/route-check.mjs` 做路由树回归 |
+| APK 发布链路 | 云构建中 | GitHub Actions（tag 触发，回归门禁）→ GitHub Release `MaiMate-latest.apk` → Cloudflare Worker 下载站；⚠️ 下载站当前仍指向 v1.6.6，待重新部署 |
 
 ### 3.3 已完成但仍需人工验收的能力
 
@@ -141,6 +149,7 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 - Bilibili 客户端深链是否在真实 Android/Bilibili 版本组合中成功打开搜索；
 - 深链失败时 HTTPS 搜索回退是否在真实设备上可用；
 - OCR 相机、快速加入计划、详情返回 OCR 和随机动画需要真机验收；
+- 牌子查询返回导航、计划拖拽排序、外部应用拉起（bilibili/orpheus/qqmusic/kugou）和 Bilibili 封面刷新同样需要真机验收；
 - 本会话没有连接 Android 设备（`adb devices` 为空），因此以上真机结果不能虚报为已验证。
 
 ---
@@ -189,6 +198,12 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
   ├─ 本地生成/读取安装种子
   ├─ 使用上海日期生成当天稳定的人品值、宜/忌和推荐歌曲
   └─ 娱乐功能，不读取成绩 Token、不上传数据
+
+牌子查询 Tab
+  ├─ 用本机已导入成绩构建每张谱面的 FC/SSS/FS DX/AP 位掩码
+  ├─ 版本 / 国区 / 难度筛选
+  ├─ 汇总卡显示各牌子 x/y 计数
+  └─ 点击条目进入歌曲详情（source=plates）；无成绩时提示先在设置导入
 
 设置 Tab
   ├─ SecureStore 保存/删除用户主动输入的 Import-Token
@@ -246,52 +261,72 @@ ML Kit 分别尝试日文、中文、拉丁文字模型
 - `@react-native-ml-kit/text-recognition`；
 - `expo-image-picker`、`expo-file-system`、`expo-sqlite` 等 Expo 模块；
 - `react-native-reanimated`、`react-native-worklets`；
+- `react-native-draggable-flatlist` + `react-native-gesture-handler`（推分计划拖拽排序，v1.6.0 起）；
+- `expo-intent-launcher`、`expo-linking`（外部应用优先打开与深链回退）；
+- 纯函数回归脚本用 `tsx` 运行：`npm run test:rating` / `test:phase-af` / `test:features` / `test:routes`；
+- `react-native-webview` 目前在 package.json 中但源码零引用，属未使用依赖待清理，不构成内嵌 WebView 能力；
 - 样式主要使用 React Native `StyleSheet.create`，不是旧设计案中描述的 NativeWind/SQLite 全量架构。
 
 ### 5.2 目录地图
 
 ```text
-/home/agent/dsh-workspace/maimate/
-├── README.md                         工作区说明和 APK 交接位置
-├── design/DESIGN.md                  本设计案的工作区镜像
-├── app/                              独立 Git 仓库
-│   ├── app/
-│   │   ├── _layout.tsx               根布局、Tabs、启动加载
-│   │   ├── index.tsx                 曲库首页
-│   │   ├── random.tsx                随机抽歌
-│   │   ├── plan.tsx                  推分计划
-│   │   ├── fortune.tsx               今日舞萌运势
-│   │   ├── settings.tsx              个人设置和成绩导入
-│   │   └── song/[id].tsx             歌曲详情
-│   ├── src/api/
-│   │   ├── prober.ts                 music_data 和曲库缓存
-│   │   ├── chart-stats.ts            chart_stats 和统计缓存
-│   │   └── score-import.ts            SecureStore Token、只读成绩 API 和归一化
-│   ├── src/data/
-│   │   ├── types.ts                  MusicData/ChartStats 等类型
-│   │   ├── music-list.ts              纯函数筛选和搜索引擎
-│   │   ├── rating.ts                  完整 Diving-Fish Rating 计算
-│   │   ├── fortune.ts                 本地确定性今日运势
-│   │   ├── bilibili-search.ts         外部客户端深链和 HTTPS 搜索 URL
-│   │   └── title-search.ts            OCR 曲名匹配
-│   ├── src/store/
-│   │   ├── music-store.ts             曲库、缓存、筛选、chart_stats 状态
-│   │   ├── plan-store.ts              推分计划持久化
-│   │   ├── score-store.ts             SecureStore Token 与本地成绩状态
-│   │   └── settings-store.ts          显示偏好持久化
-│   ├── src/components/
-│   │   ├── FilterBar.tsx
-│   │   ├── SongCard.tsx
-│   │   ├── BilibiliSearchPanel.tsx
-│   │   ├── TitleRecognizer.tsx
-│   │   ├── DrumRoll.tsx
-│   │   ├── RatingPanel.tsx
-│   │   └── NoteBar.tsx
-│   ├── docs/DESIGN.md                 App 仓库内设计案同步副本
-│   └── docs/BUILD.md                  构建指南
-├── landing/                           Cloudflare Pages/Worker 下载站
-└── research/djnaughty/                只读研究区，不直接改 App
+App Git 根（2026-08-26 起 = Windows 工作区 D:\AGENT\dsh\Workspace\flya-workspace\maimate）
+├── docs/DESIGN.md                  本设计案（仓库内副本）
+├── docs/BUILD.md                   构建指南
+├── AGENTS.md / CLAUDE.md           智能体说明
+├── app.json                        Expo 配置（version/versionCode、权限、插件）
+├── app/                            Expo Router 路由
+│   ├── _layout.tsx                 根布局、Tabs、启动加载
+│   ├── index.tsx                   曲库首页
+│   ├── random.tsx                  随机抽歌
+│   ├── plan.tsx                    推分计划
+│   ├── fortune.tsx                 今日舞萌运势
+│   ├── plates/index.tsx            本地牌子查询（Stack 子路由）
+│   ├── settings/index.tsx          个人设置和成绩导入（Stack 子路由）
+│   ├── settings/sort.tsx           默认排序选择子页
+│   ├── settings/music-platform.tsx 音乐平台选择子页
+│   └── song/[id].tsx               歌曲详情（Stack 子路由）
+├── src/api/
+│   ├── prober.ts                   music_data 和曲库缓存
+│   ├── chart-stats.ts              chart_stats 和统计缓存
+│   └── score-import.ts             SecureStore Token、只读成绩 API 和归一化
+├── src/data/
+│   ├── types.ts                    MusicData/ChartStats 等类型
+│   ├── music-list.ts               纯函数筛选和搜索引擎
+│   ├── rating.ts                   完整 Diving-Fish Rating 计算
+│   ├── fortune.ts                  本地确定性今日运势
+│   ├── bilibili-search.ts          外部客户端深链和 HTTPS 搜索 URL
+│   ├── bilibili-links.ts           用户主动保存的单条视频链接模型
+│   ├── bilibili-metadata.ts        单条链接公开元数据获取（显式链接限定）
+│   ├── bilibili-cover-cache.ts     按源 URL 键控的封面文件缓存
+│   ├── external-links.ts           外部应用优先打开与 HTTPS 回退
+│   ├── music-platforms.ts          网易云/QQ音乐/酷狗搜索 URL
+│   ├── plates.ts                   本地牌子位掩码计算与筛选
+│   ├── plan-order.ts               计划排序保护（过滤视图防拖拽丢条目）
+│   ├── version-catalog.ts          原始版本与国区年份分组目录
+│   ├── song-aliases.ts             别名层（当前不预置别名表）
+│   ├── cover-resolver.ts           统一曲绘解析（宴会場同名回退等）
+│   ├── title-search.ts             OCR 曲名匹配
+│   └── settings-options.ts         设置选项定义
+├── src/store/
+│   ├── music-store.ts              曲库、缓存、筛选、chart_stats 状态
+│   ├── plan-store.ts               推分计划持久化
+│   ├── score-store.ts              SecureStore Token 与本地成绩状态
+│   ├── settings-store.ts           显示偏好持久化
+│   └── bilibili-store.ts           单条链接、元数据与封面缓存状态
+├── src/components/
+│   ├── FilterBar.tsx / SongCard.tsx / CoverImage.tsx / RangeSlider.tsx
+│   ├── BilibiliSearchPanel.tsx / TitleRecognizer.tsx / DrumRoll.tsx
+│   └── PlanEntryCard.tsx / RatingPanel.tsx / NoteBar.tsx / DifficultyBadge.tsx
+├── plugins/
+│   └── with-external-app-queries.js  Android 包可见性（查询外部应用）配置插件
+├── scripts/
+│   ├── feature-check.ts / phase-af-check.ts / rating-check.ts  纯函数回归（tsx）
+│   └── route-check.mjs             路由树回归
+└── .github/workflows/build-apk.yml tag 触发的云构建（回归门禁 + arm64 APK → Release）
 ```
+
+历史 Linux 工作区中的 `README.md`、`design/`、`landing/`、`research/djnaughty/` 不在本克隆内；`landing/` 的 Cloudflare Pages/Worker 部署仍由下载站侧维护。
 
 ### 5.3 关键数据来源
 
@@ -650,12 +685,13 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 
 ## 12. 当前工作结论
 
-在外部 Bilibili 搜索方案下，v1.3.0-alpha 的代码、云构建、Release 和个人站部署已经完成，当前正确下一步是：
+截至 2026-08-26：代码主线已推进到 v1.6.10（云构建与 Release 齐全），设计案事实基线已修复同步。当前正确下一步是：
 
-1. 若接入 Android 设备，验证 Bilibili 客户端深链和 HTTPS 回退；
-2. 真机验收 OCR 相机、快速加入计划、详情返回 OCR 和随机抽歌点击停止；
-3. 保持 `research/djnaughty/` 为历史研究证据，不恢复自动抓取或内置视频目录；
-4. 后续每次设计、研究、代码或发布步骤继续追加到本文档。
+1. 若接入 Android 设备，验证 Bilibili 客户端深链和 HTTPS 回退、OCR 相机/返回、随机抽歌点击停止、牌子查询返回、计划拖拽排序和音乐平台拉起；
+2. 把下载站 Worker 从 v1.6.6 更新到 v1.6.10 并做线上校验（当前线上 content-length 对应 v1.6.6 资产）；
+3. 清理未使用的 `react-native-webview` 依赖（需 lockfile 重生成并经 CI 验证后随下一版发布）；
+4. 保持 `research/djnaughty/` 为历史研究证据，不恢复自动抓取或内置视频目录；
+5. 后续每次设计、研究、代码或发布步骤继续追加到本文档。
 
 当前不需要、也不允许把任何视频条目写入正式 App。
 
@@ -772,3 +808,31 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 云构建：GitHub Actions run `32259141373` 成功，Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.5.0-alpha>；arm64-v8a APK `60,134,005` bytes，SHA-256 `f748ae60535ecc2e58f1b7aec17ab3e4bc78d176af2ef8d02ca56f2ad62e73b1`。
 - 下载站：Cloudflare Pages 预览部署为 <https://c7259680.maimate-landing.pages.dev>；生产入口 <https://maimate.flya.ccwu.cc/> 显示 v1.5.0-alpha，APK URL 返回 HTTP 200、`application/vnd.android.package-archive`、`content-length: 60134005`、固定附件名；完整下载与本地 APK 字节一致。
 - 人类需要确认：仍无 Android 设备，不能把安装、OCR 相机/相册生命周期、计划返回、SecureStore 导入、Bilibili 深链或音乐平台页面宣称为真机验收完成；APK 为 arm64-v8a debug-signed 内测包，正式分发仍需稳定 release keystore。
+
+### 2026-08-19 — v1.6.0–v1.6.10 补录：外部链接、计划工具、本地牌子与导航重构
+
+- 说明：本条为 2026-08-26 会话补录。`fad5974..7ac3a26` 共 11 个提交当时未按第 10 节追加记录，本条依据提交信息和 Release 证据重建；此前另有 `e2d7c4f`（npm 元数据对齐 v1.5.0 + Phase A-F 纯回归检查）、`28d32ee`（锁定版本恢复）、`6f33085`（v1.5.0 发布验证入档）三个收尾提交。
+- 实际功能：
+  - v1.6.0（`fad5974`）：原生应用优先的外部搜索与 HTTPS 回退；Bilibili 分享文本容错解析与显式单条链接元数据缓存；原始/国区双轨版本筛选；推分计划卡片、搜索与拖拽排序；设置子页 sort/music-platform；本地 FC/SSS/FS DX/AP 牌子查询；新增 Android 包可见性插件 `plugins/with-external-app-queries.js`、手势依赖和纯函数回归检查。
+  - v1.6.1（`f656549`）：Bilibili 封面 URL 归一化后安全缓存；计划卡保留投影 Rating 设置；已存链接先用显式 Android intent 打开再 HTTPS 回退。
+  - v1.6.2（`4ccc8f2`）：歌曲详情与设置选择器加嵌套 Stack 布局并从根 Tabs 隐藏；链接 URL/曲源变更时清理陈旧封面。
+  - v1.6.3（`90d6545`）：派生搜索/显式排序视图禁用拖拽并在重排时保留隐藏条目；重启后恢复持久化的 Bilibili 加载状态；歌曲与牌子筛选暴露基础舞萌DX国区分组；同步更新本文 §6.7/§7 显式链接边界。
+  - v1.6.4（`7338d39`）：牌子页增加可见返回控件（无导航历史时回首页）。
+  - v1.6.5（`41b7361`）：settings 首页移入 layout 目录，嵌套路由不再注册为根 Tabs 屏幕；新增路由树回归检查 `scripts/route-check.mjs`。
+  - v1.6.6（`d0d6493`）：plates 移入嵌套 layout 目录获得原生 Stack 头部；删除页内重复返回按钮。
+  - v1.6.7（`425e047`）：封面缓存文件名按源 URL 键控，编辑链接不再复用旧封面像素；URL 变更/删除时清理旧文件；忽略属于旧 URL 的元数据响应。
+  - v1.6.8（`7b78163`）：链接级清理覆盖 JPG/JPEG/PNG/WebP 全部遗留扩展名并加 WebP 回归断言。
+  - v1.6.9（`5eb70f0`）：逐链接元数据请求代次防止 A→B→A 编辑串扰；同源封面强制 no-cache 临时文件并发布新本地 URI；迁移遗留持久化路径并序列化 AsyncStorage 快照保序；CI 在 arm64 构建前运行 lint/回归/Expo Doctor/export 门禁。
+  - v1.6.10（`7ac3a26`）：TypeScript 检查改用固定 tsx runner 替代 Node 22 strip-types，修复 v1.6.9 校验任务失败；versionCode 升至 14。
+- 验证证据：GitHub Releases v1.6.0→v1.6.10 于 2026-08-19T18:46Z–22:42Z 先后发布，各含 `MaiMate-latest.apk`（62,037,314 → 62,045,742 bytes）；v1.6.10 由 Actions run `32308852870` 构建（success）；2026-08-26 全量下载 v1.6.10 APK 复核 SHA-256 `86136c0dda907c9dbb3460e63d958c8c05633885bed02ab21fbc34e35e8496cc`。
+- 人类需要确认：以上全部新交互仍未做真机验收；下载站线上资产经 HEAD 核实仍停留在 v1.6.6。
+
+### 2026-08-26 — Windows 工作区重建克隆、GitHub Token 配置与设计案事实基线修复
+
+- 用户目标：在新 Windows 工作区恢复项目上下文；用户为本会话配置 GitHub token；把设计案补充修复到与代码一致并推送。
+- 本步范围：只修改 `docs/DESIGN.md` 并推送 `main`；不改 App 代码、不动 Release 和下载站。
+- 实际修改：`docs/DESIGN.md` —— 头部事实基线更新为 v1.6.10；§0 增补 Windows 克隆层级说明；§3 标题日期与 §3.1 事实表重写（当前提交/标签/versionCode/SHA-256/下载站同步状态）；§3.2 新增牌子查询、计划排序工具、双轨版本筛选、外部应用优先打开、Bilibili 链接保存增强、音乐平台设置页、嵌套导航共 8 行能力事实；§3.3 扩充待真机验收清单；§4.3 增加牌子查询流程；§5.1 补充拖拽/意图打开依赖、tsx 回归脚本和 webview 未使用备注；§5.2 目录地图按当前仓库重写；§12 当前结论更新；追加本两条记录。
+- 验证证据：`git log --oneline/--stat v1.5.0-alpha..HEAD` 共 14 提交；GitHub API releases 列表（Node fetch）确认 v1.6.0–v1.6.10 十一个 Release 及资产大小；v1.6.10 APK 全量下载 62,045,742 bytes，SHA-256 `86136c0dda907c9dbb3460e63d958c8c05633885bed02ab21fbc34e35e8496cc`；线上 HEAD <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> 返回 200 / content-length `62,040,886`（= v1.6.6 资产）；`react-native-webview` 经全仓 grep 仅出现在 package.json/package-lock.json，源码零引用；push dry-run 成功。
+- 环境阻塞记录：本 Windows 沙盒 schannel TLS 损坏（Invoke-RestMethod/curl 连 GitHub 报 SSL 错误），git 改用 openssl 后端解决；msys sh.exe 无法创建信号管道导致一切 git 凭据助手（manager/store）不可执行，改用 remote URL 内嵌 token；HTTPS API 统一走 Node fetch。GH_TOKEN 与 CLOUDFLARE_API_TOKEN 由用户配置在 `D:\AGENT\dsh\Workspace\flya-workspace\.env`（配套 load-env.ps1）。
+- 人类需要确认：token 明文存在于 `.env` 与本克隆 `.git/config` 两处，如泄露可随时在 GitHub 撤销重发；CLOUDFLARE_API_TOKEN 本会话未验证。
+- 下一步：更新 landing Worker 指向 v1.6.10 并做线上校验；接入 Android 设备完成 v1.6.x 新交互真机回归；清理 webview 依赖。
