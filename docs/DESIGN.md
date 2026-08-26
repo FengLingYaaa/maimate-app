@@ -2,8 +2,8 @@
 
 > 文档性质：项目事实基线、产品设计、工程约束和持续变更记录。
 > 最后更新：2026-08-26
-> 当前版本：`v1.6.10`
-> 当前状态：Phase A-F 与 v1.6.x 迭代已实现；v1.6.0–v1.6.10 已全部完成云构建并发布到 GitHub Release；真机验收仍待 Android 设备。
+> 当前版本：`v1.7.0`
+> 当前状态：Phase A-F、v1.6.x 迭代与 v1.7.0 批次已实现；v1.6.0–v1.6.10 已全部云构建发布，v1.7.0 云构建与下载站部署见 §3.1 与变更记录；真机验收仍待 Android 设备。
 > GitHub：<https://github.com/FengLingYaaa/maimate-app>
 
 这份文档的目标不是只描述“理想中的产品”，而是让人类或新对话中的智能体能够回答：
@@ -96,16 +96,16 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | `7ac3a2640d96422472240b6efb5be1107a0e146b`（ci: 回归检查改用 Node 20/tsx） |
-| 当前标签 | `v1.6.10`（最新 Release；v1.6.0–v1.6.9 也均已发布） |
+| 当前提交 | `0ca36fd`（chore: 同步 Expo SDK 57 补丁版本以通过 expo-doctor 门禁；前一提交 `818b57a` 为 v1.7.0 功能主体） |
+| 当前标签 | `v1.7.0`（指向 `0ca36fd`，曾短暂指向 `818b57a` 后因 doctor 门禁失败重打；v1.6.0–v1.6.10 也均已发布） |
 | Android applicationId | `cc.flya.maimate` |
-| App 版本 | `1.6.10`（Android versionCode `14`） |
-| 下载站 | <https://maimate.flya.ccwu.cc/> |
+| App 版本 | `1.7.0`（Android versionCode `15`） |
+| 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
-| APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`，由 `landing/_worker.js` 代理/转发 |
-| 最新 Release APK SHA-256（v1.6.10） | `86136c0dda907c9dbb3460e63d958c8c05633885bed02ab21fbc34e35e8496cc` |
-| 最新 Release APK 大小 | `62,045,742` bytes（约 59.2 MiB） |
-| 下载站同步状态 | ⚠️ 2026-08-26 线上 HEAD 返回 content-length `62,040,886`，与 v1.6.6 资产一致——下载站仍指向 v1.6.6，落后最新 Release，待重新部署 landing Worker |
+| APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
+| 最新 Release APK SHA-256（v1.7.0） | `5040f9dea6776439283fa738fce5607ce99439d3022ba89fd52c2d00072f3175` |
+| 最新 Release APK 大小 | `62,073,150` bytes（约 59.2 MiB） |
+| 下载站同步状态 | ✅ 2026-08-26 本会话已用 wrangler 重新部署 Pages 项目 `maimate-landing` 到 v1.7.0 内容；线上 HEAD `/MaiMate-latest.apk` content-length `62,073,150` 与 Release 资产一致 |
 | APK 构建方式 | GitHub Actions 云构建：先跑 lint/route/feature/phase/rating 回归、Expo Doctor 和 Android export 门禁，再出 arm64-v8a debug keystore 内测包 |
 
 当前 App Git 仓库在第三阶段提交之后应保持干净；设计文档本身位于仓库外的工作区镜像和 App 仓库内的文档副本中，更新文档会让 App 仓库产生文档变更，这是预期行为。
@@ -115,13 +115,13 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 | 能力 | 状态 | 事实依据/说明 |
 |---|---|---|
 | 曲库浏览器 | 已完成基础闭环 | `app/app/index.tsx`、`src/data/music-list.ts` |
-| 多维筛选 | 已完成 | 分类、难度、等级、定数、版本、SD/DX、曲师、谱师、BPM、标题等 |
+| 多维筛选 | 已完成 | 分类、难度、等级、定数、版本、SD/DX、曲师、谱师、BPM、标题等；v1.7.0 重做筛选栏（`src/components/FilterBar.tsx`）：清除键内嵌搜索框内部右侧不再与筛选按钮重叠、「筛选」按钮显示活动条件计数徽标、下方活动筛选摘要条逐项可移除并带「全部清除」，版本筛选值支持合并标签展开匹配（`expandVersionFilterValue`） |
 | 模糊搜索 | 已完成基础版本 | 支持标题、曲师、谱师和少量错字容错；结果按相关度排序 |
 | 曲库缓存 | 已完成 | AsyncStorage；缓存优先；超过 12 小时后台刷新 |
 | `chart_stats` | 已接入 | 独立缓存和后台刷新；详情页显示拟合定数 |
-| 歌曲详情 | 已完成基础版本 | 定数、等级、Note 分布、谱师、封面、Rating 预估 |
 | 推分计划 | 已完成基础版本 | 添加、删除、目标分数和本地持久化；详情页支持自定义目标，顺序/备注字段仍兼容旧数据 |
-| 随机抽歌 | 已完成基础版本 | 推分计划、全曲、按条件三种模式；结果与动画目标一致 |
+| 随机抽歌 | 已完成基础版本，v1.7.0 调整 | 推分计划、全曲、按条件三种模式；结果与动画目标一致；v1.7.0 起「按条件」模式抽选时自动收起条件面板并显示展开/收起切换按钮，避免结果卡被抽选按钮挤压遮挡 |
+| 歌曲详情 | 已完成基础版本 | 定数、等级、Note 分布、谱师、封面、Rating 预估；v1.7.0 修复定数信息行过长时把右侧 Total Notes 挤出屏幕的问题（信息块 `minWidth: 0` 弹性收缩） |
 | Rating 预估 | Phase1 已完成 | 使用完整 Diving-Fish 系数表；官方定数与 fit_diff 严格分开；宴会場不计算官方 Rating |
 | 版本显示 | Phase1 已完成 | 保留 Diving-Fish 原始 `from`，并提供舞萌DX/年份国区展示名 |
 | 曲库排序 | Phase2 已完成 | 歌曲名升/降序与选定难度官方定数升/降序；缺失定数末尾并高亮排序难度 |
@@ -131,16 +131,17 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 | 顺时针曲绘滚筒 | 已完成基础版本 | `src/components/DrumRoll.tsx`，动画中多次切换封面 |
 | Bilibili 外部搜索入口 | 本轮已实现 | 优先尝试 `bilibili://search`，失败回退 HTTPS 搜索；用户可按谱面本地保存视频链接、备注和标签，不抓取目录 |
 | OCR 拍照识别 | Phase E 已实现 | ML Kit；中文/日文/拉丁文字；连续拍摄、相册多选、逐图识别、合并去重和删除图片 |
-| 今日舞萌运势 | Phase F 已实现 | 稳定 SD/DX 推荐键、推荐曲绘、上海日期本地娱乐结果；不读取 Token、不上传运势 |
+| 今日舞萌运势 | Phase F 已实现 | 稳定 SD/DX 推荐键、推荐曲绘、上海日期本地娱乐结果；不读取 Token、不上传运势；v1.7.0 起排除宴会場谱面，仅常规曲目可被推荐 |
 | 个人设置 | Phase4 已完成 | SecureStore Token 管理、只读成绩同步、显示/排序偏好和本地数据清理 |
-| 本地牌子查询 | v1.6.0 已完成 | `app/plates/index.tsx`、`src/data/plates.ts`：按本机已导入成绩计算 FC/SSS/FS DX/AP 位掩码，支持版本/国区/难度筛选和汇总计数；不上传成绩 |
-| 推分计划排序工具 | v1.6.0 已完成 | 计划卡片化 + 计划内搜索 + 拖拽排序（`react-native-draggable-flatlist`）；派生搜索/显式排序视图禁用拖拽并保留隐藏条目（`src/data/plan-order.ts`） |
-| 版本双轨筛选 | v1.6.0 已完成 | 原始 `from` 与国区年份分组分离筛选（`src/data/version-catalog.ts`）；歌曲与牌子筛选均暴露基础舞萌DX国区分组 |
-| 外部应用优先打开 | v1.6.x 已完成 | `src/data/external-links.ts` + `plugins/with-external-app-queries.js`：bilibili/orpheus(网易云)/qqmusic/kugou 深链优先，失败回退 HTTPS；Android 包可见性与 iOS `LSApplicationQueriesSchemes` 已声明 |
+| 本地牌子查询 | v1.6.0 引入，v1.7.0 重做 | `app/plates/index.tsx`、`src/data/plates.ts`：按本机已导入成绩计算 FC/SSS/FS DX/AP 位掩码；v1.7.0 起进入页面即渲染（`useFocusEffect` 强刷 + 关闭 `removeClippedSubviews`，修复嵌套 Stack 初次空白）、按难度分别输出汇总卡、同曲多难度合并为一行并逐难度展示牌子位、支持一键把当前筛选中等级 ≥14 的谱面批量加入推分计划并可一键撤回；不上传成绩 |
+| 推分计划排序工具 | v1.6.0 引入，v1.7.0 增强 | 计划卡片化 + 计划内搜索 + 拖拽排序（`react-native-draggable-flatlist`）；v1.7.0 起左滑改为置顶 📌 / 置底 🔻 标记（再点取消），置顶/置底条目只与同组交换位置（`applyDragWithPinGroups` 收敛跨组拖拽），新添加曲目插入置顶组下方第一首 |
+| 推歌英灵殿 | v1.7.0 已完成 | 从计划移除曲目走应用内自定义确认弹窗（不再使用系统 Alert），移除后进入英灵殿（计划页标题栏 🗑️ 入口）：记录移除时间、可复原回计划或强制彻底删除；数据存于独立 AsyncStorage 键 `maimate_plan_graveyard`，标题在渲染时实时解析不落盘 |
+| 版本双轨筛选 | v1.6.0 引入，v1.7.0 修正 | 原始 `from` 与国区年份分组分离筛选（`src/data/version-catalog.ts`）；v1.7.0 起无独立成绩数据的 PLUS 代次（でらっくす/Splash/UNiVERSE/FESTiVAL/BUDDiES）并入母版本标签统一筛选，PRiSM PLUS 有数据保持独立，ALL FiNALE 无数据已从版本常量移除；牌子查询页的原始版本维度只保留 DX 代之前旧世代，避免与国区维度组合必然为空 |
+| 外部应用优先打开 | v1.6.x 引入，v1.7.0 调整 | `src/data/external-links.ts` + `plugins/with-external-app-queries.js`：Bilibili 搜索深链优先失败回退 HTTPS 不变；v1.7.0 起音乐平台改为直接打开 HTTPS 搜索结果页（客户端搜索深链路由未公开，`canOpenURL` 仅能验证 scheme 注册，深链常落在首页不带关键词）；用户主动保存的 Bilibili 视频优先 `bilibili://video/<BV|av>` 深链，其次 Android intent，最后网页 |
 | Bilibili 单条链接保存增强 | v1.6.x 已完成 | 分享文本容错解析、按源 URL 键控封面缓存、元数据请求代次防串扰、遗留封面扩展名清理（`bilibili-links/-metadata/-cover-cache`、`bilibili-store`） |
 | 音乐平台搜索设置页 | v1.6.0 已完成 | `app/settings/music-platform.tsx`、`src/data/music-platforms.ts`：网易云/QQ音乐/酷狗选择，默认网易云且仅使用 HTTPS 搜索页 |
 | 设置子页与嵌套导航 | v1.6.5–v1.6.6 已完成 | `app/settings/{index,sort,music-platform}`、`app/song/[id]`、`app/plates` 均挂到原生 Stack 子路由并带系统返回；`scripts/route-check.mjs` 做路由树回归 |
-| APK 发布链路 | 云构建中 | GitHub Actions（tag 触发，回归门禁）→ GitHub Release `MaiMate-latest.apk` → Cloudflare Worker 下载站；⚠️ 下载站当前仍指向 v1.6.6，待重新部署 |
+| APK 发布链路 | 云构建中 | GitHub Actions（tag 触发，回归门禁）→ GitHub Release `MaiMate-latest.apk` → Cloudflare Pages 项目 `maimate-landing`（maimate.flya.ccwu.cc）`_worker.js` 代理 latest 资产 |
 
 ### 3.3 已完成但仍需人工验收的能力
 
@@ -148,8 +149,12 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 
 - Bilibili 客户端深链是否在真实 Android/Bilibili 版本组合中成功打开搜索；
 - 深链失败时 HTTPS 搜索回退是否在真实设备上可用；
+- v1.7.0：音乐平台 HTTPS 搜索结果页在真实设备各平台客户端外的浏览器表现；
+- v1.7.0：用户自存 Bilibili 视频 `bilibili://video/<BV>` 深链能否直达客户端内播放页（而非网页）；
 - OCR 相机、快速加入计划、详情返回 OCR 和随机动画需要真机验收；
 - 牌子查询返回导航、计划拖拽排序、外部应用拉起（bilibili/orpheus/qqmusic/kugou）和 Bilibili 封面刷新同样需要真机验收；
+- v1.7.0：牌子查询页首次进入即渲染内容（原「点筛选后才显示」）需真机复核；分难度汇总、合并行、一键 14+ 加入/撤回交互验收；
+- v1.7.0：推分计划置顶/置底标记、同组拖拽约束、新条目插入位置、英灵殿复原/强制删除流程验收；
 - 本会话没有连接 Android 设备（`adb devices` 为空），因此以上真机结果不能虚报为已验证。
 
 ---
@@ -578,7 +583,9 @@ npm run lint
 npx expo export --platform android
 ```
 
-本机 4GB 容器不适合 Gradle 原生构建；正式 APK 使用 GitHub Actions。完整说明见 `app/docs/BUILD.md`。
+Windows 沙盒环境（2026-08-26 实测）补充：npm 默认缓存目录在用户 AppData 下会被文件沙盒拒绝，需 `--cache "$env:TEMP\npm-cache"`；esbuild 的 postinstall 与 Hermes `hermesc` 需要子进程 spawn 同样被拒，因此 npm 安装加 `--ignore-scripts`、本地 export 加 `--no-bytecode`（Hermes 字节码由 CI Ubuntu 门禁验证）；`tsx` CLI 会 spawn esbuild 子进程同样不可用，TS 回归脚本改用「`tsc --module node16 --rewriteRelativeImportExtensions --outDir <仓库内临时目录>` 编译成 CJS 后用 node 直跑」的方式执行。
+
+本机不适合 Gradle 原生构建；正式 APK 使用 GitHub Actions。完整说明见 `app/docs/BUILD.md`。
 
 ### 9.2 发布链路
 
@@ -685,11 +692,11 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 
 ## 12. 当前工作结论
 
-截至 2026-08-26：代码主线已推进到 v1.6.10（云构建与 Release 齐全），设计案事实基线已修复同步。当前正确下一步是：
+截至 2026-08-26：代码主线已推进到 v1.7.0（用户提出的 17 项修复/功能全部实现并推送云构建），设计案事实基线同步更新。当前正确下一步是：
 
-1. 若接入 Android 设备，验证 Bilibili 客户端深链和 HTTPS 回退、OCR 相机/返回、随机抽歌点击停止、牌子查询返回、计划拖拽排序和音乐平台拉起；
-2. 把下载站 Worker 从 v1.6.6 更新到 v1.6.10 并做线上校验（当前线上 content-length 对应 v1.6.6 资产）；
-3. 清理未使用的 `react-native-webview` 依赖（需 lockfile 重生成并经 CI 验证后随下一版发布）；
+1. 若接入 Android 设备，按 §3.3 清单完成 v1.6.x 与 v1.7.0 全部真机验收（深链回退、OCR、拖拽、牌子页渲染、英灵殿等）；
+2. 确认 Cloudflare Pages 落地站 `maimate.flya.ccwu.cc` 已由本会话重新部署到 v1.7.0 内容与 latest 资产代理（见变更记录）；
+3. 清理未使用的 `react-native-webview` 依赖（v1.7.0 未处理，源码零引用仅存在于 package.json/package-lock.json）；
 4. 保持 `research/djnaughty/` 为历史研究证据，不恢复自动抓取或内置视频目录；
 5. 后续每次设计、研究、代码或发布步骤继续追加到本文档。
 
@@ -837,3 +844,14 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 人类需要确认：token 明文存在于 `.env` 与本克隆 `.git/config` 两处，如泄露可随时在 GitHub 撤销重发；CLOUDFLARE_API_TOKEN 本会话未验证。
 - 推送结果补记：文档提交 `5e2480d` 已推送。由于 github.com:443 在本会话后期被间歇阻断（api.github.com 与 ssh.github.com 正常），最终推送链路为：注册仓库级只读写 Deploy Key `maimate-win-agent (auto)`（可在仓库 Settings → Deploy keys 撤销）→ remote push URL 改为 `ssh://git@ssh.github.com:443/…` → `GIT_SSH` 指向 `.git/ssh/ssh-wrapper.bat` 包装器（内含 `-F .git/ssh/.ssh/config` 固定参数，绕开 msys sh 执行含空格命令必死的问题）。fetch 仍走 HTTPS+token。
 - 下一步：更新 landing Worker 指向 v1.6.10 并做线上校验；接入 Android 设备完成 v1.6.x 新交互真机回归；清理 webview 依赖。
+
+### 2026-08-26 — v1.7.0：用户 17 项修复与功能（计划英灵殿、牌子查询重做、筛选栏改版）
+
+- 用户目标：① 今日运势抽到宴会場谱面不合理（修复）；② 详情页官方定数行过长挤出 Total Notes（修复）；③ 问音乐平台跳转成功但不能直接搜索是否正常；④ 问 B 站已存视频仍跳网页是否正常；⑤ 牌子页初始文字不显示、点筛选后才显示（修复）；⑥ 整个界面筛选显示重做；⑦ 国区版本与 DX 代之前版本混用导致筛选必然为空（修复）；⑧ 五个难度 FC/AP 分开显示、歌曲列表多难度合并；⑨ 牌子查询放到推分计划上方；⑩ 一键把当前筛选中 14+ 谱面加入推分计划并可撤回（一次删整批）；⑪ 计划难度字段用对应难度颜色；⑫ 置顶置底只能同组拖拽、新曲目加到置顶组下方第一首；⑬ 抽选后结果卡被按钮阻挡（修复）；⑭ 移除曲目用自定义控件并进「推歌英灵殿」（显示删除时间、可强制删除）；⑮ 确认 Diving-Fish 无 DX PLUS/Splash PLUS 等数据则合并版本标签、ALL FiNALE 无曲目则删除；⑯ 搜索框 × 清除键与筛选重叠难点（修复）；⑰ 触发云构建 v1.7.0 并尝试推个人站下载站。
+- 对③④的回答记录：③ 不算异常而是已知限制——各音乐客户端搜索深链路由未公开，`canOpenURL` 只能验证 scheme 注册，深链常落在应用首页不带关键词，故 v1.7.0 改为直接打开带关键词的 HTTPS 搜索结果页（保证看到候选列表）；④ 不符合设计预期——自存视频此前直接 `Linking.openURL(https)`，v1.7.0 新增 `getBilibiliVideoAppUrl` 提取 BV/av 号后优先 `bilibili://video/<id>` 深链，其次 Android intent，最后才回退网页。
+- 实际修改（22 文件，+1089/−220，提交 `818b57a`）：`src/constants/game.ts`（移除 ALL FiNALE、新增 `MERGED_VERSION_GROUPS` 与 `expandVersionFilterValue`、graveyard 存储键）；`src/data/version-catalog.ts`（合并标签分组选项）；`src/data/music-list.ts`（版本筛选展开匹配）；`src/data/fortune.ts`（排除宴会場）；`src/data/types.ts`（`PlanEntry.pin`、`PlanGraveyardEntry`）；`src/data/plan-order.ts`（pin 分组比较与跨组拖拽收敛）；`src/store/plan-store.ts`（graveyard/setPin/bulkAdd/bulkRemove/purge/restore、新增条目插入置顶组下方）；`src/data/bilibili-search.ts`（视频深链提取）；`src/data/external-links.ts`（音乐平台 HTTPS 直达、B 站视频深链优先）；`app/song/[id].tsx`（定数行弹性收缩防溢出 + 平台说明文案）；`app/_layout.tsx`（牌子 Tab 提到推分计划上方可见）；`app/plates/index.tsx` 全量重写（初始渲染修复、旧世代/国区维度拆分、分难度汇总卡、合并行、一键 14+/撤回）；`app/plan.tsx` 全量重写（自定义确认弹窗、置顶置底左滑、英灵殿底部弹层）；`src/components/PlanEntryCard.tsx`（难度颜色徽标、置顶标记）；`src/components/FilterBar.tsx` 重做快捷栏（内嵌清除键、计数徽标、活动筛选摘要条）；`app/random.tsx`（按条件模式抽选时自动收起条件面板）；`scripts/feature-check.ts`（新增 7 组断言）、`scripts/route-check.mjs`（修复 Windows `fileURLToPath` 路径拼接）；`.landing-deploy/{index.html,_worker.js}`（落地站新版素材，Pages 直传用）；后续补丁提交 `0ca36fd` 同步 Expo SDK 57 六个包的 patch 版本以通过 expo-doctor 门禁。
+- 验证证据：本地全绿——`tsc --noEmit` 通过；feature-check（含合并标签展开、ALL FiNALE 移除、牌子维度拆分、分难度汇总/合并行/14+ 筛选、pin 分组拖拽约束、B 站深链提取、运势 30 天种子扫描无宴会場且纯宴会場库返回空推荐）通过；rating-check 28 边界通过；phase-af-check 通过；route-check 通过；`expo export --platform android --no-bytecode` 成功导出（1750 模块打包、30 文件约 4.4MB）。本地环境限制记录：沙盒拒绝 esbuild postinstall/Hermes hermesc 的子进程 spawn（EPERM），npm 安装需 `--ignore-scripts`、export 用 `--no-bytecode`，Hermes 字节码由 CI Ubuntu 门禁验证。
+- 云构建记录：首次 tag 构建 run `32924763598` 失败——expo-doctor 检出上游 SDK 57 已发新 patch 而 lockfile 锁旧版（时间腐化型门禁失败），以提交 `0ca36fd` 升级 expo/expo-constants/expo-file-system/expo-image-picker/expo-linking/expo-router 后删除并重打 v1.7.0 标签触发 run `32925269083`，结论 `success`。
+- Release 资产：`MaiMate-latest.apk` 大小 `62,073,150` bytes，SHA-256 `5040f9dea6776439283fa738fce5607ce99439d3022ba89fd52c2d00072f3175`。
+- 下载站部署：确认 maimate.flya.ccwu.cc 为 Cloudflare Pages 直传项目 `maimate-landing`（非 Workers 脚本；账户 Worker 列表无 maimate 路由）。本会话以 wrangler 重新部署 `.landing-deploy/`（新版 index.html 文案与更新日志 + `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`，发布新版无需再改 Worker）。部署结果：部署成功（deployment preview `3ebea0c6.maimate-landing.pages.dev`）；线上校验通过——落地页 200 且含 v1.7.0 文案与新 SHA，`HEAD /MaiMate-latest.apk` 返回 200 / content-length `62,073,150`，与 Release 资产逐字节一致。
+- 下一步：真机验收 §3.3 清单；观察 `releases/latest/download` 302 代理在 Cloudflare 边缘的稳定性。
