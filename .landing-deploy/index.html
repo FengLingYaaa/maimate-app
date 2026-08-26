@@ -247,7 +247,7 @@
     <!-- Download -->
     <div class="download-card">
       <h3>📦 下载 MaiMate</h3>
-      <p class="info">当前版本：v1.8.0（Android arm64 内测）</p>
+      <p class="info">当前版本：v1.9.0（Android arm64 内测）</p>
       <a href="/MaiMate-latest.apk" class="download-btn disabled" id="dlBtn" aria-disabled="true" onclick="return false;">
         ⏳ 检查下载地址
       </a>
@@ -256,7 +256,7 @@
         
       </p>
       <span class="size-badge" id="apkSize">Android · arm64-v8a · 59.2 MB · debug 签名</span>
-       <p class="download-hint">SHA-256：<code id="apkSha">ff98747946007b50343f535e35f336add042d3abeccb698d47a5e1cb8d3f7238</code></p>
+       <p class="download-hint">SHA-256：<code id="apkSha">70229f8c6ca050c82bf39c0eff6f1a0349ea6c8eca9281e5698ca182d5d9eec4</code></p>
     </div>
 
     <!-- Features -->
@@ -286,6 +286,18 @@
     <!-- Changelog -->
     <div class="changelog">
       <h3>📝 更新日志</h3>
+      <div class="entry">
+        <span class="version">v1.9.0 · Android 内测</span><span class="date">2026-08-26</span>
+        <ul>
+          <li>B 站视频深链重做：BV 号本地转 av 后优先 bilibili://video/&lt;av&gt;，绕过 Android 包可见性误判（不再依赖 canOpenURL 预判），多候选逐个尝试。</li>
+          <li>修复推分计划拖拽串位根因：重排不再按陈旧顺序字段重算，连续拖拽互不干扰。</li>
+          <li>完成率损失改单音符口径：Tap/Hold/Slide/Touch 与 Break 统一按单个音符展示损失，标题去掉「试算」、删除规则脚注。</li>
+          <li>DX Rating 预估默认折叠：收起时显示「定数 · 100.5% → Rating」摘要，点击展开。</li>
+          <li>详情页板块顺序与默认折叠可在设置中配置（Rating 预估 / 完成率损失 / B 站搜索 / 音乐平台搜索）。</li>
+          <li>牌子查询版本筛选默认收起为单行摘要，总计汇总保持展开且分难度明细可滚动，不再挤占曲目列表。</li>
+          <li>音乐平台设置页新增「试开当前平台搜索」真机诊断按钮。</li>
+        </ul>
+      </div>
       <div class="entry">
         <span class="version">v1.8.0 · Android 内测</span><span class="date">2026-08-26</span>
         <ul>

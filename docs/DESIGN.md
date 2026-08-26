@@ -103,9 +103,9 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
-| 最新 Release APK SHA-256（v1.9.0） | 待回填（CI「Print APK checksum」步骤输出，构建完成后补） |
-| 最新 Release APK 大小 | 待回填 |
-| 下载站同步状态 | 待部署：v1.9.0 构建通过后回填 SHA/大小并 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
+| 最新 Release APK SHA-256（v1.9.0） | `70229f8c6ca050c82bf39c0eff6f1a0349ea6c8eca9281e5698ca182d5d9eec4`（CI「Print APK checksum」步骤输出） |
+| 最新 Release APK 大小 | 62,101,346 bytes（59.2 MB） |
+| 下载站同步状态 | 已部署：v1.9.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | APK 构建方式 | GitHub Actions 云构建：先跑 lint/route/feature/phase/rating 回归、Expo Doctor 和 Android export 门禁，再出 arm64-v8a debug keystore 内测包 |
 
 当前 App Git 仓库在第三阶段提交之后应保持干净；设计文档本身位于仓库外的工作区镜像和 App 仓库内的文档副本中，更新文档会让 App 仓库产生文档变更，这是预期行为。
@@ -888,3 +888,4 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 修复④根因：`reorder` 走 `normalizeOrder` 会按陈旧 `order` 字段重新排序，把拖拽计算出的数组顺序整个丢弃（纯函数模拟确认拖拽为 no-op）；改为 `reorder` 信任传入数组顺序只做 `order=下标`，保留 dragEpoch 重建列表内部缓存，并新增连续两次拖拽的纯函数回归断言。
 - 其余实现：`src/data/achievement-loss.ts` 常规行改单音符口径（去掉 `count` 乘数）；`AchievementLossCard` 标题去「试算」+ 删脚注 + `defaultCollapsed`；`RatingPanel` 默认折叠、收起摘要「定数 · 100.5% → Rating」+ `defaultCollapsed`；`BilibiliSearchPanel` 加折叠；新增 `MusicPlatformBoard`；`types.ts`/`settings-store.ts` 加 `DetailBoardId`/`detailBoards`（默认 rating/achievement 折叠）；新增设置子页 `app/settings/detail-boards.tsx`（上下移动 + 折叠开关）；`app/song/[id].tsx` 按 `boardOrder` 渲染四个板块；牌子页筛选默认收起为单行摘要、总计卡分难度明细 `maxHeight` 可滚动；音乐平台设置页加「试开当前平台搜索」真机诊断；`scripts/feature-check.ts` 增 BV↔AV、拖拽连续两次、损失单音符断言；`scripts/route-check.mjs` settings 子页加 `detail-boards`。
 - 验证证据：`tsc --noEmit` 通过；feature-check 通过（BV1xx411c7mD↔2、BV17x411w7KC↔170001、拖拽 D→A→B 连续顺序、损失单音符口径）；route-check 通过。云构建与下载站部署见发布补记。
+- 发布补记（当日，含 GitHub Actions 故障）：版本升至 `1.9.0`（versionCode `17`，功能提交 `2302ea9`）。首次以**附注标签**打 `v1.9.0` 推送触发云构建出现 `startup_failure`（v1.8.0 等历史标签均为轻量标签），改为**轻量标签**后 run 卡「queued/0 jobs」——经查系 GitHub Actions 官方 `major_outage`（数据库主库故障 + 上游 Vitess 问题，16:50Z 起恢复、17:54Z 缓解；期间 github.com:443 HTTPS 亦间歇不可达）。为规避同标签重推并发互卡，移除 workflow `concurrency` 块（提交 `b98cbc0`）并将标签移到 `b98cbc0`；故障恢复后删标签重推，触发 run `32998575544` 一次通过。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.9.0>；资产 `MaiMate-latest.apk` 大小 `62,101,346` bytes（59.2 MB），SHA-256 `70229f8c6ca050c82bf39c0eff6f1a0349ea6c8eca9281e5698ca182d5d9eec4`（取自 CI「Print APK checksum」步骤输出）。落地页更新 v1.9.0 文案、日志与 SHA 后经 wrangler 部署 Pages，线上校验落地页 200 且含新 SHA、`HEAD /MaiMate-latest.apk` 与资产一致。等待用户真机验收 §8 A1.5 六项。
