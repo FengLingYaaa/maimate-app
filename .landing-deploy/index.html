@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>MaiMate 舞萌伴侣</title>
+  <meta name="description" content="MaiMate 舞萌伴侣 — MaimaiDX 手机辅助APP | 推分计划 · 随机抽歌 · 谱面查询">
+  <style>
+    :root {
+      --bg: #0f0f1a;
+      --bg-card: #1a1a2e;
+      --bg-card2: #252540;
+      --text: #f0e6ff;
+      --text2: #9888b0;
+      --text3: #5a4a6e;
+      --accent: #ff6b9d;
+      --accent2: #c44dff;
+      --cyan: #00d4ff;
+      --border: rgba(240,230,255,0.12);
+      --success: #3dd68c;
+      --warn: #f0b429;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, 'PingFang SC', 'Noto Sans SC', 'Segoe UI', sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .container { max-width: 480px; width: 100%; padding: 20px 16px 40px; }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 32px 0 20px;
+    }
+    .hero-icon {
+      width: 100px;
+      height: 100px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 52px;
+      margin: 0 auto 16px;
+      box-shadow: 0 8px 32px rgba(255,107,157,0.25);
+    }
+    .hero h1 {
+      font-size: 28px;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero .subtitle {
+      font-size: 15px;
+      color: var(--text2);
+      margin-top: 4px;
+      font-weight: 500;
+    }
+
+    /* Badge row */
+    .badges {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      color: var(--text2);
+      font-weight: 600;
+    }
+    .badge.active {
+      background: rgba(255,107,157,0.15);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Download card */
+    .download-card {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 20px;
+      margin-top: 20px;
+      border: 1px solid var(--border);
+      text-align: center;
+    }
+    .download-card h3 {
+      font-size: 16px;
+      margin-bottom: 4px;
+    }
+    .download-card .info {
+      font-size: 13px;
+      color: var(--text2);
+      margin-bottom: 16px;
+    }
+    .download-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      padding: 14px 32px;
+      border-radius: 14px;
+      font-size: 16px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .download-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(255,107,157,0.35);
+    }
+    .download-btn.disabled {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    .download-hint {
+      font-size: 11px;
+      color: var(--text3);
+      margin-top: 12px;
+    }
+    .size-badge {
+      display: inline-block;
+      background: var(--bg-card2);
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: var(--text2);
+      margin-top: 8px;
+    }
+
+    /* Feature grid */
+    .features {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .feature {
+      background: var(--bg-card);
+      border-radius: 14px;
+      padding: 16px;
+      border: 1px solid var(--border);
+    }
+    .feature .icon { font-size: 28px; margin-bottom: 8px; }
+    .feature .title { font-size: 14px; font-weight: 700; }
+    .feature .desc { font-size: 12px; color: var(--text2); margin-top: 4px; }
+
+    /* Version log */
+    .changelog {
+      margin-top: 20px;
+    }
+    .changelog h3 {
+      font-size: 14px;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .changelog .entry {
+      background: var(--bg-card);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      border: 1px solid var(--border);
+    }
+    .changelog .version {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .changelog .date {
+      font-size: 11px;
+      color: var(--text3);
+      margin-left: 8px;
+    }
+    .changelog ul {
+      margin-top: 6px;
+      padding-left: 18px;
+      font-size: 13px;
+      color: var(--text2);
+    }
+    .changelog li { margin-bottom: 2px; }
+
+    /* QR code */
+    .qr-section {
+      text-align: center;
+      margin-top: 20px;
+    }
+    .qr-section p {
+      font-size: 12px;
+      color: var(--text3);
+      margin-top: 8px;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    footer p {
+      font-size: 11px;
+      color: var(--text3);
+      line-height: 1.8;
+    }
+    footer a {
+      color: var(--cyan);
+      text-decoration: none;
+    }
+    footer a:hover { text-decoration: underline; }
+
+    /* Responsive */
+    @media (max-width: 360px) {
+      .features { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Hero -->
+    <div class="hero">
+      <div class="hero-icon">🎵</div>
+      <h1>MaiMate</h1>
+      <p class="subtitle">舞萌伴侣 · MaimaiDX 手机辅助</p>
+      <div class="badges">
+        <span class="badge active">📋 推分计划</span>
+        <span class="badge">🎲 随机抽歌</span>
+        <span class="badge">🎵 谱面查询</span>
+        <span class="badge">⚡ 离线可用</span>
+      </div>
+    </div>
+
+    <!-- Download -->
+    <div class="download-card">
+      <h3>📦 下载 MaiMate</h3>
+      <p class="info">当前版本：v1.7.0（Android arm64 内测）</p>
+      <a href="/MaiMate-latest.apk" class="download-btn disabled" id="dlBtn" aria-disabled="true" onclick="return false;">
+        ⏳ 检查下载地址
+      </a>
+      <p class="download-hint" id="downloadHint">
+        正在检查最新 APK；下载后即可直接安装
+        
+      </p>
+      <span class="size-badge" id="apkSize">Android · arm64-v8a · 59.2 MB · debug 签名</span>
+       <p class="download-hint">SHA-256：<code id="apkSha">5040f9dea6776439283fa738fce5607ce99439d3022ba89fd52c2d00072f3175</code></p>
+    </div>
+
+    <!-- Features -->
+    <div class="features">
+      <div class="feature">
+        <div class="icon">🎵</div>
+        <div class="title">曲目浏览器</div>
+        <div class="desc">10维筛选：分类/难度/定数/版本/曲师/谱师...</div>
+      </div>
+      <div class="feature">
+        <div class="icon">📋</div>
+        <div class="title">推分计划</div>
+        <div class="desc">标记练习目标，有序排序，机厅不再迷茫</div>
+      </div>
+      <div class="feature">
+        <div class="icon">🎲</div>
+        <div class="title">滚筒抽歌</div>
+        <div class="desc">模拟洗衣机滚筒，按条件随机抽选练习曲</div>
+      </div>
+      <div class="feature">
+        <div class="icon">⚡</div>
+        <div class="title">离线可用</div>
+        <div class="desc">曲库本地缓存，机厅地下信号差也不怕</div>
+      </div>
+    </div>
+
+    <!-- Changelog -->
+    <div class="changelog">
+      <h3>📝 更新日志</h3>
+      <div class="entry">
+        <span class="version">v1.7.0 · Android 内测</span><span class="date">2026-08-26</span>
+        <ul>
+          <li>推分计划新增「推歌英灵殿」：移除曲目进入英灵殿并记录时间，可复原或强制删除；移除确认改为应用内自定义弹窗。</li>
+          <li>计划支持置顶/置底标记：同组之间拖拽调动，新添加曲目插入置顶组下方第一首。</li>
+          <li>牌子查询重做：进入即显示内容、按难度分别统计 FC/SSS/FS/AP、同曲多难度合并展示、一键把当前筛选中 14+ 谱面加入计划并支持一键撤回。</li>
+          <li>牌子查询版本维度拆分：原始版本只保留旧世代，DX 代归属由国区年份维度承担，组合筛选不再必然为空。</li>
+          <li>今日舞萌运势不再推荐宴会場谱面；筛选栏全面改版，清除键内嵌搜索框内并可逐项移除活动筛选。</li>
+          <li>音乐平台跳转直达 HTTPS 搜索结果页；Bilibili 已保存视频优先客户端深链打开。</li>
+          <li>随机抽歌「按条件」抽选时自动收起条件面板；详情页定数行不再挤出 Total Notes。</li>
+          <li>无独立数据的 PLUS 代次并入母版本标签，移除无曲目数据的 ALL FiNALE。</li>
+        </ul>
+      </div>
+      <div class="entry">
+        <span class="version">v1.6.6 · Android 内测</span><span class="date">2026-08-20</span>
+        <ul>
+          <li>Bilibili 与音乐平台优先尝试打开已安装应用，失败时自动回退 HTTPS 网页。</li>
+          <li>支持粘贴 Bilibili 分享文本，并按单条主动保存链接解析标题和封面到本地缓存。</li>
+          <li>日服原始版本与中国区版本独立筛选；推分计划支持搜索、目标摘要、拖拽和左滑置顶/置底。</li>
+          <li>新增本地牌子查询：FC、SSS、FS DX、AP；无成绩时保持空状态，不上传成绩。</li>
+          <li>补齐 Bilibili 封面 HTTPS 缓存、保存视频的应用优先打开，并保留目标 Rating 显示设置。</li>
+          <li>修复歌曲详情和设置子页面的 Stack 导航，并清理编辑视频链接后遗留的旧封面缓存。</li>
+          <li>修复筛选视图拖拽导致的计划顺序错乱，恢复重启后卡在元数据加载状态的问题，并补齐基础舞萌DX牌子版本组。</li>
+          <li>为从设置进入的本地牌子查询页补充可见返回按钮，避免根 Tab 路由缺少导航返回入口。</li>
+          <li>将设置主页面、音乐平台、排序、牌子查询和歌曲详情真正收拢到嵌套 Stack，避免子页面被注册为无返回头的根 Tab。</li>
+        </ul>
+      </div>
+      <div class="entry">
+        <span class="version">v1.5.0-alpha · Phase A-F</span><span class="date">2026-08-20</span>
+        <ul>
+          <li>独立歌曲别名层、PLUS/国区版本筛选和宴会場同名普通曲绘回退</li>
+          <li>只读成绩同步快照与变化记录；本地 Bilibili 视频链接支持备注、标签、编辑和删除</li>
+          <li>推分计划 100/100.5 快捷目标、计划来源返回、连续多图 OCR 与稳定运势曲绘</li>
+          <li>网易云、QQ 音乐、酷狗 HTTPS 搜索入口；不抓取第三方视频或音乐内容</li>
+        </ul>
+      </div>
+      <div class="entry">
+        <span class="version">v1.4.0-alpha · Phase 1-4</span><span class="date">2026-08-19</span>
+        <ul>
+          <li>修正完整 Diving-Fish DX Rating 系数表，宴会場显示无详细定数并区分拟合参考</li>
+          <li>新增原始/国区版本名、歌曲名和选定难度定数排序，推分计划只展示选定难度</li>
+          <li>新增目标达成率/目标 Rating、今日舞萌运势、SecureStore 只读成绩导入和个人设置</li>
+          <li>OCR 候选匹配结果置于原始识别文字之前，保留相机识别与快速加入流程</li>
+        </ul>
+      </div>
+      <div class="entry">
+        <span class="version">v1.1.0-alpha · Phase 1-2</span><span class="date">2026-08-18</span>
+        <ul>
+          <li>曲库缓存超过 12 小时后后台同步 Diving-Fish API，并保留离线缓存</li>
+          <li>随机结果支持点击查看详情，新增顺时针曲绘多次切换动画</li>
+          <li>优化版本展开、谱师高亮、Rating、定数滑条和推分计划弹窗</li>
+          <li>应用内增加更新/下载入口</li>
+        </ul>
+      </div>
+      <div class="entry">
+        <span class="version">P0-P6 内测构建</span><span class="date">2026-08-18</span>
+        <ul>
+          <li>修复分类、SD/DX、版本和清空筛选问题</li>
+          <li>新增曲师、谱师、模糊搜索和 0～15 定数滑条</li>
+          <li>新增推分计划默认抽选和与结果绑定的滚筒动画</li>
+          <li>新增拟合定数、官方/拟合 DX Rating</li>
+        </ul>
+      </div>
+      <div class="entry">
+        <span class="version">v0.1.0-alpha</span><span class="date">2026-08-16</span>
+        <ul>
+          <li>🎉 项目初始化，脚手架搭建</li>
+          <li>曲目浏览器 + 10维筛选引擎</li>
+          <li>谱面详情页（note分布可视化）</li>
+          <li>随机抽歌 + 滚筒旋转动画</li>
+          <li>推分计划管理（标记/排序）</li>
+          <li>霓虹舞伴暗色主题</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- QR -->
+    <div class="qr-section" id="qrSection" style="display:none;">
+      <p>📱 扫码安装（APK 发布后自动显示）</p>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>
+        数据来源：<a href="https://maimai.diving-fish.com" target="_blank">Diving-Fish 舞萌DX查分器</a> (MIT)
+      </p>
+      <p>
+        开源：<a href="https://github.com/FengLingYaaa/maimate-app" target="_blank">GitHub</a>
+        · 联系：<a href="https://github.com/FengLingYaaa" target="_blank">FengLingYaaa</a>
+      </p>
+      <p style="margin-top:8px;">
+        本应用与华立科技、SEGA 等公司无任何关系。<br>
+        注册商标所有权归相关品牌所有。曲目数据仅供推分指导参考。
+      </p>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      const apkPath = '/MaiMate-latest.apk';
+      const button = document.getElementById('dlBtn');
+      const hint = document.getElementById('downloadHint');
+      const size = document.getElementById('apkSize');
+
+      fetch(apkPath, { method: 'HEAD', cache: 'no-store' })
+        .then((response) => {
+          if (!response.ok) return;
+          button.classList.remove('disabled');
+          button.removeAttribute('aria-disabled');
+          button.removeAttribute('onclick');
+          button.textContent = '⬇️ 下载 APK';
+          hint.innerHTML = '独立安装包，下载后直接安装<br>';
+
+          const bytes = Number(response.headers.get('content-length'));
+          if (Number.isFinite(bytes) && bytes > 0) {
+            size.textContent = `Android · arm64-v8a · ${(bytes / 1024 / 1024).toFixed(1)} MB`;
+          }
+        })
+        .catch(() => {
+          // Keep the safe "building" state when the APK is not uploaded yet.
+        });
+    })();
+  </script>
+</body>
+</html>
