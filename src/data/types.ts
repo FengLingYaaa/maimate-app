@@ -102,6 +102,14 @@ export interface PlanEntry {
   order: number;            // 排序权重
   note?: string;            // 用户备注
   targetScore?: number;     // 目标达成率
+  /** 置顶/置底标记；同组之间才可拖拽调动位置。 */
+  pin?: 'top' | 'bottom';
+}
+
+/** 推歌英灵殿条目：从计划移除的谱面与其删除时间。 */
+export interface PlanGraveyardEntry {
+  entry: PlanEntry;
+  removedAt: number;
 }
 
 /** 已从 Diving-Fish 导入的单曲成绩。 */

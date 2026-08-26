@@ -5,11 +5,9 @@ import type { MusicPlatform } from './types';
 import {
   getBilibiliAppSearchUrl,
   getBilibiliSearchUrl,
+  getBilibiliVideoAppUrl,
 } from './bilibili-search';
-import {
-  getMusicPlatformAppUrls,
-  getMusicPlatformSearchUrl,
-} from './music-platforms';
+import { getMusicPlatformSearchUrl } from './music-platforms';
 
 type AppCandidate = { url: string; packageName?: string };
 
@@ -21,14 +19,6 @@ const ANDROID_PACKAGES: Record<string, string> = {
   qqmusic: 'com.tencent.qqmusic',
   kugou: 'com.kugou.android',
 };
-
-function packageForUrl(url: string): string | undefined {
-  try {
-    return ANDROID_PACKAGES[new URL(url).protocol.replace(':', '')];
-  } catch {
-    return undefined;
-  }
-}
 
 async function tryLinkingApp(candidate: AppCandidate): Promise<boolean> {
   try {
@@ -60,10 +50,7 @@ export async function openAppFirst(
 ): Promise<ExternalOpenResult> {
   for (const candidate of candidates) {
     if (await tryLinkingApp(candidate)) return 'app';
-    if (await tryAndroidIntent({
-      ...candidate,
-      packageName: candidate.packageName || packageForUrl(candidate.url),
-    })) return 'app';
+    if (await tryAndroidIntent(candidate)) return 'app';
   }
   await Linking.openURL(webUrl);
   return 'web';
@@ -79,21 +66,25 @@ export async function openBilibiliSearch(
   );
 }
 
+/**
+ * 音乐平台打开 HTTPS 搜索结果页（v1.7.0 起）。
+ * 各客户端的搜索深链路由未公开：canOpenURL 只能验证 scheme 注册，
+ * 打开后常落在应用首页而不带关键词。改为直接打开带关键词的
+ * HTTPS 搜索页，保证用户看到的就是候选结果列表。
+ */
 export async function openMusicPlatformSearch(
   platform: MusicPlatform,
   title: string,
   artist?: string,
 ): Promise<ExternalOpenResult> {
-  return openAppFirst(
-    getMusicPlatformAppUrls(platform, title, artist).map(url => ({
-      url,
-      packageName: packageForUrl(url),
-    })),
-    getMusicPlatformSearchUrl(platform, title, artist),
-  );
+  await Linking.openURL(getMusicPlatformSearchUrl(platform, title, artist));
+  return 'web';
 }
 
+/** 用户主动保存的单条 B 站视频：优先客户端内打开，失败回退网页。 */
 export async function openBilibiliVideo(url: string): Promise<void> {
+  const appUrl = getBilibiliVideoAppUrl(url);
+  if (appUrl && await tryLinkingApp({ url: appUrl, packageName: ANDROID_PACKAGES.bilibili })) return;
   if (await tryAndroidIntent({ url, packageName: ANDROID_PACKAGES.bilibili })) return;
   await Linking.openURL(url);
 }

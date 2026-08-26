@@ -1,6 +1,6 @@
 /**
  * MaiMate Root Layout
- * Expo Router Tabs: 抽歌 | 曲库 | 计划
+ * Expo Router Tabs: 曲库 | 抽歌 | 牌子 | 计划 | 运势 | 设置
  */
 
 import React, { useEffect } from 'react';
@@ -74,6 +74,13 @@ export default function RootLayout() {
           }}
         />
         <Tabs.Screen
+          name="plates"
+          options={{
+            title: '牌子',
+            tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🏅</Text>,
+          }}
+        />
+        <Tabs.Screen
           name="plan"
           options={{
             title: '推分计划',
@@ -94,7 +101,6 @@ export default function RootLayout() {
             tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>⚙️</Text>,
           }}
         />
-        <Tabs.Screen name="plates" options={{ href: null }} />
         <Tabs.Screen name="song" options={{ href: null }} />
       </Tabs>
     </GestureHandlerRootView>

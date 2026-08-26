@@ -3,7 +3,7 @@
  * 曲库和抽选页使用同一套 FilterOptions，避免两边规则不一致。
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -171,38 +171,125 @@ export function FilterBar({
     setShowModal(false);
   };
 
+  /** 清除全部筛选但不关闭弹层（活动筛选条上的入口）。 */
+  const clearAllInPlace = () => {
+    setLocalFilters({});
+    onClear();
+  };
+
   const dsRange: [number, number] = localFilters.dsRange || [0, 15];
   const pendingCount = getPreviewCount ? getPreviewCount(cleanFilters(localFilters)) : filteredCount;
+
+  // 摘要条的移除操作要立即生效：基于「已应用的 filters」打补丁并 onApply。
+  const localFiltersRef = useRef(localFilters);
+  useEffect(() => { localFiltersRef.current = localFilters; }, [localFilters]);
+  const applyPatch = useCallback((patch: Partial<FilterOptions>) => {
+    const next = cleanFilters({ ...filters, ...patch });
+    setLocalFilters(next);
+    onApply(next);
+  }, [filters, onApply]);
+  const removeFromList = useCallback((key: 'genre' | 'difficulty' | 'version' | 'chinaVersion' | 'type', value: string | number) => {
+    const current = filters[key];
+    if (current === undefined) return;
+    const list = Array.isArray(current) ? current.filter(item => item !== value) : [];
+    applyPatch({ [key]: list.length > 0 ? list : undefined } as unknown as Partial<FilterOptions>);
+  }, [applyPatch, filters]);
+
+  /** 活动筛选摘要条目；每项可单独移除。 */
+  const activeChips = useMemo(() => {
+    const chips: Array<{ key: string; label: string; color?: string; onRemove: () => void }> = [];
+
+    if (filters.titleSearch?.trim()) {
+      chips.push({ key: 'q', label: `🔍 ${filters.titleSearch.trim()}`, onRemove: () => applyPatch({ titleSearch: undefined }) });
+    }
+    const each = <T,>(value: unknown, fn: (item: T) => void) => {
+      const list = (Array.isArray(value) ? value : value !== undefined ? [value] : []) as T[];
+      list.forEach(fn);
+    };
+    each<string>(filters.genre, item => chips.push({
+      key: `g:${item}`, label: item, onRemove: () => removeFromList('genre', item),
+    }));
+    each<number>(filters.difficulty, index => chips.push({
+      key: `d:${index}`,
+      label: DifficultyLabels[index] || `难度${index}`,
+      color: DifficultyColorMap[index],
+      onRemove: () => removeFromList('difficulty', index),
+    }));
+    each<string>(filters.version, item => chips.push({
+      key: `v:${item}`, label: item, onRemove: () => removeFromList('version', item),
+    }));
+    each<string>(filters.chinaVersion, item => chips.push({
+      key: `c:${item}`, label: item, onRemove: () => removeFromList('chinaVersion', item),
+    }));
+    each<string>(filters.type, item => chips.push({
+      key: `t:${item}`, label: item, onRemove: () => removeFromList('type', item),
+    }));
+    if (filters.dsRange && !(filters.dsRange[0] <= 0 && filters.dsRange[1] >= 15)) {
+      chips.push({ key: 'ds', label: `定数 ${filters.dsRange[0]}–${filters.dsRange[1]}`, onRemove: () => applyPatch({ dsRange: undefined }) });
+    }
+    if (filters.artist?.trim()) {
+      chips.push({ key: 'ar', label: `曲师 ${filters.artist.trim()}`, onRemove: () => applyPatch({ artist: undefined }) });
+    }
+    if (filters.charter?.trim()) {
+      chips.push({ key: 'ch', label: `谱师 ${filters.charter.trim()}`, onRemove: () => applyPatch({ charter: undefined }) });
+    }
+    if (filters.sort && filters.sort.mode !== 'relevance') {
+      const labels: Record<string, string> = {
+        titleAsc: 'A→Z', titleDesc: 'Z→A', constantAsc: '定数↑', constantDesc: '定数↓',
+      };
+      chips.push({
+        key: 'sort',
+        label: `排序 ${labels[filters.sort.mode] || filters.sort.mode}`,
+        onRemove: () => applyPatch({ sort: undefined }),
+      });
+    }
+    return chips;
+  }, [applyPatch, filters, removeFromList]);
 
   return (
     <View>
       <View style={styles.quickBar}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="模糊搜索歌曲名、曲师或谱师..."
-          placeholderTextColor={Colors.text.muted}
-          value={localFilters.titleSearch || ''}
-          onChangeText={handleSearchChange}
-          onSubmitEditing={() => onApply(cleanFilters(localFilters))}
-          returnKeyType="search"
-        />
-        {!!localFilters.titleSearch && (
-          <Pressable style={styles.clearSearch} onPress={clearSearch}>
-            <Text style={styles.clearSearchText}>×</Text>
-          </Pressable>
-        )}
+        <View style={styles.searchField}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="模糊搜索歌曲名、曲师或谱师..."
+            placeholderTextColor={Colors.text.muted}
+            value={localFilters.titleSearch || ''}
+            onChangeText={handleSearchChange}
+            onSubmitEditing={() => onApply(cleanFilters(localFilters))}
+            returnKeyType="search"
+          />
+          {!!localFilters.titleSearch && (
+            <Pressable style={styles.clearSearch} onPress={clearSearch} hitSlop={6} accessibilityLabel="清空搜索">
+              <Text style={styles.clearSearchText}>×</Text>
+            </Pressable>
+          )}
+        </View>
         <Pressable
           style={[styles.filterBtn, hasActiveFilters && styles.filterBtnActive]}
           onPress={() => setShowModal(true)}
         >
           <Text style={[styles.filterBtnText, hasActiveFilters && styles.filterBtnTextActive]}>
-            筛选 {hasActiveFilters ? '●' : '○'}
+            筛选{hasActiveFilters ? ` · ${activeChips.length}` : ''}
           </Text>
         </Pressable>
       </View>
 
-      {hasActiveFilters && (
-        <Text style={styles.countText}>{filteredCount} / {totalCount} 首</Text>
+      {(activeChips.length > 0 || filteredCount !== totalCount) && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.activeRow} contentContainerStyle={styles.activeRowContent}>
+          <Text style={styles.countText}>{filteredCount}/{totalCount} 首</Text>
+          {activeChips.map(chip => (
+            <Pressable key={chip.key} style={[styles.activeChip, chip.color ? { borderColor: `${chip.color}88`, backgroundColor: `${chip.color}1f` } : null]} onPress={chip.onRemove}>
+              <Text style={[styles.activeChipText, chip.color ? { color: chip.color } : null]} numberOfLines={1}>{chip.label}</Text>
+              <Text style={[styles.activeChipClose, chip.color ? { color: chip.color } : null]}>×</Text>
+            </Pressable>
+          ))}
+          {activeChips.length > 1 && (
+            <Pressable style={styles.activeChipAll} onPress={clearAllInPlace}>
+              <Text style={styles.activeChipAllText}>全部清除</Text>
+            </Pressable>
+          )}
+        </ScrollView>
       )}
 
       <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => setShowModal(false)}>
@@ -410,12 +497,22 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
+    alignItems: 'center',
+  },
+  // 搜索框与清除键包在同一个容器内：清除键悬浮在输入框内部右侧，
+  // 不再与「筛选」按钮重叠（v1.7.0 布局修复）。
+  searchField: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
   },
   searchInput: {
     flex: 1,
     backgroundColor: Colors.bg.secondary,
     borderRadius: 10,
-    paddingHorizontal: 14,
+    paddingLeft: 14,
+    paddingRight: 36,
     paddingVertical: 10,
     fontSize: 14,
     color: Colors.text.primary,
@@ -424,19 +521,25 @@ const styles = StyleSheet.create({
   },
   clearSearch: {
     position: 'absolute',
-    right: 78,
-    top: 16,
+    right: 4,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 30,
     zIndex: 2,
   },
   clearSearchText: {
-    fontSize: 22,
+    fontSize: 20,
     lineHeight: 22,
-    color: Colors.text.muted,
+    color: Colors.text.secondary,
+    textAlign: 'center',
   },
   filterBtn: {
     backgroundColor: Colors.bg.secondary,
     borderRadius: 10,
     paddingHorizontal: 14,
+    paddingVertical: 10,
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: Colors.border.light,
@@ -451,12 +554,57 @@ const styles = StyleSheet.create({
   },
   filterBtnTextActive: {
     color: Colors.accent.primary,
+    fontWeight: '700',
+  },
+  activeRow: {
+    flexGrow: 0,
+  },
+  activeRowContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingBottom: 6,
   },
   countText: {
     fontSize: 11,
     color: Colors.text.muted,
-    paddingHorizontal: 16,
-    paddingBottom: 4,
+    marginRight: 2,
+  },
+  activeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    maxWidth: 220,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: Colors.border.medium,
+    backgroundColor: Colors.bg.secondary,
+  },
+  activeChipText: {
+    fontSize: 10,
+    color: Colors.text.secondary,
+    fontWeight: '600',
+  },
+  activeChipClose: {
+    fontSize: 13,
+    lineHeight: 14,
+    color: Colors.text.muted,
+  },
+  activeChipAll: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: `${Colors.functional.danger}1f`,
+    borderWidth: 1,
+    borderColor: `${Colors.functional.danger}66`,
+  },
+  activeChipAllText: {
+    fontSize: 10,
+    color: Colors.functional.danger,
+    fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,

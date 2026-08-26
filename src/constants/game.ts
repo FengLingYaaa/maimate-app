@@ -44,7 +44,6 @@ export const Versions = [
   'maimai MiLK',
   'MiLK PLUS',
   'maimai FiNALE',
-  'ALL FiNALE',
   'maimai でらっくす',
   'maimai でらっくす PLUS',
   'maimai でらっくす Splash',
@@ -58,6 +57,28 @@ export const Versions = [
   'maimai でらっくす PRiSM',
   'maimai でらっくす PRiSM PLUS',
 ] as const;
+
+/**
+ * Diving-Fish 数据确认（2026-08-26，1379 首）：
+ * - 「ALL FiNALE」在 music_data 中没有任何曲目，已从版本列表移除；
+ * - DX 时代的 でらっくす PLUS / Splash PLUS / UNiVERSE PLUS / FESTiVAL PLUS /
+ *   BUDDiES PLUS 均无独立数据（曲目已并入基础版本名），筛选时把基础与 PLUS
+ *   合并为一个标签；PRiSM PLUS 有 57 首独立数据，因此 PRiSM 与 PRiSM PLUS
+ *   保持两个独立筛选项。
+ */
+export const MERGED_VERSION_GROUPS: ReadonlyArray<{ label: string; rawValues: string[] }> = [
+  { label: 'maimai でらっくす+PLUS', rawValues: ['maimai でらっくす', 'maimai でらっくす PLUS'] },
+  { label: 'maimai でらっくす Splash+PLUS', rawValues: ['maimai でらっくす Splash', 'maimai でらっくす Splash PLUS'] },
+  { label: 'maimai でらっくす UNiVERSE+PLUS', rawValues: ['maimai でらっくす UNiVERSE', 'maimai でらっくす UNiVERSE PLUS'] },
+  { label: 'maimai でらっくす FESTiVAL+PLUS', rawValues: ['maimai でらっくす FESTiVAL', 'maimai でらっくす FESTiVAL PLUS'] },
+  { label: 'maimai でらっくす BUDDiES+PLUS', rawValues: ['maimai でらっくす BUDDiES', 'maimai でらっくす BUDDiES PLUS'] },
+];
+
+/** 把一个版本筛选项展开为它覆盖的全部原始版本名。 */
+export function expandVersionFilterValue(value: string): string[] {
+  const group = MERGED_VERSION_GROUPS.find(candidate => candidate.label === value);
+  return group ? group.rawValues : [value];
+}
 
 /** 原始版本名 → 舞萌中国区展示名。原始值始终保留用于筛选与数据匹配。 */
 export const ChinaVersionMap: Record<string, string> = {
@@ -113,6 +134,7 @@ export const CACHE_KEYS = {
   scoreSync: 'maimate_score_sync',
   scoreSnapshots: 'maimate_score_snapshots',
   scoreChanges: 'maimate_score_changes',
+  planGraveyard: 'maimate_plan_graveyard',
   bilibiliLinks: 'maimate_bilibili_links',
   fortuneSeed: 'maimate_fortune_seed',
 } as const;

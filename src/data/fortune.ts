@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isBanquetGenre } from '../constants/game';
 import type { MusicData } from './types';
 import { CACHE_KEYS } from '../constants/game';
 
@@ -64,11 +65,14 @@ export function generateFortune(seed: string, songs: MusicData[], dateKey = getC
   }
 
   // Sorting by stable chart identity prevents a refresh/reordered API payload from changing today's result.
-  const stableSongs = [...songs].sort((left, right) => {
-    const leftKey = `${left.type}:${left.id}:${left.title}`;
-    const rightKey = `${right.type}:${right.id}:${right.title}`;
-    return leftKey.localeCompare(rightKey);
-  });
+  // 宴会場谱面没有常规难度与定数，不应作为今日推荐歌曲。
+  const stableSongs = songs
+    .filter(song => !isBanquetGenre(song.basic_info.genre))
+    .sort((left, right) => {
+      const leftKey = `${left.type}:${left.id}:${left.title}`;
+      const rightKey = `${right.type}:${right.id}:${right.title}`;
+      return leftKey.localeCompare(rightKey);
+    });
   const recommendedSong = stableSongs.length > 0
     ? stableSongs[Math.floor(nextRandom(state) * stableSongs.length)]
     : null;

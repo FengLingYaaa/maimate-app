@@ -1,6 +1,6 @@
 import React, { memo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Colors, DifficultyLabels, getChinaVersionName } from '../constants';
+import { Colors, DifficultyColorMap, DifficultyLabels, getChinaVersionName } from '../constants';
 import { calculateRating, formatAchievement } from '../data/rating';
 import { getOfficialChartConstant } from '../data/music-list';
 import { CoverImage } from './CoverImage';
@@ -24,6 +24,7 @@ export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, 
   const officialConstant = getOfficialChartConstant(music, entry.difficultyIndex);
   const targetRating = entry.targetScore === undefined ? null : calculateRating(officialConstant ?? undefined, entry.targetScore);
   const chinaName = getChinaVersionName(music.basic_info.from);
+  const difficultyColor = DifficultyColorMap[entry.difficultyIndex] || Colors.accent.secondary;
   const [editingTarget, setEditingTarget] = useState(false);
   const showTargetPicker = entry.targetScore === undefined || editingTarget;
   const chooseTarget = (score: number | null) => {
@@ -33,14 +34,23 @@ export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, 
 
   return (
     <View style={styles.wrapper}>
-      <View style={styles.orderBadge}><Text style={styles.orderText}>{index + 1}</Text></View>
+      <View style={[styles.orderBadge, entry.pin && styles.orderBadgePinned]}><Text style={styles.orderText}>{index + 1}</Text></View>
       <View style={styles.card}>
         <Pressable style={({ pressed }) => [styles.songHeader, pressed && styles.pressed]} onPress={onPress} onLongPress={onLongPress} delayLongPress={260}>
           <CoverImage music={music} allSongs={allSongs} style={styles.cover} accessibilityLabel={`${music.title} 曲绘`} />
           <View style={styles.info}>
-            <Text style={styles.title} numberOfLines={2}>{music.title}</Text>
+            <View style={styles.titleRow}>
+              {entry.pin === 'top' && <Text style={styles.pinMark}>📌</Text>}
+              {entry.pin === 'bottom' && <Text style={styles.pinMark}>🔻</Text>}
+              <Text style={styles.title} numberOfLines={2}>{music.title}</Text>
+            </View>
             <Text style={styles.artist} numberOfLines={1}>{music.basic_info.artist}</Text>
-            <Text style={styles.meta}>{music.type} · {DifficultyLabels[entry.difficultyIndex] || `难度 ${entry.difficultyIndex}`} · {officialConstant === null ? '无定数' : `定数 ${officialConstant.toFixed(1)}`}</Text>
+            <View style={styles.metaLine}>
+              <Text style={[styles.diffChip, { color: difficultyColor, borderColor: `${difficultyColor}88`, backgroundColor: `${difficultyColor}1a` }]}>
+                {DifficultyLabels[entry.difficultyIndex] || `难度 ${entry.difficultyIndex}`}
+              </Text>
+              <Text style={styles.meta}>{music.type} · {officialConstant === null ? '无定数' : `定数 ${officialConstant.toFixed(1)}`}</Text>
+            </View>
             <Text style={styles.version} numberOfLines={1}>原始：{music.basic_info.from}</Text>
             {showChinaVersion && chinaName !== music.basic_info.from && <Text style={styles.version} numberOfLines={1}>国区：{chinaName}</Text>}
           </View>
@@ -74,7 +84,12 @@ export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, 
 const styles = StyleSheet.create({
   wrapper: { paddingHorizontal: 12, paddingVertical: 5 },
   orderBadge: { position: 'absolute', top: 14, left: 7, zIndex: 2, width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.accent.primary, alignItems: 'center', justifyContent: 'center' },
+  orderBadgePinned: { backgroundColor: Colors.accent.secondaryDark },
   orderText: { fontSize: 12, fontWeight: '800', color: '#fff' },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
+  pinMark: { fontSize: 11 },
+  metaLine: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  diffChip: { fontSize: 10, fontWeight: '800', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, borderWidth: 1, overflow: 'hidden' },
   card: { padding: 10, paddingLeft: 15, borderRadius: 13, backgroundColor: Colors.bg.secondary, borderWidth: 1, borderColor: Colors.border.light, gap: 7 },
   songHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   pressed: { opacity: 0.75 },

@@ -3,8 +3,22 @@ import assert from 'node:assert/strict';
 import { parseBilibiliShare, normalizeBilibiliVideoUrl } from '../src/data/bilibili-links.ts';
 import { getMusicPlatformAppUrls, getMusicPlatformSearchUrl } from '../src/data/music-platforms.ts';
 import { getChinaVersionOptions, getVersionOptions } from '../src/data/version-catalog.ts';
-import { buildPlateEntries, getPlateMask, getPlateChinaVersionOptions, summarizePlates, PLATE_BITS } from '../src/data/plates.ts';
-import { canDragPlanRows, reorderVisibleEntries } from '../src/data/plan-order.ts';
+import { expandVersionFilterValue, Versions } from '../src/constants/game.ts';
+import {
+  buildPlateEntries,
+  getPlateMask,
+  getPlateChinaVersionOptions,
+  getPlateLegacyVersionOptions,
+  summarizePlates,
+  summarizePlatesByDifficulty,
+  mergePlateRows,
+  filterEntriesByMinLevel,
+  PLATE_BITS,
+} from '../src/data/plates.ts';
+import { applyDragWithPinGroups, canDragPlanRows, compareByPinThenOrder, pinGroupOf, reorderVisibleEntries } from '../src/data/plan-order.ts';
+import { getBilibiliVideoAppUrl } from '../src/data/bilibili-search.ts';
+import { generateFortune } from '../src/data/fortune.ts';
+import { matchesMusic } from '../src/data/music-list.ts';
 import {
   getBilibiliCoverCacheFilename,
   getBilibiliCoverExtension,
@@ -37,17 +51,28 @@ assert.equal(isBilibiliCoverCacheFileForLink(getBilibiliCoverCacheFilename(cover
 assert.equal(isBilibiliCoverCacheFileForLink('other-link-deadbeef.jpg', coverLinkId), false);
 
 const chart = { notes: [1, 1, 1, 1], charter: 'tester' };
-const makeMusic = (id, from, type = 'DX') => ({
+const makeMusic = (id, from, type = 'DX', genre = '流行&动漫') => ({
   id, type, title: `Song ${id}`, ds: [1, 2, 3, 14.5, 14.5], level: ['1', '2', '3', '14', '14+'], cids: [1, 2, 3, 4, 5],
   charts: [chart, chart, chart, chart, chart],
-  basic_info: { title: `Song ${id}`, artist: 'Artist', genre: '流行&动漫', bpm: 120, release_date: '', from, is_new: false },
+  basic_info: { title: `Song ${id}`, artist: 'Artist', genre, bpm: 120, release_date: '', from, is_new: false },
 });
 const rawData = [makeMusic('1', 'maimai でらっくす Splash'), makeMusic('2', 'maimai PiNK'), makeMusic('3', 'maimai でらっくす')];
 const japan = getVersionOptions(rawData);
 const china = getChinaVersionOptions(rawData);
-assert.equal(japan.find(option => option.rawValue.includes('Splash'))?.label, 'maimai でらっくす Splash');
+// v1.7.0：无独立数据的 Splash 与 Splash PLUS 合并为一个标签。
+assert.equal(japan.find(option => option.label === 'maimai でらっくす Splash+PLUS')?.rawValues?.length, 2);
+assert.equal(japan.some(option => option.label === 'maimai でらっくす Splash'), false);
 assert.equal(china.find(option => option.rawValue === '舞萌DX 2021')?.rawValues?.[0], 'maimai でらっくす Splash');
 assert.equal(china.some(option => option.label === '舞萌DX'), true);
+
+// v1.7.0：版本筛选值展开匹配——合并标签命中组内任意原始版本名。
+assert.deepEqual(expandVersionFilterValue('maimai でらっくす Splash+PLUS'), ['maimai でらっくす Splash', 'maimai でらっくす Splash PLUS']);
+assert.deepEqual(expandVersionFilterValue('maimai PiNK'), ['maimai PiNK']);
+assert.equal(matchesMusic(rawData[0], { version: 'maimai でらっくす Splash+PLUS' }), true);
+assert.equal(matchesMusic(rawData[1], { version: 'maimai でらっくす Splash+PLUS' }), false);
+
+// v1.7.0：ALL FiNALE 无曲目数据，从版本常量中移除。
+assert.equal(Versions.some(version => /FiNALE/i.test(version) && version !== 'maimai FiNALE'), false);
 
 assert.equal(canDragPlanRows({}), true);
 assert.equal(canDragPlanRows({ titleSearch: 'Song 1' }), false);
@@ -61,4 +86,50 @@ const summary = summarizePlates(entries.filter(entry => entry.music.id === '1' &
 assert.deepEqual(summary, { total: 1, counts: { FC: 1, SSS: 1, FSD: 1, AP: 1 } });
 assert.equal(getPlateChinaVersionOptions(entries).includes('舞萌DX'), true);
 
-console.log('Feature checks passed (deep links, Bilibili parsing, version groups, local plates)');
+// v1.7.0：牌子页版本维度拆分——原始版本只保留旧世代，DX 代交给国区维度。
+const legacyOptions = getPlateLegacyVersionOptions(entries);
+assert.equal(legacyOptions.includes('全部'), true);
+assert.equal(legacyOptions.includes('maimai PiNK'), true);
+assert.equal(legacyOptions.some(value => value.startsWith('maimai でらっくす')), false);
+
+// v1.7.0：分难度汇总、多难度合并行、14+ 批量筛选。
+const byDifficulty = summarizePlatesByDifficulty(entries.filter(entry => entry.music.id === '1'));
+assert.deepEqual(byDifficulty.map(row => row.difficultyIndex), [0, 1, 2, 3, 4]);
+const merged = mergePlateRows(entries.filter(entry => entry.music.id === '1'));
+assert.equal(merged.length, 1);
+assert.equal(merged[0].charts.length, 5);
+assert.deepEqual(merged[0].charts.map(c => c.difficultyIndex), [0, 1, 2, 3, 4]);
+const fourteenPlus = filterEntriesByMinLevel(entries.filter(entry => entry.music.id === '1'), 14);
+assert.deepEqual(fourteenPlus.map(e => e.difficultyIndex), [3, 4]);
+
+// v1.7.0：置顶置底分组约束。
+const baseEntry = { songId: 'x', difficultyIndex: 3, addedAt: 1, order: 0 };
+const pinA = { ...baseEntry, order: 0, pin: 'top' };
+const pinB = { ...baseEntry, order: 1, pin: 'top' };
+const midC = { ...baseEntry, order: 2 };
+const botD = { ...baseEntry, order: 3, pin: 'bottom' };
+assert.equal(pinGroupOf(pinA), 'top');
+assert.equal(compareByPinThenOrder(pinA, midC) < 0, true);
+assert.equal(compareByPinThenOrder(midC, botD) < 0, true);
+const dragged = [pinB, botD, midC, pinA];
+const legal = applyDragWithPinGroups(dragged);
+assert.deepEqual(legal.map(entry => entry.order), [1, 0, 2, 3]);
+
+// v1.7.0：B 站视频深链提取；b23.tv 短链无法本地展开。
+assert.equal(getBilibiliVideoAppUrl('https://www.bilibili.com/video/BV1xx411c7mD?p=1'), 'bilibili://video/BV1xx411c7mD');
+assert.equal(getBilibiliVideoAppUrl('https://www.bilibili.com/video/av170001'), 'bilibili://video/av170001');
+assert.equal(getBilibiliVideoAppUrl('https://b23.tv/TdQjEN6'), null);
+
+// v1.7.0：今日运势不再推荐宴会場谱面。
+const banquetRaw = [...rawData, makeMusic('9', 'maimai でらっくす BUDDiES', 'DX', '宴会場')];
+for (let day = 0; day < 30; day += 1) {
+  const dateKey = `2026-08-${String((day % 28) + 1).padStart(2, '0')}`;
+  const result = generateFortune(`seed-${day}`, banquetRaw, dateKey);
+  const picked = banquetRaw.find(song => song.id === result.recommendedSongId && song.type === result.recommendedMusicType)
+    || banquetRaw.find(song => song.id === result.recommendedSongId);
+  assert.notEqual(picked?.basic_info.genre, '宴会場');
+}
+const onlyBanquet = generateFortune('seed-x', [makeMusic('9', 'maimai でらっくす BUDDiES', 'DX', '宴会場')], '2026-08-26');
+assert.equal(onlyBanquet.recommendedSongId, null);
+
+console.log('Feature checks passed (deep links, Bilibili parsing, version groups, local plates, pins, fortune)');

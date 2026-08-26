@@ -1,14 +1,24 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
-import { Colors, DifficultyColorMap, DifficultyLabels } from '../../src/constants';
-import { useMusicStore, useScoreStore } from '../../src/store';
-import { buildPlateEntries, filterPlateEntries, getPlateChinaVersionOptions, getPlateVersionOptions, PLATE_BITS, summarizePlates, type PlateBit, type PlateEntry } from '../../src/data/plates';
+import { Stack, useRouter, useFocusEffect } from 'expo-router';
+import { Colors, DifficultyColorMap, DifficultyLabels, DifficultyShortLabels } from '../../src/constants';
+import { useMusicStore, usePlanStore, useScoreStore } from '../../src/store';
+import {
+  buildPlateEntries,
+  filterPlateEntries,
+  filterEntriesByMinLevel,
+  getPlateChinaVersionOptions,
+  getPlateLegacyVersionOptions,
+  mergePlateRows,
+  summarizePlates,
+  summarizePlatesByDifficulty,
+  type PlateBit,
+} from '../../src/data/plates';
 
 const PLATE_LABELS: Array<{ name: PlateBit; label: string; color: string }> = [
   { name: 'FC', label: 'FC', color: Colors.functional.success },
   { name: 'SSS', label: 'SSS', color: Colors.accent.secondary },
-  { name: 'FSD', label: 'FS DX', color: '#c084fc' },
+  { name: 'FSD', label: 'FS', color: '#c084fc' },
   { name: 'AP', label: 'AP', color: '#fb923c' },
 ];
 
@@ -16,14 +26,76 @@ export default function PlatesPage() {
   const router = useRouter();
   const rawData = useMusicStore(s => s.rawData);
   const scores = useScoreStore(s => s.scores);
+  const entries = usePlanStore(s => s.entries);
+  const isInPlan = usePlanStore(s => s.isInPlan);
+  const bulkAddEntries = usePlanStore(s => s.bulkAddEntries);
+  const bulkRemoveEntries = usePlanStore(s => s.bulkRemoveEntries);
+
   const [version, setVersion] = useState('全部');
   const [chinaVersion, setChinaVersion] = useState<string | undefined>();
-  const [difficultyIndex, setDifficultyIndex] = useState<number | undefined>(3);
-  const entries = useMemo(() => buildPlateEntries(rawData, scores), [rawData, scores]);
-  const versionOptions = useMemo(() => getPlateVersionOptions(entries), [entries]);
-  const chinaOptions = useMemo(() => getPlateChinaVersionOptions(entries), [entries]);
-  const filtered = useMemo(() => filterPlateEntries(entries, version, difficultyIndex, chinaVersion), [entries, version, difficultyIndex, chinaVersion]);
-  const summary = useMemo(() => summarizePlates(filtered), [filtered]);
+  const [difficultyIndex, setDifficultyIndex] = useState<number | undefined>();
+  const [lastBulkKeys, setLastBulkKeys] = useState<string[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
+  // 进入页面时强制刷新一次：修复嵌套 Stack 初次渲染偶发空白、
+  // 点击筛选后才显示的问题。
+  const [focusTick, setFocusTick] = useState(0);
+  useFocusEffect(useCallback(() => { setFocusTick(tick => tick + 1); }, []));
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 2400);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  const plateEntries = useMemo(
+    () => buildPlateEntries(rawData, scores),
+    // focusTick 参与依赖，切回该页时重新计算一次。
+    [rawData, scores, focusTick],
+  );
+  const filtered = useMemo(
+    () => filterPlateEntries(plateEntries, version, difficultyIndex, chinaVersion),
+    [plateEntries, version, difficultyIndex, chinaVersion],
+  );
+  const legacyVersions = useMemo(() => getPlateLegacyVersionOptions(plateEntries), [plateEntries]);
+  const chinaOptions = useMemo(() => getPlateChinaVersionOptions(plateEntries), [plateEntries]);
+  const byDifficulty = useMemo(() => summarizePlatesByDifficulty(filtered), [filtered]);
+  const total = useMemo(() => summarizePlates(filtered), [filtered]);
+  const mergedRows = useMemo(() => mergePlateRows(filtered), [filtered]);
+
+  const eligible14Plus = useMemo(() => filterEntriesByMinLevel(filtered, 14), [filtered]);
+  const pendingCount = useMemo(
+    () => eligible14Plus.filter(entry => !isInPlan(entry.music.id, entry.difficultyIndex, entry.music.type)).length,
+    [eligible14Plus, isInPlan],
+  );
+
+  const openSong = useCallback((row: ReturnType<typeof mergePlateRows>[number]) => {
+    const highest = row.charts[row.charts.length - 1];
+    router.push({
+      pathname: '/song/[id]' as any,
+      params: { id: row.music.id, type: row.music.type, difficultyIndex: String(highest.difficultyIndex), source: 'plates' },
+    });
+  }, [router]);
+
+  const handleBulkAdd = () => {
+    if (eligible14Plus.length === 0) return;
+    const added = bulkAddEntries(eligible14Plus.map(entry => ({
+      songId: entry.music.id,
+      difficultyIndex: entry.difficultyIndex,
+      musicType: entry.music.type,
+    })));
+    if (added.length === 0) {
+      setNotice('选中的 14+ 谱面都已在推分计划中');
+      return;
+    }
+    setLastBulkKeys(added);
+    setNotice(`已把 ${added.length} 张 14+ 谱面加入推分计划`);
+  };
+
+  const handleBulkUndo = () => {
+    if (lastBulkKeys.length === 0) return;
+    bulkRemoveEntries(lastBulkKeys, { purge: true });
+    setNotice(`已撤回 ${lastBulkKeys.length} 张谱面`);
+    setLastBulkKeys([]);
+  };
 
   return (
     <View style={styles.container}>
@@ -32,51 +104,124 @@ export default function PlatesPage() {
         <Text style={styles.title}>🏅 本地牌子查询</Text>
         <Text style={styles.subtitle}>根据本机已导入成绩计算，不会上传成绩，也不是逐局游玩历史。</Text>
       </View>
+
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        {versionOptions.map(option => <FilterChip key={option} label={option} active={version === option} onPress={() => setVersion(option)} />)}
+        {legacyVersions.map(option => <FilterChip key={option} label={option === '全部' ? '全部版本' : option} active={version === option} onPress={() => setVersion(option)} />)}
       </ScrollView>
-      {chinaOptions.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          <FilterChip label="全部国区" active={!chinaVersion} onPress={() => setChinaVersion(undefined)} />
-          {chinaOptions.map(option => <FilterChip key={option} label={option} active={chinaVersion === option} onPress={() => setChinaVersion(option)} />)}
-        </ScrollView>
-      )}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+        <FilterChip label="全部国区" active={!chinaVersion} onPress={() => setChinaVersion(undefined)} />
+        {chinaOptions.map(option => <FilterChip key={option} label={option} active={chinaVersion === option} onPress={() => setChinaVersion(option)} />)}
+      </ScrollView>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
         <FilterChip label="全部难度" active={difficultyIndex === undefined} onPress={() => setDifficultyIndex(undefined)} />
-        {DifficultyLabels.map((label, index) => <FilterChip key={label} label={label} active={difficultyIndex === index} onPress={() => setDifficultyIndex(index)} color={DifficultyColorMap[index]} />)}
+        {DifficultyLabels.map((label, index) => (
+          <FilterChip
+            key={label}
+            label={label}
+            active={difficultyIndex === index}
+            onPress={() => setDifficultyIndex(index)}
+            color={DifficultyColorMap[index]}
+          />
+        ))}
       </ScrollView>
+
       <View style={styles.summaryCard}>
-        {PLATE_LABELS.map(item => <View key={item.name} style={styles.summaryItem}><Text style={[styles.summaryLabel, { color: item.color }]}>{item.label}</Text><Text style={styles.summaryValue}>{summary.counts[item.name]} / {summary.total}</Text></View>)}
+        <View style={[styles.summaryRow, styles.totalRow]}>
+          <Text style={styles.totalLabel}>总计</Text>
+          <View style={styles.summaryCells}>{PLATE_LABELS.map(item => <SummaryCell key={item.name} item={item} counts={total.counts} total={total.total} />)}</View>
+        </View>
+        {byDifficulty.map(row => (
+          <View key={row.difficultyIndex} style={styles.summaryRow}>
+            <Text style={[styles.diffLabel, { color: DifficultyColorMap[row.difficultyIndex] }]}>
+              {DifficultyShortLabels[row.difficultyIndex] || `难度${row.difficultyIndex}`}
+            </Text>
+            <View style={styles.summaryCells}>{PLATE_LABELS.map(item => <SummaryCell key={item.name} item={item} counts={row.counts} total={row.total} />)}</View>
+          </View>
+        ))}
       </View>
+
+      {(eligible14Plus.length > 0 || lastBulkKeys.length > 0) && (
+        <View style={styles.bulkBar}>
+          <Pressable
+            style={({ pressed }) => [styles.bulkButton, pressed && styles.pressed, pendingCount === 0 && styles.bulkDisabled]}
+            onPress={handleBulkAdd}
+            disabled={pendingCount === 0}
+          >
+            <Text style={styles.bulkButtonText}>⚡ 一键加入 14+（{pendingCount}）</Text>
+          </Pressable>
+          {lastBulkKeys.length > 0 && (
+            <Pressable style={({ pressed }) => [styles.undoButton, pressed && styles.pressed]} onPress={handleBulkUndo}>
+              <Text style={styles.undoButtonText}>↩ 撤回本次（{lastBulkKeys.length}）</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+      {notice && <View style={styles.notice}><Text style={styles.noticeText}>{notice}</Text></View>}
+
       {scores.length === 0 ? (
-        <View style={styles.empty}><Text style={styles.emptyTitle}>暂无本地成绩</Text><Text style={styles.emptyText}>请先在设置中导入成绩，再查询 FC、SSS、FS DX 和 AP 牌子。</Text></View>
+        <View style={styles.empty}><Text style={styles.emptyTitle}>暂无本地成绩</Text><Text style={styles.emptyText}>请先在设置中导入成绩，再查询 FC、SSS、FS 和 AP 牌子。</Text></View>
       ) : filtered.length === 0 ? (
         <View style={styles.empty}><Text style={styles.emptyTitle}>没有可查询的谱面</Text><Text style={styles.emptyText}>当前筛选条件没有匹配曲目。</Text></View>
       ) : (
         <FlatList
-          data={filtered}
+          data={mergedRows}
           keyExtractor={item => item.key}
+          removeClippedSubviews={false}
           contentContainerStyle={styles.list}
-          renderItem={({ item }) => <PlateRow entry={item} onPress={() => router.push({ pathname: '/song/[id]' as any, params: { id: item.music.id, type: item.music.type, difficultyIndex: String(item.difficultyIndex), source: 'plates' } })} />}
+          renderItem={({ item }) => <PlateRow entry={item} plannedCount={entries.filter(e => e.songId === item.music.id).length} onPress={() => openSong(item)} />}
         />
       )}
     </View>
   );
 }
 
-function FilterChip({ label, active, onPress, color }: { label: string; active: boolean; onPress: () => void; color?: string }) {
-  return <Pressable style={[styles.chip, active && { borderColor: color || Colors.accent.primary, backgroundColor: `${color || Colors.accent.primary}22` }]} onPress={onPress}><Text style={[styles.chipText, active && { color: color || Colors.accent.primary }]}>{label}</Text></Pressable>;
+function SummaryCell({ item, counts, total }: { item: { name: PlateBit; label: string; color: string }; counts: Record<PlateBit, number>; total: number }) {
+  return (
+    <View style={styles.summaryItem}>
+      <Text style={[styles.summaryLabel, { color: item.color }]}>{item.label}</Text>
+      <Text style={styles.summaryValue}>{counts[item.name]}<Text style={styles.summaryTotal}>/{total}</Text></Text>
+    </View>
+  );
 }
 
-function PlateRow({ entry, onPress }: { entry: PlateEntry; onPress: () => void }) {
+function FilterChip({ label, active, onPress, color }: { label: string; active: boolean; onPress: () => void; color?: string }) {
+  return <Pressable style={[styles.chip, active && { borderColor: color || Colors.accent.primary, backgroundColor: `${color || Colors.accent.primary}22` }]} onPress={onPress}><Text style={[styles.chipText, active && { color: color || Colors.accent.primary, fontWeight: '800' }]}>{label}</Text></Pressable>;
+}
+
+function PlateChartLine({ chart }: { chart: { difficultyIndex: number; mask: number; level?: string } }) {
+  const color = DifficultyColorMap[chart.difficultyIndex];
+  return (
+    <View style={styles.chartLine}>
+      <View style={[styles.diffBadge, { borderColor: color }]}>
+        <Text style={[styles.diffBadgeText, { color }]}>
+          {DifficultyShortLabels[chart.difficultyIndex] || `D${chart.difficultyIndex}`}
+          {chart.level ? ` ${chart.level}` : ''}
+        </Text>
+      </View>
+      <View style={styles.badgeMarks}>
+        {PLATE_LABELS.map(item => {
+          const earned = (chart.mask & ({ FC: 1, SSS: 2, FSD: 4, AP: 8 } as const)[item.name]) !== 0;
+          return (
+            <Text key={item.name} style={[styles.mark, { color: earned ? item.color : Colors.text.muted }]}>
+              {earned ? '✓' : '○'}{item.label}
+            </Text>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function PlateRow({ entry, plannedCount, onPress }: { entry: ReturnType<typeof mergePlateRows>[number]; plannedCount: number; onPress: () => void }) {
   return (
     <Pressable style={({ pressed }) => [styles.row, pressed && styles.rowPressed]} onPress={onPress}>
       <View style={styles.rowInfo}>
-        <Text style={styles.rowTitle} numberOfLines={1}>{entry.music.title}</Text>
-        <Text style={styles.rowMeta}>{DifficultyLabels[entry.difficultyIndex]} · {entry.music.type} · {entry.rawVersion}</Text>
-      </View>
-      <View style={styles.plateIcons}>
-        {PLATE_LABELS.map(item => <Text key={item.name} style={[styles.plateIcon, { color: (entry.mask & PLATE_BITS[item.name]) !== 0 ? item.color : Colors.text.muted }]}>{(entry.mask & PLATE_BITS[item.name]) !== 0 ? '✓' : '○'}</Text>)}
+        <View style={styles.titleLine}>
+          <Text style={styles.rowTitle} numberOfLines={1}>{entry.music.title}</Text>
+          {plannedCount > 0 && <View style={styles.planTag}><Text style={styles.planTagText}>计划×{plannedCount}</Text></View>}
+        </View>
+        <Text style={styles.rowMeta}>{entry.music.type} · {entry.music.basic_info.from}</Text>
+        {entry.charts.map(chart => <PlateChartLine key={chart.difficultyIndex} chart={chart} />)}
       </View>
     </Pressable>
   );
@@ -90,18 +235,39 @@ const styles = StyleSheet.create({
   chips: { gap: 7, paddingHorizontal: 12, paddingVertical: 5 },
   chip: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 9, borderWidth: 1, borderColor: Colors.border.light, backgroundColor: Colors.bg.secondary },
   chipText: { fontSize: 10, color: Colors.text.secondary, fontWeight: '700' },
-  summaryCard: { flexDirection: 'row', justifyContent: 'space-around', margin: 12, padding: 12, borderRadius: 12, backgroundColor: Colors.bg.secondary, borderWidth: 1, borderColor: Colors.border.light },
-  summaryItem: { alignItems: 'center', gap: 3 },
-  summaryLabel: { fontSize: 11, fontWeight: '800' },
-  summaryValue: { fontSize: 12, color: Colors.text.primary, fontWeight: '700' },
+  summaryCard: { marginHorizontal: 12, marginVertical: 8, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12, backgroundColor: Colors.bg.secondary, borderWidth: 1, borderColor: Colors.border.light, gap: 6 },
+  summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  totalRow: { borderBottomWidth: 1, borderBottomColor: Colors.border.light, paddingBottom: 6, marginBottom: 2 },
+  totalLabel: { fontSize: 12, fontWeight: '800', color: Colors.text.primary, width: 34 },
+  diffLabel: { fontSize: 11, fontWeight: '800', width: 34 },
+  summaryCells: { flex: 1, flexDirection: 'row', justifyContent: 'space-around' },
+  summaryItem: { alignItems: 'center', minWidth: 52 },
+  summaryLabel: { fontSize: 10, fontWeight: '800' },
+  summaryValue: { fontSize: 12, color: Colors.text.primary, fontWeight: '800' },
+  summaryTotal: { fontSize: 9, color: Colors.text.muted, fontWeight: '600' },
+  bulkBar: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 4, gap: 8 },
+  bulkButton: { flex: 1, backgroundColor: Colors.accent.primary, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
+  bulkDisabled: { opacity: 0.45 },
+  bulkButtonText: { fontSize: 12, fontWeight: '800', color: '#fff' },
+  undoButton: { backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.medium, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center' },
+  undoButtonText: { fontSize: 12, fontWeight: '800', color: Colors.text.secondary },
+  pressed: { opacity: 0.75 },
+  notice: { alignSelf: 'center', marginTop: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9, backgroundColor: 'rgba(25,25,34,0.94)' },
+  noticeText: { fontSize: 11, color: '#fff', fontWeight: '700' },
   list: { paddingHorizontal: 12, paddingBottom: 80, gap: 6 },
-  row: { flexDirection: 'row', alignItems: 'center', padding: 11, borderRadius: 11, backgroundColor: Colors.bg.secondary, borderWidth: 1, borderColor: Colors.border.light, gap: 8 },
+  row: { padding: 11, borderRadius: 11, backgroundColor: Colors.bg.secondary, borderWidth: 1, borderColor: Colors.border.light },
   rowPressed: { backgroundColor: Colors.bg.tertiary, borderColor: Colors.border.accent },
-  rowInfo: { flex: 1, gap: 3 },
-  rowTitle: { fontSize: 13, fontWeight: '700', color: Colors.text.primary },
+  rowInfo: { gap: 4 },
+  titleLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  rowTitle: { flexShrink: 1, fontSize: 13, fontWeight: '700', color: Colors.text.primary },
+  planTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: `${Colors.accent.primary}22` },
+  planTagText: { fontSize: 9, color: Colors.accent.primary, fontWeight: '800' },
   rowMeta: { fontSize: 10, color: Colors.text.muted },
-  plateIcons: { flexDirection: 'row', gap: 6 },
-  plateIcon: { fontSize: 17, fontWeight: '900' },
+  chartLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  diffBadge: { minWidth: 56, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
+  diffBadgeText: { fontSize: 10, fontWeight: '800', textAlign: 'center' },
+  badgeMarks: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  mark: { fontSize: 10, fontWeight: '800' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 7, paddingBottom: 80 },
   emptyTitle: { fontSize: 16, color: Colors.text.primary, fontWeight: '700' },
   emptyText: { fontSize: 12, color: Colors.text.muted },

@@ -27,3 +27,19 @@ export function getBilibiliSearchUrl(title: string, difficultyLabel: string): st
 export function getBilibiliAppSearchUrl(title: string, difficultyLabel: string): string {
   return `bilibili://search?keyword=${encodeURIComponent(getBilibiliSearchQuery(title, difficultyLabel))}`;
 }
+
+/**
+ * 从用户保存的视频链接提取 B 站客户端深链。
+ * bilibili.com/video/BV… 或 /av… 可直接映射为 bilibili://video/<id>；
+ * b23.tv 短链无法在本地展开，返回 null 由调用方走 intent/网页回退。
+ */
+export function getBilibiliVideoAppUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    const match = parsed.pathname.match(/\/(?:video\/)?(BV[0-9A-Za-z]{10}|av\d+)/i);
+    if (match) return `bilibili://video/${match[1]}`;
+  } catch {
+    // 非 http(s) 结构时按无深链处理
+  }
+  return null;
+}

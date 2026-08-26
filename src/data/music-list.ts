@@ -7,6 +7,7 @@
 
 import type { FilterOptions, MusicData, ChartData, SortOptions } from './types';
 import { getChinaVersionName, isBanquetGenre } from '../constants/game';
+import { expandVersionSelection } from './version-catalog';
 import { getSearchTitles } from './song-aliases';
 
 /** 返回可用于官方定数筛选/排序/Rating 的定数；宴会場保留为缺失。 */
@@ -167,7 +168,9 @@ export function getMatchingDifficultyIndices(music: MusicData, opts: FilterOptio
 /** 判断歌曲是否命中所有筛选条件。 */
 export function matchesMusic(music: MusicData, opts: FilterOptions): boolean {
   if (!inOrEqual(music.basic_info.genre, opts.genre)) return false;
-  if (!inOrEqual(music.basic_info.from, opts.version)) return false;
+  // 版本筛选值可能是合并标签（如 "Splash+PLUS"），先展开为原始版本名集合。
+  const versionScope = expandVersionSelection(opts.version);
+  if (versionScope !== undefined && !versionScope.includes(music.basic_info.from)) return false;
   if (!inOrEqual(getChinaVersionName(music.basic_info.from), opts.chinaVersion)) return false;
   if (!inOrEqual(music.type, opts.type)) return false;
   if (opts.bpmRange !== undefined && !inOrEqual(music.basic_info.bpm, opts.bpmRange)) return false;

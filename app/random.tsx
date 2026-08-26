@@ -32,6 +32,9 @@ export default function RandomPicker() {
   const [mode, setMode] = useState<DrawMode>('plan');
   const [filters, setFilters] = useState<FilterOptions>({});
   const [showVersions, setShowVersions] = useState(false);
+  // 「按条件」模式下抽选时自动收起条件面板：否则滚筒+结果卡会被
+  // 底部抽选按钮挤压/遮挡。
+  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
   const [animationItems, setAnimationItems] = useState<DrawCandidate[]>([]);
   const [animationResultIndex, setAnimationResultIndex] = useState<number | null>(null);
   const [spinning, setSpinning] = useState(false);
@@ -99,7 +102,8 @@ export default function RandomPicker() {
     setAnimationItems(displayItems);
     setAnimationResultIndex(displayItems.length - 1);
     setSpinning(true);
-  }, [candidates, spinning]);
+    if (mode === 'filtered') setFiltersCollapsed(true);
+  }, [candidates, mode, spinning]);
 
   const handleSpinEnd = useCallback(() => {
     setSpinning(false);
@@ -146,7 +150,7 @@ export default function RandomPicker() {
         </View>
       )}
 
-      {mode === 'filtered' && (
+      {mode === 'filtered' && !filtersCollapsed && (
         <ScrollView style={styles.filterPanel} horizontal={false} showsVerticalScrollIndicator={false}>
           <TextInput
             style={styles.searchInput}
@@ -242,6 +246,14 @@ export default function RandomPicker() {
             onChangeText={value => updateTextFilter('charter', value)}
           />
         </ScrollView>
+      )}
+
+      {mode === 'filtered' && (
+        <Pressable style={styles.filterToggle} onPress={() => setFiltersCollapsed(value => !value)}>
+          <Text style={styles.filterToggleText}>
+            {filtersCollapsed ? '⚙ 展开筛选条件' : '▲ 收起筛选条件，给抽选区让位'}
+          </Text>
+        </Pressable>
       )}
 
       <View style={styles.drumArea}>
@@ -423,6 +435,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 12,
+    overflow: 'hidden',
+  },
+  filterToggle: {
+    alignSelf: 'center',
+    marginTop: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 9,
+    backgroundColor: Colors.bg.tertiary,
+    borderWidth: 1,
+    borderColor: Colors.border.light,
+  },
+  filterToggleText: {
+    fontSize: 11,
+    color: Colors.accent.secondary,
+    fontWeight: '700',
   },
   placeholder: {
     alignItems: 'center',

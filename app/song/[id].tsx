@@ -239,7 +239,7 @@ export default function SongDetail() {
               <View style={styles.chartCard}>
                 {/* 定数与等级 */}
                 <View style={styles.chartHeader}>
-                  <View>
+                  <View style={styles.chartHeaderInfo}>
                     <Text style={styles.chartLevel}>
                       {DifficultyLabels[selectedDiff]} {level}
                     </Text>
@@ -315,7 +315,7 @@ export default function SongDetail() {
                        </Pressable>
                      ))}
                    </View>
-                   <Text style={styles.platformNote}>优先尝试打开已安装应用，失败时回退网页；结果仍需手动确认版本。</Text>
+                   <Text style={styles.platformNote}>直接打开音乐平台的网页搜索结果页，可立即查看候选曲目；平台应用内的深链搜索由客户端路由决定，不做保证。</Text>
                  </View>
               </View>
             </View>
@@ -498,6 +498,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    gap: 12,
+  },
+  // 左侧信息区约束宽度，避免长文案（如宴会场的“无详细定数”提示）把
+  // 右侧 Total Notes 挤出卡片边界。
+  chartHeaderInfo: {
+    flex: 1,
+    minWidth: 0,
   },
   chartLevel: {
     fontSize: 20,

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
 import { dirname, extname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -16,7 +17,8 @@ function collectRouteKeys(directory, prefix = '.') {
   });
 }
 
-const appDirectory = join(dirname(new URL(import.meta.url).pathname), '..', 'app');
+// fileURLToPath 兼容 Windows（URL pathname 会产生 /D:/... 形式）。
+const appDirectory = join(dirname(fileURLToPath(import.meta.url)), '..', 'app');
 const contextKeys = collectRouteKeys(appDirectory);
 const context = () => ({ default: function Route() {} });
 context.keys = () => contextKeys;
