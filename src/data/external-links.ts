@@ -5,9 +5,10 @@ import type { MusicPlatform } from './types';
 import {
   getBilibiliAppSearchUrl,
   getBilibiliSearchUrl,
-  getBilibiliVideoAppUrl,
+  isBilibiliShortLink,
 } from './bilibili-search';
-import { getMusicPlatformSearchUrl } from './music-platforms';
+import { getDirectVideoAppUrl, resolveAndCacheVideoUrl } from './bilibili-resolve';
+import { getMusicPlatformSearchUrl, getMusicPlatformAppUrls } from './music-platforms';
 
 type AppCandidate = { url: string; packageName?: string };
 
@@ -67,25 +68,37 @@ export async function openBilibiliSearch(
 }
 
 /**
- * 音乐平台打开 HTTPS 搜索结果页（v1.7.0 起）。
- * 各客户端的搜索深链路由未公开：canOpenURL 只能验证 scheme 注册，
- * 打开后常落在应用首页而不带关键词。改为直接打开带关键词的
- * HTTPS 搜索页，保证用户看到的就是候选结果列表。
+ * 音乐平台搜索跳转（v1.7.x 起应用优先、可关）。
+ * 先逐个尝试客户端搜索深链候选（社区已知路由，无官方文档），
+ * 全部失败自动回退带关键词的 HTTPS 搜索结果页；回退永不阻塞。
  */
 export async function openMusicPlatformSearch(
   platform: MusicPlatform,
   title: string,
   artist?: string,
+  options?: { appSearchFirst?: boolean },
 ): Promise<ExternalOpenResult> {
+  if (options?.appSearchFirst !== false) {
+    for (const candidate of getMusicPlatformAppUrls(platform, title, artist)) {
+      if (await tryLinkingApp({ url: candidate, packageName: ANDROID_PACKAGES[platform] })) return 'app';
+      if (await tryAndroidIntent({ url: candidate, packageName: ANDROID_PACKAGES[platform] })) return 'app';
+    }
+  }
   await Linking.openURL(getMusicPlatformSearchUrl(platform, title, artist));
   return 'web';
 }
 
-/** 用户主动保存的单条 B 站视频：优先客户端内打开，失败回退网页。 */
+/** 用户主动保存的单条 B 站视频：优先客户端内打开，失败回退网页。
+ * b23.tv 短链会先解析成最终地址（结果缓存），再尝试 bilibili://video 深链。 */
 export async function openBilibiliVideo(url: string): Promise<void> {
-  const appUrl = getBilibiliVideoAppUrl(url);
+  let target = url;
+  if (isBilibiliShortLink(url)) {
+    const resolved = await resolveAndCacheVideoUrl(url);
+    if (resolved) target = resolved;
+  }
+  const appUrl = getDirectVideoAppUrl(target);
   if (appUrl && await tryLinkingApp({ url: appUrl, packageName: ANDROID_PACKAGES.bilibili })) return;
-  if (await tryAndroidIntent({ url, packageName: ANDROID_PACKAGES.bilibili })) return;
+  if (await tryAndroidIntent({ url: target, packageName: ANDROID_PACKAGES.bilibili })) return;
   await Linking.openURL(url);
 }
 

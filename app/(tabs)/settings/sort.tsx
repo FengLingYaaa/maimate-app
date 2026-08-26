@@ -1,9 +1,9 @@
-import React from 'react';
+﻿import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { Colors, DifficultyColorMap, DifficultyLabels } from '../../src/constants';
-import { SORT_OPTIONS } from '../../src/data/settings-options';
-import { useSettingsStore } from '../../src/store';
+import { Colors, DifficultyColorMap, DifficultyLabels } from '../../../src/constants';
+import { SORT_OPTIONS } from '../../../src/data/settings-options';
+import { useSettingsStore } from '../../../src/store';
 
 export default function SortSettings() {
   const router = useRouter();

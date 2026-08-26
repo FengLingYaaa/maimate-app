@@ -1,10 +1,12 @@
-/**
+﻿/**
  * MaiMate Root Layout
- * Expo Router Tabs: 曲库 | 抽歌 | 牌子 | 计划 | 运势 | 设置
+ * 根 Stack：(tabs) 主框架 + song 歌曲详情。
+ * 详情页压在 Tabs 之上，返回时自然回到进入前的 Tab
+ * （修复此前从详情返回总是落在推分计划的问题）。
  */
 
 import React, { useEffect } from 'react';
-import { Tabs } from 'expo-router';
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -29,80 +31,28 @@ export default function RootLayout() {
 
   if (loading) {
     return (
-      <View style={styles.loading}>
+      <GestureHandlerRootView style={styles.root}>
         <StatusBar style="light" />
-        <Text style={styles.loadingText}>🎵 正在加载曲库...</Text>
-        <Text style={styles.loadingSub}>数据来源: Diving-Fish 舞萌DX查分器</Text>
-      </View>
+        <View style={styles.loading}>
+          <Text style={styles.loadingText}>🎵 正在加载曲库...</Text>
+          <Text style={styles.loadingSub}>数据来源: Diving-Fish 舞萌DX查分器</Text>
+        </View>
+      </GestureHandlerRootView>
     );
   }
 
   return (
     <GestureHandlerRootView style={styles.root}>
       <StatusBar style="light" />
-      <Tabs
+      <Stack
         screenOptions={{
           headerShown: false,
-          tabBarStyle: {
-            backgroundColor: Colors.bg.secondary,
-            borderTopColor: Colors.border.light,
-            borderTopWidth: 1,
-            height: 60,
-            paddingBottom: 8,
-            paddingTop: 4,
-          },
-          tabBarActiveTintColor: Colors.accent.primary,
-          tabBarInactiveTintColor: Colors.text.muted,
-          tabBarLabelStyle: {
-            fontSize: 11,
-            fontWeight: '600',
-          },
+          contentStyle: { backgroundColor: Colors.bg.primary },
         }}
       >
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: '曲库',
-            tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🎵</Text>,
-          }}
-        />
-        <Tabs.Screen
-          name="random"
-          options={{
-            title: '抽歌',
-            tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🎲</Text>,
-          }}
-        />
-        <Tabs.Screen
-          name="plates"
-          options={{
-            title: '牌子',
-            tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🏅</Text>,
-          }}
-        />
-        <Tabs.Screen
-          name="plan"
-          options={{
-            title: '推分计划',
-            tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📋</Text>,
-          }}
-        />
-        <Tabs.Screen
-          name="fortune"
-          options={{
-            title: '今日运势',
-            tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🔮</Text>,
-          }}
-        />
-        <Tabs.Screen
-          name="settings"
-          options={{
-            title: '设置',
-            tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>⚙️</Text>,
-          }}
-        />
-        <Tabs.Screen name="song" options={{ href: null }} />
-      </Tabs>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="song" />
+      </Stack>
     </GestureHandlerRootView>
   );
 }

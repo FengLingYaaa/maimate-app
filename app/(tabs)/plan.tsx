@@ -5,14 +5,14 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import DraggableFlatList, { ScaleDecorator, type RenderItemParams } from 'react-native-draggable-flatlist';
 import { Swipeable } from 'react-native-gesture-handler';
-import { FilterBar, PlanEntryCard } from '../src/components';
-import { Colors, DifficultyColorMap, DifficultyLabels } from '../src/constants';
-import { getChinaVersionOptions, getVersionOptions } from '../src/data/version-catalog';
-import { getMusicSearchScore, getOfficialChartConstant, matchesMusic } from '../src/data/music-list';
-import { applyDragWithPinGroups, canDragPlanRows, reorderVisibleEntries } from '../src/data/plan-order';
-import type { FilterOptions, MusicData, PlanEntry, PlayerScore, SortOptions } from '../src/data/types';
-import { useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '../src/store';
-import { planEntryKey } from '../src/store/plan-store';
+import { FilterBar, PlanEntryCard } from '../../src/components';
+import { Colors, DifficultyColorMap, DifficultyLabels } from '../../src/constants';
+import { getChinaVersionOptions, getVersionOptions } from '../../src/data/version-catalog';
+import { getMusicSearchScore, getOfficialChartConstant, matchesMusic } from '../../src/data/music-list';
+import { applyDragWithPinGroups, canDragPlanRows, reorderVisibleEntries } from '../../src/data/plan-order';
+import type { FilterOptions, MusicData, PlanEntry, PlayerScore, SortOptions } from '../../src/data/types';
+import { useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '../../src/store';
+import { planEntryKey } from '../../src/store/plan-store';
 
 type PlanRow = { music: MusicData; entry: PlanEntry };
 
@@ -76,6 +76,9 @@ export default function PushPlan() {
   const [filters, setFilters] = useState<FilterOptions>({});
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [graveyardVisible, setGraveyardVisible] = useState(false);
+  // 每次拖拽提交后自增：强制 DraggableFlatList 重建内部顺序缓存，
+  // 修复「拖完 A 后立刻长按 B 却调整了 A 的位置」的串位问题。
+  const [dragEpoch, setDragEpoch] = useState(0);
 
   const plannedRows = useMemo(() => entries
     .map(entry => {
@@ -122,6 +125,11 @@ export default function PushPlan() {
 
   const handleDragEnd = useCallback((data: PlanRow[]) => {
     if (!manualOrderView || data.length === 0) return;
+    // 键一致性校验：拖拽结果与 store 现有条目必须一一对应且无重复，
+    // 不一致时丢弃本次结果，防止错乱写入持久层。
+    const storeKeys = new Set(entries.map(planEntryKey));
+    const dataKeys = data.map(rowKey);
+    if (new Set(dataKeys).size !== dataKeys.length || !dataKeys.every(key => storeKeys.has(key))) return;
     // 置顶/置底条目只与同组交换位置：跨组拖拽会被收敛回各自分组块。
     const legalOrder = applyDragWithPinGroups(data.map(row => row.entry));
     const visibleKeys = new Set(data.map(rowKey));
@@ -131,6 +139,7 @@ export default function PushPlan() {
       return music && visibleKeys.has(`${music.type}:${music.id}:${entry.difficultyIndex}`) ? index : -1;
     }).filter(index => index >= 0);
     reorder(reorderVisibleEntries(orderedEntries, visibleIndices, legalOrder));
+    setDragEpoch(epoch => epoch + 1);
   }, [entries, manualOrderView, rawData, reorder]);
 
   const graveyardRows = useMemo(() => graveyard.map(item => ({
@@ -172,6 +181,7 @@ export default function PushPlan() {
         <View style={styles.empty}><Text style={styles.emptyText}>没有匹配的计划条目</Text><Pressable onPress={() => setFilters({})}><Text style={styles.clearLink}>清除筛选</Text></Pressable></View>
       ) : (
         <DraggableFlatList
+          key={`plan-drag-${dragEpoch}`}
           data={filteredRows}
           keyExtractor={rowKey}
           onDragEnd={({ data }) => handleDragEnd(data)}

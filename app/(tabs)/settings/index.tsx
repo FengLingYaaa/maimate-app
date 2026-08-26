@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Colors } from '../../src/constants';
-import { useScoreStore, useSettingsStore } from '../../src/store';
-import { MUSIC_PLATFORM_OPTIONS, getSortLabel } from '../../src/data/settings-options';
+import { Colors } from '../../../src/constants';
+import { useScoreStore, useSettingsStore } from '../../../src/store';
+import { MUSIC_PLATFORM_OPTIONS, getSortLabel } from '../../../src/data/settings-options';
 
 export default function SettingsPage() {
   const router = useRouter();

@@ -534,6 +534,18 @@ floor(ds × min(achievement, 100.5) / 100 × coefficient)
 
 新方案不包含“人工审核视频后填充正式目录”这一步。本轮代码已实现上述交互；仍需通过 GitHub Actions 云构建、真实 Android 验收和个人站部署后才能称为本版本发布完成。
 
+### A1.5：用户第二轮修订（代码已完成，等待真机验收）
+
+2026-08-26 提出、当日完成实现；尚未云构建与发版：
+
+1. **B 站深链**：b23.tv 短链在打开时自动解析成最终视频地址（结果会话内缓存），再拉起 `bilibili://video` 深链；视频 ID 提取扩展覆盖 mobile 主站、`?bvid=`/`?avid=` 参数形态；面板新增可折叠「深链诊断」区，逐条显示跳转策略并支持试开；
+2. **音乐平台应用优先（默认开启）**：恢复逐个尝试客户端搜索深链候选（社区路由，无官方文档），全部失败自动回退 HTTPS 搜索页；设置 → 默认音乐平台页提供「优先打开应用（实验）」开关与候选深链列表；
+3. **牌子查询筛选无字**：三行筛选 chips 从横向 ScrollView 改为 flexWrap 换行容器，外层容器以 focusTick 作 key 整树重挂载，规避嵌套 Stack 首帧测量异常；
+4. **推分计划拖拽串位**：每次拖拽提交后自增 dragEpoch 强制 DraggableFlatList 重建内部顺序缓存，并在应用结果前校验拖拽键与 store 条目一一对应；
+5. **详情页返回来源**：路由重构为根 Stack（`(tabs)` 分组 + `song` 兄弟路由），详情页压在 Tabs 之上，返回自然回到进入前的 Tab；
+6. **完成率损失试算（新功能）**：详情页 Rating 板块下方新增折叠卡片，按谱面 Note 分布计算单音符各判定损失的达成率百分点与等效 Great·Tap 数（两种口径按钮切换）；计分口径见 `src/data/achievement-loss.ts` 头注释（基础分单位权重 Tap1/Hold2/Slide3/Break5，Break 内部档位 G-2000/1500/1250 等效 5/10/12.5 个 Tap·Great、Good=15、Miss=25，奖励分池每 Break 平分 1 点、份额 CP100%/P-2550 75%/P-2500 50%/Great 统一 40%/Good 30%/Miss 0%，理论满分 101%）。
+
+
 ### A2：第三阶段只读审查
 
 审查以下文件的 TypeScript、Expo SDK 57、运行时、权限和范围边界：
@@ -855,3 +867,10 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - Release 资产：`MaiMate-latest.apk` 大小 `62,073,150` bytes，SHA-256 `5040f9dea6776439283fa738fce5607ce99439d3022ba89fd52c2d00072f3175`。
 - 下载站部署：确认 maimate.flya.ccwu.cc 为 Cloudflare Pages 直传项目 `maimate-landing`（非 Workers 脚本；账户 Worker 列表无 maimate 路由）。本会话以 wrangler 重新部署 `.landing-deploy/`（新版 index.html 文案与更新日志 + `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`，发布新版无需再改 Worker）。部署结果：部署成功（deployment preview `3ebea0c6.maimate-landing.pages.dev`）；线上校验通过——落地页 200 且含 v1.7.0 文案与新 SHA，`HEAD /MaiMate-latest.apk` 返回 200 / content-length `62,073,150`，与 Release 资产逐字节一致。
 - 下一步：真机验收 §3.3 清单；观察 `releases/latest/download` 302 代理在 Cloudflare 边缘的稳定性。
+
+### 2026-08-26 — 用户第二轮修订：B 站短链深链、音乐平台应用优先、路由重构与完成率损失试算
+
+- 用户目标（6 项）：① B 站短链/长链都要能跳进 bilibili 应用（此前点击正确打开网页但深链失效）；② 音乐平台直跳应用默认开启并留回退，用户自行真机测试；③ 牌子查询版本选择初始仍无字（上一轮 focusTick 方案无效）；④ 推分计划调整一首后长按另一首会串位到上一首的位置；⑤ 详情页返回应回到进入时的界面而非固定落在推分计划；⑥ 新功能「完成率损失试算」，口径经多轮人工核对后确认。
+- 路由重构（修 ⑤ 的根因方案）：`app/_layout.tsx` 改为根 Stack（`(tabs)` 分组 + `song` 兄弟 Stack），六个 Tab 屏移入 `app/(tabs)/`（index/random/plan/fortune/plates/settings），相对导入整体加深一层；`song/[id]` 压在 Tabs 之上，返回自然回到进入前 Tab；`scripts/route-check.mjs` 断言重写以匹配新树。
+- 其余实现：`src/data/bilibili-search.ts`（新增 `isBilibiliShortLink`/`extractBilibiliVideoId` 扩展形态/`resolveBilibiliShortLink` 跟随 302）；`src/data/bilibili-resolve.ts` 新建（解析结果会话内存缓存，不依赖 react-native 可被回归脚本直测）；`src/data/music-platforms.ts` 恢复候选深链表；`src/data/external-links.ts`（`openMusicPlatformSearch` 应用优先可关、`openBilibiliVideo` 短链先解析再深链）；`AppSettings.musicAppSearchFirst` 默认 true；设置页加实验开关与候选列表；牌子页 chips 改 flexWrap + 整树 key 重挂载；计划页 dragEpoch 重建 DraggableFlatList 内部缓存 + 键一致性校验；`src/data/achievement-loss.ts` 新建纯计算模块（口径见 §8 A1.5 第 6 条）；`src/components/AchievementLossCard.tsx` 新建双口径表格卡片插入详情页 Rating 与 Bilibili 板块之间。
+- 验证证据：本地全绿——`tsc --noEmit` 通过；feature-check 通过（新增扩展 ID 形态提取、短链判定、达成率损失矩阵断言：717/115/166/87 示例谱面 totalUnits=1880、单音符 Tap·Great=0.010638%、Break 合计 Good=0.1676%、全谱 Miss 合计=101.0000 理论上限、无 Break 谱面 breakRows=null）；route-check 通过（新 `(tabs)` 树）。本轮尚未触发云构建与发版。

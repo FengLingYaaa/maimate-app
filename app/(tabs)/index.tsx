@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 曲库首页 — 歌曲浏览器
  * 支持筛选、搜索、列表展示
  */
@@ -6,12 +6,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, Pressable, Linking } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useMusicStore, useSettingsStore } from '../src/store';
-import { SongCard, FilterBar, TitleRecognizer } from '../src/components';
-import { Colors } from '../src/constants';
-import { getMatchingDifficultyIndices, MusicList } from '../src/data/music-list';
-import { getChinaVersionOptions, getVersionOptions } from '../src/data/version-catalog';
-import type { FilterOptions, MusicData } from '../src/data/types';
+import { useMusicStore, useSettingsStore } from '../../src/store';
+import { SongCard, FilterBar, TitleRecognizer } from '../../src/components';
+import { Colors } from '../../src/constants';
+import { getMatchingDifficultyIndices, MusicList } from '../../src/data/music-list';
+import { getChinaVersionOptions, getVersionOptions } from '../../src/data/version-catalog';
+import type { FilterOptions, MusicData } from '../../src/data/types';
 
 function formatCacheTime(timestamp: number | null): string {
   if (!timestamp) return '尚未同步';

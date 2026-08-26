@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
-import { Colors, DifficultyColorMap, DifficultyLabels, DifficultyShortLabels } from '../../src/constants';
-import { useMusicStore, usePlanStore, useScoreStore } from '../../src/store';
+import { Colors, DifficultyColorMap, DifficultyLabels, DifficultyShortLabels } from '../../../src/constants';
+import { useMusicStore, usePlanStore, useScoreStore } from '../../../src/store';
 import {
   buildPlateEntries,
   filterPlateEntries,
@@ -13,7 +13,7 @@ import {
   summarizePlates,
   summarizePlatesByDifficulty,
   type PlateBit,
-} from '../../src/data/plates';
+} from '../../../src/data/plates';
 
 const PLATE_LABELS: Array<{ name: PlateBit; label: string; color: string }> = [
   { name: 'FC', label: 'FC', color: Colors.functional.success },
@@ -98,21 +98,23 @@ export default function PlatesPage() {
   };
 
   return (
-    <View style={styles.container}>
+    // 整树 key 重挂载：切回本页时强制全新子树，彻底规避嵌套 Stack
+    // 首帧测量异常（配合 chips 换行容器修复初始无字问题）。
+    <View key={`plates-root-${focusTick}`} style={styles.container}>
       <Stack.Screen options={{ title: '牌子查询', headerStyle: { backgroundColor: Colors.bg.primary }, headerTintColor: Colors.text.primary }} />
       <View style={styles.header}>
         <Text style={styles.title}>🏅 本地牌子查询</Text>
         <Text style={styles.subtitle}>根据本机已导入成绩计算，不会上传成绩，也不是逐局游玩历史。</Text>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+      <View style={styles.chips}>
         {legacyVersions.map(option => <FilterChip key={option} label={option === '全部' ? '全部版本' : option} active={version === option} onPress={() => setVersion(option)} />)}
-      </ScrollView>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+      </View>
+      <View style={styles.chips}>
         <FilterChip label="全部国区" active={!chinaVersion} onPress={() => setChinaVersion(undefined)} />
         {chinaOptions.map(option => <FilterChip key={option} label={option} active={chinaVersion === option} onPress={() => setChinaVersion(option)} />)}
-      </ScrollView>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+      </View>
+      <View style={styles.chips}>
         <FilterChip label="全部难度" active={difficultyIndex === undefined} onPress={() => setDifficultyIndex(undefined)} />
         {DifficultyLabels.map((label, index) => (
           <FilterChip
@@ -123,7 +125,7 @@ export default function PlatesPage() {
             color={DifficultyColorMap[index]}
           />
         ))}
-      </ScrollView>
+      </View>
 
       <View style={styles.summaryCard}>
         <View style={[styles.summaryRow, styles.totalRow]}>
@@ -232,7 +234,13 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8, gap: 4 },
   title: { fontSize: 23, fontWeight: '800', color: Colors.text.primary },
   subtitle: { fontSize: 11, lineHeight: 16, color: Colors.text.muted },
-  chips: { gap: 7, paddingHorizontal: 12, paddingVertical: 5 },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
   chip: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 9, borderWidth: 1, borderColor: Colors.border.light, backgroundColor: Colors.bg.secondary },
   chipText: { fontSize: 10, color: Colors.text.secondary, fontWeight: '700' },
   summaryCard: { marginHorizontal: 12, marginVertical: 8, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12, backgroundColor: Colors.bg.secondary, borderWidth: 1, borderColor: Colors.border.light, gap: 6 },

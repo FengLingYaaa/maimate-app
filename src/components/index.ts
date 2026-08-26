@@ -9,3 +9,4 @@ export { DrumRoll } from './DrumRoll';
 export { BilibiliSearchPanel } from './BilibiliSearchPanel';
 export { TitleRecognizer } from './TitleRecognizer';
 export { PlanEntryCard } from './PlanEntryCard';
+export { AchievementLossCard } from './AchievementLossCard';

@@ -1,16 +1,16 @@
-/**
+﻿/**
  * 随机抽歌页 — 推分计划、全曲库和按条件抽选。
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useMusicStore, usePlanStore } from '../src/store';
-import { DrumRoll, RangeSlider } from '../src/components';
-import { Colors, DifficultyColorMap, DifficultyLabels, MusicTypes } from '../src/constants';
-import { getMatchingDifficultyIndices, MusicList } from '../src/data/music-list';
-import { getVersionOptions } from '../src/data/version-catalog';
-import type { DrawCandidate, FilterOptions } from '../src/data/types';
+import { useMusicStore, usePlanStore } from '../../src/store';
+import { DrumRoll, RangeSlider } from '../../src/components';
+import { Colors, DifficultyColorMap, DifficultyLabels, MusicTypes } from '../../src/constants';
+import { getMatchingDifficultyIndices, MusicList } from '../../src/data/music-list';
+import { getVersionOptions } from '../../src/data/version-catalog';
+import type { DrawCandidate, FilterOptions } from '../../src/data/types';
 
 type DrawMode = 'plan' | 'any' | 'filtered';
 

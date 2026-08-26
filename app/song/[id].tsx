@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '../../src/store';
-import { BilibiliSearchPanel, CoverImage, DifficultyBadge, NoteBar, RatingPanel } from '../../src/components';
+import { BilibiliSearchPanel, CoverImage, DifficultyBadge, NoteBar, RatingPanel, AchievementLossCard } from '../../src/components';
 import { Colors } from '../../src/constants';
 import { DifficultyLabels, getChinaVersionName } from '../../src/constants/game';
 import { getOfficialChartConstant, getTotalNotes } from '../../src/data/music-list';
@@ -151,7 +151,7 @@ export default function SongDetail() {
 
   const openMusicPlatform = async (platform: MusicPlatform) => {
     try {
-      const result = await openMusicPlatformSearch(platform, music.title, music.basic_info.artist);
+      const result = await openMusicPlatformSearch(platform, music.title, music.basic_info.artist, { appSearchFirst: settings.musicAppSearchFirst });
       showToast(result === 'app' ? `已打开${MUSIC_PLATFORM_LABELS[platform]}应用` : `已打开${MUSIC_PLATFORM_LABELS[platform]}网页`);
     } catch {
       showToast('无法打开音乐平台');
@@ -296,6 +296,7 @@ export default function SongDetail() {
                 ) : (
                   <Text style={styles.importedScoreEmpty}>尚未导入该难度成绩</Text>
                 )}
+                {chart && <AchievementLossCard notes={chart.notes} />}
                 <BilibiliSearchPanel
                   songId={music.id}
                    songTitle={music.title}

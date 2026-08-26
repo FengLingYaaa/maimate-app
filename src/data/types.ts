@@ -192,6 +192,8 @@ export interface AppSettings {
   defaultSort: SortOptions;
   showProjectedRating: boolean;
   defaultMusicPlatform: MusicPlatform;
+  /** 音乐平台搜索优先尝试客户端深链（失败自动回退 HTTPS）；v1.7.x 默认开启。 */
+  musicAppSearchFirst: boolean;
 }
 
 /** 推分计划 */

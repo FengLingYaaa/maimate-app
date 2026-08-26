@@ -31,17 +31,27 @@ const tree = getExactRoutes(context, {
 
 assert.ok(tree, 'Expo Router route tree should be generated');
 const rootRoutes = new Map(tree.children.map(route => [route.route, route]));
-assert.equal(rootRoutes.get('settings')?.type, 'layout', 'settings must be a nested layout route');
-assert.equal(rootRoutes.get('song')?.type, 'layout', 'song must be a nested layout route');
-assert.equal(rootRoutes.get('plates')?.type, 'layout', 'plates must be a nested layout route');
+assert.equal(rootRoutes.get('(tabs)')?.type, 'layout', '(tabs) must be the root tab group layout');
+assert.equal(rootRoutes.get('song')?.type, 'layout', 'song must be a root-level Stack sibling of (tabs)');
+const tabsChildren = new Map(rootRoutes.get('(tabs)')?.children.map(route => [route.route, route]));
+for (const name of ['index', 'random', 'plan', 'fortune']) {
+  assert.equal(tabsChildren.get(name)?.type, 'route', `${name} must live inside (tabs) as a leaf screen`);
+}
+for (const name of ['plates', 'settings']) {
+  assert.equal(tabsChildren.get(name)?.type, 'layout', `${name} must live inside (tabs) as a nested Stack`);
+}
+assert.equal(rootRoutes.has('index'), false, 'tab screens must not leak to root');
+assert.equal(rootRoutes.has('plan'), false, 'tab screens must not leak to root');
 assert.equal(rootRoutes.has('settings/music-platform'), false, 'settings child must not be a root route');
 assert.equal(rootRoutes.has('settings/sort'), false, 'settings child must not be a root route');
 assert.equal(rootRoutes.has('song/[id]'), false, 'song detail must not be a root route');
+const settingsNode = tabsChildren.get('settings');
 assert.deepEqual(
-  rootRoutes.get('settings')?.children.map(route => route.route).sort(),
+  settingsNode?.children.map(route => route.route).sort(),
   ['index', 'music-platform', 'sort'],
 );
 assert.deepEqual(rootRoutes.get('song')?.children.map(route => route.route), ['[id]']);
-assert.deepEqual(rootRoutes.get('plates')?.children.map(route => route.route), ['index']);
+const platesNode = tabsChildren.get('plates');
+assert.deepEqual(platesNode?.children.map(route => route.route), ['index']);
 
-console.log('Route checks passed (settings, song, and plates routes use nested Stack layouts)');
+console.log('Route checks passed ((tabs) group + root-level song detail with nested Stack layouts)');

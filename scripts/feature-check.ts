@@ -17,6 +17,8 @@ import {
 } from '../src/data/plates.ts';
 import { applyDragWithPinGroups, canDragPlanRows, compareByPinThenOrder, pinGroupOf, reorderVisibleEntries } from '../src/data/plan-order.ts';
 import { getBilibiliVideoAppUrl } from '../src/data/bilibili-search.ts';
+import { extractBilibiliVideoId, isBilibiliShortLink } from '../src/data/bilibili-search.ts';
+import { computeAchievementLoss, JUDGMENT_KEYS } from '../src/data/achievement-loss.ts';
 import { generateFortune } from '../src/data/fortune.ts';
 import { matchesMusic } from '../src/data/music-list.ts';
 import {
@@ -119,6 +121,36 @@ assert.deepEqual(legal.map(entry => entry.order), [1, 0, 2, 3]);
 assert.equal(getBilibiliVideoAppUrl('https://www.bilibili.com/video/BV1xx411c7mD?p=1'), 'bilibili://video/BV1xx411c7mD');
 assert.equal(getBilibiliVideoAppUrl('https://www.bilibili.com/video/av170001'), 'bilibili://video/av170001');
 assert.equal(getBilibiliVideoAppUrl('https://b23.tv/TdQjEN6'), null);
+
+// v1.7.x：扩展的视频 ID 形态提取。
+assert.equal(extractBilibiliVideoId('https://mobile.bilibili.com/video/BV1xx411c7mD'), 'BV1xx411c7mD');
+assert.equal(extractBilibiliVideoId('https://www.bilibili.com/video/av170001?p=2'), 'av170001');
+assert.equal(extractBilibiliVideoId('https://www.bilibili.com/video?bvid=BV1xx411c7mD'), 'BV1xx411c7mD');
+assert.equal(extractBilibiliVideoId('https://www.bilibili.com/video?avid=170001'), 'av170001');
+assert.equal(isBilibiliShortLink('https://b23.tv/abc'), true);
+assert.equal(isBilibiliShortLink('https://www.bilibili.com/video/BV1xx411c7mD'), false);
+
+// v1.7.x：达成率损失试算（口径经人工逐项核对）。
+const loss = computeAchievementLoss({ tap: 717, hold: 115, slide: 166, breaks: 87 });
+assert.equal(loss.totalUnits, 1880);
+assert.deepEqual(JUDGMENT_KEYS.length, 8);
+const near = (value: number, expected: number) => assert.ok(Math.abs(value - expected) < 5e-4, `${value} ~ ${expected}`);
+near(loss.regularRows[0].losses.miss.percent, 38.1383);
+near(loss.regularRows[0].losses.g2000.eqTapGreat, 717);
+near(loss.regularRows[1].losses.good.percent, 6.1170);
+near(loss.regularRows[2].losses.miss.percent, 26.4894);
+// 单音符口径（与 UI 两张表一致）：
+near(loss.breakRows!.base.g1500.percent, 10 * loss.tapGreatUnit);
+near(loss.breakRows!.base.good.percent, 15 * loss.tapGreatUnit);
+near(loss.breakRows!.bonus.p2550.percent, 0.25 / 87);
+near(loss.breakRows!.total.g2000.percent, 5 * loss.tapGreatUnit + 0.6 / 87);
+near(loss.breakRows!.total.good.percent, 15 * loss.tapGreatUnit + 0.7 / 87);
+near(loss.breakRows!.total.miss.eqTapGreat, 25 + 94 / 87);
+near(loss.totalsIfAllSame.miss.percent, 101.0);
+near(loss.totalsIfAllSame.g2000.percent, 20.6);
+const noBreak = computeAchievementLoss({ tap: 10, hold: 2, slide: 1, breaks: 0 });
+assert.equal(noBreak.breakRows, null);
+near(noBreak.unitValue, 100 / 17);
 
 // v1.7.0：今日运势不再推荐宴会場谱面。
 const banquetRaw = [...rawData, makeMusic('9', 'maimai でらっくす BUDDiES', 'DX', '宴会場')];

@@ -8,6 +8,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultSort: { mode: 'relevance', difficultyIndex: 3 },
   showProjectedRating: true,
   defaultMusicPlatform: 'netease',
+  musicAppSearchFirst: true,
 };
 
 interface SettingsStore {

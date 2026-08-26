@@ -1,12 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useMusicStore } from '../src/store';
-import { CoverImage } from '../src/components';
-import { Colors, DifficultyLabels, getChinaVersionName } from '../src/constants';
-import { generateFortune, getChinaDateKey, getFortuneSeed, type FortuneResult } from '../src/data/fortune';
-import { getOfficialChartConstant } from '../src/data/music-list';
-import type { MusicData } from '../src/data/types';
+import { useMusicStore } from '../../src/store';
+import { CoverImage } from '../../src/components';
+import { Colors, DifficultyLabels, getChinaVersionName } from '../../src/constants';
+import { generateFortune, getChinaDateKey, getFortuneSeed, type FortuneResult } from '../../src/data/fortune';
+import { getOfficialChartConstant } from '../../src/data/music-list';
+import type { MusicData } from '../../src/data/types';
 
 export default function FortunePage() {
   const router = useRouter();
