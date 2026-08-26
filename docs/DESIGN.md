@@ -96,16 +96,16 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | `0ca36fd`（chore: 同步 Expo SDK 57 补丁版本以通过 expo-doctor 门禁；前一提交 `818b57a` 为 v1.7.0 功能主体） |
-| 当前标签 | `v1.7.0`（指向 `0ca36fd`，曾短暂指向 `818b57a` 后因 doctor 门禁失败重打；v1.6.0–v1.6.10 也均已发布） |
+| 当前提交 | `ef2344d`（docs: landing v1.8.0 SHA 回填；前一提交 `ed2632f` 为版本号与落地页日志，`704f7ab` 为 v1.8.0 功能主体） |
+| 当前标签 | `v1.8.0`（指向 `704f7ab`；v1.7.0 及更早标签均已发布） |
 | Android applicationId | `cc.flya.maimate` |
-| App 版本 | `1.7.0`（Android versionCode `15`） |
+| App 版本 | `1.8.0`（Android versionCode `16`） |
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
-| 最新 Release APK SHA-256（v1.7.0） | `5040f9dea6776439283fa738fce5607ce99439d3022ba89fd52c2d00072f3175` |
-| 最新 Release APK 大小 | `62,073,150` bytes（约 59.2 MiB） |
-| 下载站同步状态 | ✅ 2026-08-26 本会话已用 wrangler 重新部署 Pages 项目 `maimate-landing` 到 v1.7.0 内容；线上 HEAD `/MaiMate-latest.apk` content-length `62,073,150` 与 Release 资产一致 |
+| 最新 Release APK SHA-256（v1.8.0） | `ff98747946007b50343f535e35f336add042d3abeccb698d47a5e1cb8d3f7238`（CI 构建机 sha256sum 输出） |
+| 最新 Release APK 大小 | `62,090,006` bytes（约 59.2 MiB） |
+| 下载站同步状态 | ✅ 2026-08-26 本会话已用 wrangler 部署 Pages 项目 `maimate-landing` 到 v1.8.0 内容（deployment preview `d9c7f496.maimate-landing.pages.dev`）；线上页面含 v1.8.0 文案与新 SHA，HEAD `/MaiMate-latest.apk` content-length `62,090,006` 与 Release 资产一致 |
 | APK 构建方式 | GitHub Actions 云构建：先跑 lint/route/feature/phase/rating 回归、Expo Doctor 和 Android export 门禁，再出 arm64-v8a debug keystore 内测包 |
 
 当前 App Git 仓库在第三阶段提交之后应保持干净；设计文档本身位于仓库外的工作区镜像和 App 仓库内的文档副本中，更新文档会让 App 仓库产生文档变更，这是预期行为。
@@ -874,3 +874,4 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 路由重构（修 ⑤ 的根因方案）：`app/_layout.tsx` 改为根 Stack（`(tabs)` 分组 + `song` 兄弟 Stack），六个 Tab 屏移入 `app/(tabs)/`（index/random/plan/fortune/plates/settings），相对导入整体加深一层；`song/[id]` 压在 Tabs 之上，返回自然回到进入前 Tab；`scripts/route-check.mjs` 断言重写以匹配新树。
 - 其余实现：`src/data/bilibili-search.ts`（新增 `isBilibiliShortLink`/`extractBilibiliVideoId` 扩展形态/`resolveBilibiliShortLink` 跟随 302）；`src/data/bilibili-resolve.ts` 新建（解析结果会话内存缓存，不依赖 react-native 可被回归脚本直测）；`src/data/music-platforms.ts` 恢复候选深链表；`src/data/external-links.ts`（`openMusicPlatformSearch` 应用优先可关、`openBilibiliVideo` 短链先解析再深链）；`AppSettings.musicAppSearchFirst` 默认 true；设置页加实验开关与候选列表；牌子页 chips 改 flexWrap + 整树 key 重挂载；计划页 dragEpoch 重建 DraggableFlatList 内部缓存 + 键一致性校验；`src/data/achievement-loss.ts` 新建纯计算模块（口径见 §8 A1.5 第 6 条）；`src/components/AchievementLossCard.tsx` 新建双口径表格卡片插入详情页 Rating 与 Bilibili 板块之间。
 - 验证证据：本地全绿——`tsc --noEmit` 通过；feature-check 通过（新增扩展 ID 形态提取、短链判定、达成率损失矩阵断言：717/115/166/87 示例谱面 totalUnits=1880、单音符 Tap·Great=0.010638%、Break 合计 Good=0.1676%、全谱 Miss 合计=101.0000 理论上限、无 Break 谱面 breakRows=null）；route-check 通过（新 `(tabs)` 树）。本轮尚未触发云构建与发版。
+- 发布补记（同日）：版本升至 `1.8.0`（versionCode `16`，提交 `ed2632f`）并打标 `v1.8.0` 触发云构建 run `32970206183`，一次通过。Release 资产 `MaiMate-latest.apk` 大小 `62,090,006` bytes，SHA-256 `ff98747946007b50343f535e35f336add042d3abeccb698d47a5e1cb8d3f7238`（取自 CI「Print APK checksum」步骤输出）。落地页更新 v1.8.0 文案、日志与新 SHA 后经 wrangler 重新部署 Pages（deployment `d9c7f496.maimate-landing.pages.dev`）；线上校验通过——落地页 200 且含新文案与 SHA，HEAD `/MaiMate-latest.apk` 返回 200 / content-length `62,090,006` 与资产一致。SHA 回填提交 `ef2344d`。等待用户真机验收 §8 A1.5 六项。
