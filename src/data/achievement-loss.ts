@@ -134,9 +134,10 @@ export function computeAchievementLoss(counts: AchievementNoteCounts): Achieveme
     label,
     count,
     unitsPerNote,
+    // 单音符口径：每个音符在该判定下的损失（不乘 count），与 Break 单音符合计对齐。
     losses: makeCells(key => ({
-      percent: round6(count * unitsPerNote * unitValue * (1 - BASE_RATIO[key])),
-      eqTapGreat: round6((count * unitsPerNote * (1 - BASE_RATIO[key])) / (1 - BASE_RATIO.g2000)),
+      percent: round6(unitsPerNote * unitValue * (1 - BASE_RATIO[key])),
+      eqTapGreat: round6((unitsPerNote * (1 - BASE_RATIO[key])) / (1 - BASE_RATIO.g2000)),
     })),
   }));
 

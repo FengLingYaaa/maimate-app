@@ -44,11 +44,12 @@ assert.equal(rootRoutes.has('index'), false, 'tab screens must not leak to root'
 assert.equal(rootRoutes.has('plan'), false, 'tab screens must not leak to root');
 assert.equal(rootRoutes.has('settings/music-platform'), false, 'settings child must not be a root route');
 assert.equal(rootRoutes.has('settings/sort'), false, 'settings child must not be a root route');
+assert.equal(rootRoutes.has('settings/detail-boards'), false, 'settings child must not be a root route');
 assert.equal(rootRoutes.has('song/[id]'), false, 'song detail must not be a root route');
 const settingsNode = tabsChildren.get('settings');
 assert.deepEqual(
   settingsNode?.children.map(route => route.route).sort(),
-  ['index', 'music-platform', 'sort'],
+  ['detail-boards', 'index', 'music-platform', 'sort'],
 );
 assert.deepEqual(rootRoutes.get('song')?.children.map(route => route.route), ['[id]']);
 const platesNode = tabsChildren.get('plates');

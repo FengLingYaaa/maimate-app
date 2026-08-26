@@ -3,7 +3,7 @@ import { Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'reac
 import { Colors, DifficultyColorMap, DifficultyLabels } from '../constants';
 import { BILIBILI_QUICK_TAGS, getBilibiliLinkChartKey, getChartKey, normalizeBilibiliVideoUrl, parseBilibiliShare } from '../data/bilibili-links';
 import { openBilibiliSearch, openBilibiliVideo } from '../data/external-links';
-import { getDirectVideoAppUrl } from '../data/bilibili-resolve';
+import { getDirectVideoAppUrls } from '../data/bilibili-resolve';
 import { isBilibiliShortLink } from '../data/bilibili-search';
 import { useBilibiliStore } from '../store';
 
@@ -12,12 +12,14 @@ interface Props {
   songTitle: string;
   musicType: 'SD' | 'DX';
   difficultyIndex: number;
+  defaultCollapsed?: boolean;
 }
 
-export function BilibiliSearchPanel({ songId, songTitle, musicType, difficultyIndex }: Props) {
+export function BilibiliSearchPanel({ songId, songTitle, musicType, difficultyIndex, defaultCollapsed = false }: Props) {
   const shouldShow = [2, 3, 4].includes(difficultyIndex);
   const difficultyLabel = DifficultyLabels[difficultyIndex];
   const difficultyColor = DifficultyColorMap[difficultyIndex];
+  const [expanded, setExpanded] = useState(!defaultCollapsed);
   const allLinks = useBilibiliStore(s => s.links);
   const addLink = useBilibiliStore(s => s.addLink);
   const updateLink = useBilibiliStore(s => s.updateLink);
@@ -39,9 +41,9 @@ export function BilibiliSearchPanel({ songId, songTitle, musicType, difficultyIn
 
   /** 深链诊断：描述每条已存视频当前的跳转策略。 */
   const describeDeepLink = (linkUrl: string): string => {
-    if (isBilibiliShortLink(linkUrl)) return 'b23.tv 短链：点击时自动解析成 BV 并拉起客户端（首次需联网，结果会缓存）';
-    const appUrl = getDirectVideoAppUrl(linkUrl);
-    if (appUrl) return `深链就绪：${appUrl}`;
+    if (isBilibiliShortLink(linkUrl)) return 'b23.tv 短链：点击时自动解析成 BV 并转 av 拉起客户端（首次需联网，结果会缓存）';
+    const appUrls = getDirectVideoAppUrls(linkUrl);
+    if (appUrls.length > 0) return `深链就绪：${appUrls.join(' ｜ ')}`;
     return '无法提取视频 ID：将以网页方式打开';
   };
 
@@ -108,10 +110,18 @@ export function BilibiliSearchPanel({ songId, songTitle, musicType, difficultyIn
 
   return (
     <View style={styles.container}>
-      <View style={styles.titleRow}>
-        <Text style={styles.title}>Bilibili 搜索</Text>
-        <Text style={[styles.difficulty, { color: difficultyColor }]}>{difficultyLabel}</Text>
-      </View>
+      <Pressable style={styles.titleRow} onPress={() => setExpanded(value => !value)}>
+        <View style={styles.headerText}>
+          <Text style={styles.title}>Bilibili 搜索</Text>
+          {!expanded && <Text style={styles.summary}>{links.length} 条已存视频</Text>}
+        </View>
+        <View style={styles.headerRight}>
+          <Text style={[styles.difficulty, { color: difficultyColor }]}>{difficultyLabel}</Text>
+          <Text style={styles.toggle}>{expanded ? '▲' : '▼'}</Text>
+        </View>
+      </Pressable>
+      {expanded && (
+        <>
       <Pressable style={({ pressed }) => [styles.searchButton, pressed && styles.searchButtonPressed]} onPress={() => void openBilibiliSearch(songTitle, difficultyLabel)}>
         <Text style={styles.searchButtonText}>去 Bilibili 搜索该谱面</Text>
       </Pressable>
@@ -157,6 +167,8 @@ export function BilibiliSearchPanel({ songId, songTitle, musicType, difficultyIn
             </View>
           ))}
         </>
+      )}
+      </>
       )}
 
       <Modal transparent visible={modalVisible} animationType="fade" onRequestClose={() => setModalVisible(false)}>
@@ -204,7 +216,11 @@ export function BilibiliSearchPanel({ songId, songTitle, musicType, difficultyIn
 const styles = StyleSheet.create({
   container: { marginTop: 10, padding: 12, borderRadius: 12, backgroundColor: Colors.bg.tertiary, gap: 8 },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerText: { flex: 1, gap: 3, paddingRight: 8 },
   title: { fontSize: 13, fontWeight: '800', color: Colors.text.primary },
+  summary: { fontSize: 11, color: Colors.text.muted },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  toggle: { fontSize: 11, color: Colors.text.muted, fontWeight: '700' },
   difficulty: { fontSize: 11, fontWeight: '800' },
   searchButton: { alignItems: 'center', paddingHorizontal: 10, paddingVertical: 10, borderRadius: 8, backgroundColor: `${Colors.accent.secondary}22`, borderWidth: 1, borderColor: Colors.accent.secondary },
   searchButtonPressed: { opacity: 0.72 },

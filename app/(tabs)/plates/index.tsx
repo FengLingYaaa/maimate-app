@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import { Colors, DifficultyColorMap, DifficultyLabels, DifficultyShortLabels } from '../../../src/constants';
 import { useMusicStore, usePlanStore, useScoreStore } from '../../../src/store';
@@ -36,6 +36,8 @@ export default function PlatesPage() {
   const [difficultyIndex, setDifficultyIndex] = useState<number | undefined>();
   const [lastBulkKeys, setLastBulkKeys] = useState<string[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  // 版本筛选默认收起：避免筛选区过高挤占曲目列表。
+  const [filtersCollapsed, setFiltersCollapsed] = useState(true);
   // 进入页面时强制刷新一次：修复嵌套 Stack 初次渲染偶发空白、
   // 点击筛选后才显示的问题。
   const [focusTick, setFocusTick] = useState(0);
@@ -107,39 +109,53 @@ export default function PlatesPage() {
         <Text style={styles.subtitle}>根据本机已导入成绩计算，不会上传成绩，也不是逐局游玩历史。</Text>
       </View>
 
-      <View style={styles.chips}>
-        {legacyVersions.map(option => <FilterChip key={option} label={option === '全部' ? '全部版本' : option} active={version === option} onPress={() => setVersion(option)} />)}
-      </View>
-      <View style={styles.chips}>
-        <FilterChip label="全部国区" active={!chinaVersion} onPress={() => setChinaVersion(undefined)} />
-        {chinaOptions.map(option => <FilterChip key={option} label={option} active={chinaVersion === option} onPress={() => setChinaVersion(option)} />)}
-      </View>
-      <View style={styles.chips}>
-        <FilterChip label="全部难度" active={difficultyIndex === undefined} onPress={() => setDifficultyIndex(undefined)} />
-        {DifficultyLabels.map((label, index) => (
-          <FilterChip
-            key={label}
-            label={label}
-            active={difficultyIndex === index}
-            onPress={() => setDifficultyIndex(index)}
-            color={DifficultyColorMap[index]}
-          />
-        ))}
-      </View>
+      <Pressable style={styles.filterToggle} onPress={() => setFiltersCollapsed(value => !value)}>
+        <Text style={styles.filterToggleText}>
+          {filtersCollapsed
+            ? `筛选：${version === '全部' ? '全部版本' : version} · ${chinaVersion || '全部国区'} · ${difficultyIndex === undefined ? '全部难度' : DifficultyLabels[difficultyIndex]}`
+            : '筛选（点击收起）'}
+        </Text>
+        <Text style={styles.filterToggleArrow}>{filtersCollapsed ? '▼' : '▲'}</Text>
+      </Pressable>
+      {!filtersCollapsed && (
+        <>
+          <View style={styles.chips}>
+            {legacyVersions.map(option => <FilterChip key={option} label={option === '全部' ? '全部版本' : option} active={version === option} onPress={() => setVersion(option)} />)}
+          </View>
+          <View style={styles.chips}>
+            <FilterChip label="全部国区" active={!chinaVersion} onPress={() => setChinaVersion(undefined)} />
+            {chinaOptions.map(option => <FilterChip key={option} label={option} active={chinaVersion === option} onPress={() => setChinaVersion(option)} />)}
+          </View>
+          <View style={styles.chips}>
+            <FilterChip label="全部难度" active={difficultyIndex === undefined} onPress={() => setDifficultyIndex(undefined)} />
+            {DifficultyLabels.map((label, index) => (
+              <FilterChip
+                key={label}
+                label={label}
+                active={difficultyIndex === index}
+                onPress={() => setDifficultyIndex(index)}
+                color={DifficultyColorMap[index]}
+              />
+            ))}
+          </View>
+        </>
+      )}
 
       <View style={styles.summaryCard}>
         <View style={[styles.summaryRow, styles.totalRow]}>
           <Text style={styles.totalLabel}>总计</Text>
           <View style={styles.summaryCells}>{PLATE_LABELS.map(item => <SummaryCell key={item.name} item={item} counts={total.counts} total={total.total} />)}</View>
         </View>
-        {byDifficulty.map(row => (
-          <View key={row.difficultyIndex} style={styles.summaryRow}>
-            <Text style={[styles.diffLabel, { color: DifficultyColorMap[row.difficultyIndex] }]}>
-              {DifficultyShortLabels[row.difficultyIndex] || `难度${row.difficultyIndex}`}
-            </Text>
-            <View style={styles.summaryCells}>{PLATE_LABELS.map(item => <SummaryCell key={item.name} item={item} counts={row.counts} total={row.total} />)}</View>
-          </View>
-        ))}
+        <ScrollView style={styles.summaryScroll} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+          {byDifficulty.map(row => (
+            <View key={row.difficultyIndex} style={styles.summaryRow}>
+              <Text style={[styles.diffLabel, { color: DifficultyColorMap[row.difficultyIndex] }]}>
+                {DifficultyShortLabels[row.difficultyIndex] || `难度${row.difficultyIndex}`}
+              </Text>
+              <View style={styles.summaryCells}>{PLATE_LABELS.map(item => <SummaryCell key={item.name} item={item} counts={row.counts} total={row.total} />)}</View>
+            </View>
+          ))}
+        </ScrollView>
       </View>
 
       {(eligible14Plus.length > 0 || lastBulkKeys.length > 0) && (
@@ -243,7 +259,11 @@ const styles = StyleSheet.create({
   },
   chip: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 9, borderWidth: 1, borderColor: Colors.border.light, backgroundColor: Colors.bg.secondary },
   chipText: { fontSize: 10, color: Colors.text.secondary, fontWeight: '700' },
+  filterToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 12, marginTop: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, backgroundColor: Colors.bg.secondary, borderWidth: 1, borderColor: Colors.border.light },
+  filterToggleText: { flex: 1, fontSize: 11, fontWeight: '700', color: Colors.text.secondary },
+  filterToggleArrow: { fontSize: 11, color: Colors.text.muted, fontWeight: '700' },
   summaryCard: { marginHorizontal: 12, marginVertical: 8, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12, backgroundColor: Colors.bg.secondary, borderWidth: 1, borderColor: Colors.border.light, gap: 6 },
+  summaryScroll: { maxHeight: 190 },
   summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   totalRow: { borderBottomWidth: 1, borderBottomColor: Colors.border.light, paddingBottom: 6, marginBottom: 2 },
   totalLabel: { fontSize: 12, fontWeight: '800', color: Colors.text.primary, width: 34 },

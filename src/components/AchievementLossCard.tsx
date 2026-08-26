@@ -12,12 +12,14 @@ import { computeAchievementLoss, type LossCell } from '../data/achievement-loss'
 interface Props {
   /** DF 谱面 notes 数组：DX=[TAP,HOLD,SLIDE,TOUCH,BREAK]，SD=[TAP,HOLD,SLIDE,BREAK]。 */
   notes: number[];
+  /** 打开详情页时的初始折叠状态（设置页可配置）。 */
+  defaultCollapsed?: boolean;
 }
 
 type Mode = 'percent' | 'eqTap';
 
-export function AchievementLossCard({ notes }: Props) {
-  const [expanded, setExpanded] = useState(false);
+export function AchievementLossCard({ notes, defaultCollapsed = false }: Props) {
+  const [expanded, setExpanded] = useState(!defaultCollapsed);
   const [mode, setMode] = useState<Mode>('percent');
 
   const result = useMemo(() => {
@@ -49,7 +51,7 @@ export function AchievementLossCard({ notes }: Props) {
   return (
     <View style={styles.card}>
       <Pressable style={styles.header} onPress={() => setExpanded(value => !value)}>
-        <Text style={styles.title}>🎯 完成率损失试算</Text>
+        <Text style={styles.title}>🎯 完成率损失</Text>
         <Text style={styles.toggle}>{expanded ? '▲ 收起' : '▼ 展开'}</Text>
       </Pressable>
 
@@ -89,11 +91,6 @@ export function AchievementLossCard({ notes }: Props) {
               ))}
             </View>
           </ScrollView>
-
-          <Text style={styles.hint}>
-            单位权重 Tap1 · Hold2 · Slide3 · Break5；Break 另计独立奖励分（理论满分 101%）；Touch-Hold 在数据源中并入 Hold。
-            {mode === 'eqTap' ? ' 等效基准：单个 Tap 打 Great 的损失。' : ''}
-          </Text>
         </>
       )}
     </View>

@@ -227,7 +227,9 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
   },
 
   reorder: (entries) => {
-    set({ entries: normalizeOrder(entries) });
+    // 信任传入数组的显示顺序（handleDragEnd 已按置顶分组收敛并重排），
+    // 仅把 order 归一化为数组下标；不能再按 order 重排，否则会把拖拽结果丢弃。
+    set({ entries: entries.map((entry, index) => ({ ...entry, order: index })) });
     get().savePlan();
   },
 

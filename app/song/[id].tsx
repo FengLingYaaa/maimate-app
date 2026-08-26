@@ -3,7 +3,7 @@
  * 展示谱面信息、note分布、推分操作
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BackHandler,
   View,
@@ -16,14 +16,14 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '../../src/store';
-import { BilibiliSearchPanel, CoverImage, DifficultyBadge, NoteBar, RatingPanel, AchievementLossCard } from '../../src/components';
+import { BilibiliSearchPanel, CoverImage, DifficultyBadge, NoteBar, RatingPanel, AchievementLossCard, MusicPlatformBoard } from '../../src/components';
 import { Colors } from '../../src/constants';
 import { DifficultyLabels, getChinaVersionName } from '../../src/constants/game';
 import { getOfficialChartConstant, getTotalNotes } from '../../src/data/music-list';
 import { formatAchievement, normalizeAchievement } from '../../src/data/rating';
 import { openMusicPlatformSearch } from '../../src/data/external-links';
 import { MUSIC_PLATFORM_LABELS } from '../../src/data/music-platforms';
-import type { ChartData, MusicPlatform } from '../../src/data/types';
+import type { ChartData, DetailBoardId, MusicPlatform } from '../../src/data/types';
 
 export default function SongDetail() {
   const { id, type, difficultyIndex, source } = useLocalSearchParams<{ id: string; type?: 'SD' | 'DX'; difficultyIndex?: string; source?: string }>();
@@ -158,6 +158,11 @@ export default function SongDetail() {
     }
   };
 
+  const boardOrder = useMemo(
+    () => (Object.keys(settings.detailBoards) as DetailBoardId[]).sort((a, b) => settings.detailBoards[a].order - settings.detailBoards[b].order),
+    [settings.detailBoards],
+  );
+
   return (
     <>
       <Stack.Screen
@@ -283,7 +288,6 @@ export default function SongDetail() {
                   <Text style={styles.charterValue}>{chart.charter || '-'}</Text>
                 </View>
 
-                <RatingPanel ds={ds} fitDiff={stats?.fit_diff} loading={chartStatsLoading} />
                 {currentScore ? (
                   <View style={styles.importedScoreCard}>
                     <Text style={styles.importedScoreTitle}>已导入成绩</Text>
@@ -296,28 +300,33 @@ export default function SongDetail() {
                 ) : (
                   <Text style={styles.importedScoreEmpty}>尚未导入该难度成绩</Text>
                 )}
-                {chart && <AchievementLossCard notes={chart.notes} />}
-                <BilibiliSearchPanel
-                  songId={music.id}
-                   songTitle={music.title}
-                   musicType={music.type}
-                  difficultyIndex={selectedDiff}
-                 />
 
-                 <View style={styles.platformCard}>
-                   <View style={styles.platformHeader}>
-                     <Text style={styles.platformTitle}>音乐平台搜索</Text>
-                     <Text style={styles.platformDefault}>默认：{MUSIC_PLATFORM_LABELS[settings.defaultMusicPlatform]}</Text>
-                   </View>
-                   <View style={styles.platformRow}>
-                     {(Object.keys(MUSIC_PLATFORM_LABELS) as MusicPlatform[]).map(platform => (
-                       <Pressable key={platform} style={[styles.platformButton, platform === settings.defaultMusicPlatform && styles.platformButtonActive]} onPress={() => void openMusicPlatform(platform)}>
-                         <Text style={[styles.platformButtonText, platform === settings.defaultMusicPlatform && styles.platformButtonTextActive]}>{MUSIC_PLATFORM_LABELS[platform]}</Text>
-                       </Pressable>
-                     ))}
-                   </View>
-                   <Text style={styles.platformNote}>直接打开音乐平台的网页搜索结果页，可立即查看候选曲目；平台应用内的深链搜索由客户端路由决定，不做保证。</Text>
-                 </View>
+                {boardOrder.map(boardId => {
+                  switch (boardId) {
+                    case 'rating':
+                      return <RatingPanel key="rating" ds={ds} fitDiff={stats?.fit_diff} loading={chartStatsLoading} defaultCollapsed={settings.detailBoards.rating.collapsed} />;
+                    case 'achievement':
+                      return chart ? <AchievementLossCard key="achievement" notes={chart.notes} defaultCollapsed={settings.detailBoards.achievement.collapsed} /> : null;
+                    case 'bilibili':
+                      return <BilibiliSearchPanel
+                        key="bilibili"
+                        songId={music.id}
+                        songTitle={music.title}
+                        musicType={music.type}
+                        difficultyIndex={selectedDiff}
+                        defaultCollapsed={settings.detailBoards.bilibili.collapsed}
+                      />;
+                    case 'platform':
+                      return <MusicPlatformBoard
+                        key="platform"
+                        defaultPlatform={settings.defaultMusicPlatform}
+                        defaultCollapsed={settings.detailBoards.platform.collapsed}
+                        onOpen={platform => void openMusicPlatform(platform)}
+                      />;
+                    default:
+                      return null;
+                  }
+                })}
               </View>
             </View>
 

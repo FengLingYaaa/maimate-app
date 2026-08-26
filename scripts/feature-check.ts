@@ -16,8 +16,9 @@ import {
   PLATE_BITS,
 } from '../src/data/plates.ts';
 import { applyDragWithPinGroups, canDragPlanRows, compareByPinThenOrder, pinGroupOf, reorderVisibleEntries } from '../src/data/plan-order.ts';
-import { getBilibiliVideoAppUrl } from '../src/data/bilibili-search.ts';
+import { getBilibiliVideoAppUrls } from '../src/data/bilibili-search.ts';
 import { extractBilibiliVideoId, isBilibiliShortLink } from '../src/data/bilibili-search.ts';
+import { av2bv, bv2av } from '../src/data/bilibili-bvid.ts';
 import { computeAchievementLoss, JUDGMENT_KEYS } from '../src/data/achievement-loss.ts';
 import { generateFortune } from '../src/data/fortune.ts';
 import { matchesMusic } from '../src/data/music-list.ts';
@@ -117,10 +118,34 @@ const dragged = [pinB, botD, midC, pinA];
 const legal = applyDragWithPinGroups(dragged);
 assert.deepEqual(legal.map(entry => entry.order), [1, 0, 2, 3]);
 
+// v1.9.0：拖拽串位修复——store.reorder 必须信任传入数组顺序（order=下标），
+// 连续两次拖拽后顺序正确、互不串位。
+const renumber = (list) => list.map((entry, index) => ({ ...entry, order: index }));
+const mkEntry = (id: string, order: number) => ({ songId: id, difficultyIndex: 3, musicType: 'DX', order, addedAt: 1 });
+function simulateDrag(entries: any[], draggedIds: string[]): any[] {
+  const ordered = [...entries].sort((a, b) => a.order - b.order);
+  const data = draggedIds.map(id => ordered.find(entry => entry.songId === id)!).filter(Boolean);
+  const legalOrder = applyDragWithPinGroups(data);
+  const visibleIndices = ordered.map((entry, index) => index);
+  return renumber(reorderVisibleEntries(ordered, visibleIndices, legalOrder));
+}
+const seq = [mkEntry('A', 0), mkEntry('B', 1), mkEntry('C', 2), mkEntry('D', 3)];
+const afterFirst = simulateDrag(seq, ['D', 'A', 'B', 'C']);
+assert.deepEqual(afterFirst.map(e => e.songId), ['D', 'A', 'B', 'C']);
+const afterSecond = simulateDrag(afterFirst, ['B', 'D', 'A', 'C']);
+assert.deepEqual(afterSecond.map(e => e.songId), ['B', 'D', 'A', 'C']);
+
 // v1.7.0：B 站视频深链提取；b23.tv 短链无法本地展开。
-assert.equal(getBilibiliVideoAppUrl('https://www.bilibili.com/video/BV1xx411c7mD?p=1'), 'bilibili://video/BV1xx411c7mD');
-assert.equal(getBilibiliVideoAppUrl('https://www.bilibili.com/video/av170001'), 'bilibili://video/av170001');
-assert.equal(getBilibiliVideoAppUrl('https://b23.tv/TdQjEN6'), null);
+// v1.9.0 起深链 av 优先：BV 号本地转 av 后优先 bilibili://video/<av>。
+assert.deepEqual(getBilibiliVideoAppUrls('https://www.bilibili.com/video/BV1xx411c7mD?p=1'), ['bilibili://video/2', 'bilibili://video/BV1xx411c7mD']);
+assert.deepEqual(getBilibiliVideoAppUrls('https://www.bilibili.com/video/av170001'), ['bilibili://video/av170001']);
+assert.deepEqual(getBilibiliVideoAppUrls('https://b23.tv/TdQjEN6'), []);
+
+// v1.9.0：BV↔AV 本地互转（权威对）。
+assert.equal(bv2av('BV1xx411c7mD'), 2);
+assert.equal(av2bv(2), 'BV1xx411c7mD');
+assert.equal(av2bv(170001), 'BV17x411w7KC');
+assert.equal(bv2av('BV17x411w7KC'), 170001);
 
 // v1.7.x：扩展的视频 ID 形态提取。
 assert.equal(extractBilibiliVideoId('https://mobile.bilibili.com/video/BV1xx411c7mD'), 'BV1xx411c7mD');
@@ -135,11 +160,12 @@ const loss = computeAchievementLoss({ tap: 717, hold: 115, slide: 166, breaks: 8
 assert.equal(loss.totalUnits, 1880);
 assert.deepEqual(JUDGMENT_KEYS.length, 8);
 const near = (value: number, expected: number) => assert.ok(Math.abs(value - expected) < 5e-4, `${value} ~ ${expected}`);
-near(loss.regularRows[0].losses.miss.percent, 38.1383);
-near(loss.regularRows[0].losses.g2000.eqTapGreat, 717);
-near(loss.regularRows[1].losses.good.percent, 6.1170);
-near(loss.regularRows[2].losses.miss.percent, 26.4894);
-// 单音符口径（与 UI 两张表一致）：
+// 单音符口径（v1.9.0 修正）：常规音符行与 Break 行统一为单个音符的损失。
+near(loss.regularRows[0].losses.miss.percent, loss.unitValue);        // Tap·Miss = 1 单位
+near(loss.regularRows[0].losses.g2000.eqTapGreat, 1);                // Tap·Great = 1 个 Tap-Great
+near(loss.regularRows[1].losses.good.percent, loss.unitValue);       // Hold·Good = 2×0.5 单位
+near(loss.regularRows[2].losses.miss.percent, 3 * loss.unitValue);   // Slide·Miss = 3 单位
+// Break 单音符合计（与 UI 两张表一致）：
 near(loss.breakRows!.base.g1500.percent, 10 * loss.tapGreatUnit);
 near(loss.breakRows!.base.good.percent, 15 * loss.tapGreatUnit);
 near(loss.breakRows!.bonus.p2550.percent, 0.25 / 87);

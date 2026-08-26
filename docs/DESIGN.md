@@ -96,16 +96,16 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | `ef2344d`（docs: landing v1.8.0 SHA 回填；前一提交 `ed2632f` 为版本号与落地页日志，`704f7ab` 为 v1.8.0 功能主体） |
-| 当前标签 | `v1.8.0`（指向 `704f7ab`；v1.7.0 及更早标签均已发布） |
+| 当前提交 | v1.9.0 功能主体（前一代 `ef2344d` 为 v1.8.0 landing SHA 回填） |
+| 当前标签 | `v1.9.0`（v1.8.0 及更早标签均已发布） |
 | Android applicationId | `cc.flya.maimate` |
-| App 版本 | `1.8.0`（Android versionCode `16`） |
+| App 版本 | `1.9.0`（Android versionCode `17`） |
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
-| 最新 Release APK SHA-256（v1.8.0） | `ff98747946007b50343f535e35f336add042d3abeccb698d47a5e1cb8d3f7238`（CI 构建机 sha256sum 输出） |
-| 最新 Release APK 大小 | `62,090,006` bytes（约 59.2 MiB） |
-| 下载站同步状态 | ✅ 2026-08-26 本会话已用 wrangler 部署 Pages 项目 `maimate-landing` 到 v1.8.0 内容（deployment preview `d9c7f496.maimate-landing.pages.dev`）；线上页面含 v1.8.0 文案与新 SHA，HEAD `/MaiMate-latest.apk` content-length `62,090,006` 与 Release 资产一致 |
+| 最新 Release APK SHA-256（v1.9.0） | 待回填（CI「Print APK checksum」步骤输出，构建完成后补） |
+| 最新 Release APK 大小 | 待回填 |
+| 下载站同步状态 | 待部署：v1.9.0 构建通过后回填 SHA/大小并 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | APK 构建方式 | GitHub Actions 云构建：先跑 lint/route/feature/phase/rating 回归、Expo Doctor 和 Android export 门禁，再出 arm64-v8a debug keystore 内测包 |
 
 当前 App Git 仓库在第三阶段提交之后应保持干净；设计文档本身位于仓库外的工作区镜像和 App 仓库内的文档副本中，更新文档会让 App 仓库产生文档变更，这是预期行为。
@@ -122,7 +122,7 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 | 推分计划 | 已完成基础版本 | 添加、删除、目标分数和本地持久化；详情页支持自定义目标，顺序/备注字段仍兼容旧数据 |
 | 随机抽歌 | 已完成基础版本，v1.7.0 调整 | 推分计划、全曲、按条件三种模式；结果与动画目标一致；v1.7.0 起「按条件」模式抽选时自动收起条件面板并显示展开/收起切换按钮，避免结果卡被抽选按钮挤压遮挡 |
 | 歌曲详情 | 已完成基础版本 | 定数、等级、Note 分布、谱师、封面、Rating 预估；v1.7.0 修复定数信息行过长时把右侧 Total Notes 挤出屏幕的问题（信息块 `minWidth: 0` 弹性收缩） |
-| Rating 预估 | Phase1 已完成 | 使用完整 Diving-Fish 系数表；官方定数与 fit_diff 严格分开；宴会場不计算官方 Rating |
+| Rating 预估 | Phase1 已完成，v1.9.0 可折叠 | 使用完整 Diving-Fish 系数表；官方定数与 fit_diff 严格分开；宴会場不计算官方 Rating；v1.9.0 起默认折叠，收起摘要显示「定数 · 100.5% → Rating」，详情页板块可配置默认折叠 |
 | 版本显示 | Phase1 已完成 | 保留 Diving-Fish 原始 `from`，并提供舞萌DX/年份国区展示名 |
 | 曲库排序 | Phase2 已完成 | 歌曲名升/降序与选定难度官方定数升/降序；缺失定数末尾并高亮排序难度 |
 | 推分计划目标 | Phase2 已完成 | 只展示条目选定难度；支持目标达成率、目标 Rating 和导入成绩 |
@@ -133,14 +133,16 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 | OCR 拍照识别 | Phase E 已实现 | ML Kit；中文/日文/拉丁文字；连续拍摄、相册多选、逐图识别、合并去重和删除图片 |
 | 今日舞萌运势 | Phase F 已实现 | 稳定 SD/DX 推荐键、推荐曲绘、上海日期本地娱乐结果；不读取 Token、不上传运势；v1.7.0 起排除宴会場谱面，仅常规曲目可被推荐 |
 | 个人设置 | Phase4 已完成 | SecureStore Token 管理、只读成绩同步、显示/排序偏好和本地数据清理 |
-| 本地牌子查询 | v1.6.0 引入，v1.7.0 重做 | `app/plates/index.tsx`、`src/data/plates.ts`：按本机已导入成绩计算 FC/SSS/FS DX/AP 位掩码；v1.7.0 起进入页面即渲染（`useFocusEffect` 强刷 + 关闭 `removeClippedSubviews`，修复嵌套 Stack 初次空白）、按难度分别输出汇总卡、同曲多难度合并为一行并逐难度展示牌子位、支持一键把当前筛选中等级 ≥14 的谱面批量加入推分计划并可一键撤回；不上传成绩 |
-| 推分计划排序工具 | v1.6.0 引入，v1.7.0 增强 | 计划卡片化 + 计划内搜索 + 拖拽排序（`react-native-draggable-flatlist`）；v1.7.0 起左滑改为置顶 📌 / 置底 🔻 标记（再点取消），置顶/置底条目只与同组交换位置（`applyDragWithPinGroups` 收敛跨组拖拽），新添加曲目插入置顶组下方第一首 |
+| 本地牌子查询 | v1.6.0 引入，v1.7.0 重做，v1.9.0 折叠筛选 | `app/plates/index.tsx`、`src/data/plates.ts`：按本机已导入成绩计算 FC/SSS/FS DX/AP 位掩码；v1.7.0 起进入页面即渲染（`useFocusEffect` 强刷 + 关闭 `removeClippedSubviews`，修复嵌套 Stack 初次空白）、按难度分别输出汇总卡、同曲多难度合并为一行并逐难度展示牌子位、支持一键把当前筛选中等级 ≥14 的谱面批量加入推分计划并可一键撤回；v1.9.0 起版本/国区/难度筛选默认收起为单行摘要（点开再展开），总计汇总卡保持展开但分难度明细可纵向滚动，避免筛选区过高挤占曲目列表；不上传成绩 |
+| 推分计划排序工具 | v1.6.0 引入，v1.7.0 增强，v1.9.0 修复串位 | 计划卡片化 + 计划内搜索 + 拖拽排序（`react-native-draggable-flatlist`）；v1.7.0 起左滑改为置顶 📌 / 置底 🔻 标记（再点取消），置顶/置底条目只与同组交换位置（`applyDragWithPinGroups` 收敛跨组拖拽），新添加曲目插入置顶组下方第一首；v1.9.0 修复 `reorder` 按陈旧 order 字段重排导致拖拽结果被丢弃的串位问题（改为信任传入数组顺序 + 每次拖拽后重建列表内部顺序缓存） |
 | 推歌英灵殿 | v1.7.0 已完成 | 从计划移除曲目走应用内自定义确认弹窗（不再使用系统 Alert），移除后进入英灵殿（计划页标题栏 🗑️ 入口）：记录移除时间、可复原回计划或强制彻底删除；数据存于独立 AsyncStorage 键 `maimate_plan_graveyard`，标题在渲染时实时解析不落盘 |
 | 版本双轨筛选 | v1.6.0 引入，v1.7.0 修正 | 原始 `from` 与国区年份分组分离筛选（`src/data/version-catalog.ts`）；v1.7.0 起无独立成绩数据的 PLUS 代次（でらっくす/Splash/UNiVERSE/FESTiVAL/BUDDiES）并入母版本标签统一筛选，PRiSM PLUS 有数据保持独立，ALL FiNALE 无数据已从版本常量移除；牌子查询页的原始版本维度只保留 DX 代之前旧世代，避免与国区维度组合必然为空 |
-| 外部应用优先打开 | v1.6.x 引入，v1.7.0 调整 | `src/data/external-links.ts` + `plugins/with-external-app-queries.js`：Bilibili 搜索深链优先失败回退 HTTPS 不变；v1.7.0 起音乐平台改为直接打开 HTTPS 搜索结果页（客户端搜索深链路由未公开，`canOpenURL` 仅能验证 scheme 注册，深链常落在首页不带关键词）；用户主动保存的 Bilibili 视频优先 `bilibili://video/<BV|av>` 深链，其次 Android intent，最后网页 |
+| 外部应用优先打开 | v1.6.x 引入，v1.7.0 调整，v1.9.0 深链修复 | `src/data/external-links.ts` + `plugins/with-external-app-queries.js` + `src/data/bilibili-bvid.ts`：Bilibili 搜索深链优先失败回退 HTTPS 不变；v1.9.0 起 Android 上绕过 `canOpenURL` 预判（package visibility 会造成假阴性）改为直接 openURL + 隐式 intent（不带 packageName），用户自存 B 站视频按 `bilibili://video/<av>`（BV 本地转 av，兼容面更广）多候选逐个尝试，最后回退网页；音乐平台客户端搜索深链路由未公开，v1.7.0 起默认改为直接打开 HTTPS 搜索结果页，v1.9.0 在设置页提供「试开」真机诊断器 |
+| 完成率损失试算 | v1.8.0 引入，v1.9.0 修正口径 | `src/data/achievement-loss.ts` + `src/components/AchievementLossCard.tsx`：按官方达成率公式反推各判定下单音符损失；v1.9.0 起常规音符行（Tap/Hold/Slide/Touch）与 Break 行统一为「单音符」口径（不再乘总数），标题去掉「试算」、删除底部规则说明脚注，默认折叠 |
+| 详情页板块配置 | v1.9.0 新增 | `src/store/settings-store.ts`（`detailBoards`）+ `app/settings/detail-boards.tsx` + `src/components/MusicPlatformBoard.tsx`：歌曲详情页四个板块（Rating 预估 / 完成率损失 / B 站搜索 / 音乐平台搜索）的上下顺序与默认折叠可在设置页配置；Rating 与完成率损失默认折叠 |
+| 音乐平台搜索设置页 | v1.6.0 已完成，v1.9.0 加试开 | `app/settings/music-platform.tsx`、`src/data/music-platforms.ts`：网易云/QQ音乐/酷狗选择，默认网易云且仅使用 HTTPS 搜索页；v1.9.0 增「试开当前平台搜索」真机诊断按钮与候选深链展示 |
 | Bilibili 单条链接保存增强 | v1.6.x 已完成 | 分享文本容错解析、按源 URL 键控封面缓存、元数据请求代次防串扰、遗留封面扩展名清理（`bilibili-links/-metadata/-cover-cache`、`bilibili-store`） |
-| 音乐平台搜索设置页 | v1.6.0 已完成 | `app/settings/music-platform.tsx`、`src/data/music-platforms.ts`：网易云/QQ音乐/酷狗选择，默认网易云且仅使用 HTTPS 搜索页 |
-| 设置子页与嵌套导航 | v1.6.5–v1.6.6 已完成 | `app/settings/{index,sort,music-platform}`、`app/song/[id]`、`app/plates` 均挂到原生 Stack 子路由并带系统返回；`scripts/route-check.mjs` 做路由树回归 |
+| 设置子页与嵌套导航 | v1.6.5–v1.6.6 已完成，v1.9.0 增 detail-boards | `app/settings/{index,sort,music-platform,detail-boards}`、`app/song/[id]`、`app/plates` 均挂到原生 Stack 子路由并带系统返回；`scripts/route-check.mjs` 做路由树回归 |
 | APK 发布链路 | 云构建中 | GitHub Actions（tag 触发，回归门禁）→ GitHub Release `MaiMate-latest.apk` → Cloudflare Pages 项目 `maimate-landing`（maimate.flya.ccwu.cc）`_worker.js` 代理 latest 资产 |
 
 ### 3.3 已完成但仍需人工验收的能力
@@ -155,6 +157,9 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 - 牌子查询返回导航、计划拖拽排序、外部应用拉起（bilibili/orpheus/qqmusic/kugou）和 Bilibili 封面刷新同样需要真机验收；
 - v1.7.0：牌子查询页首次进入即渲染内容（原「点筛选后才显示」）需真机复核；分难度汇总、合并行、一键 14+ 加入/撤回交互验收；
 - v1.7.0：推分计划置顶/置底标记、同组拖拽约束、新条目插入位置、英灵殿复原/强制删除流程验收；
+- v1.9.0：B 站自存视频 `bilibili://video/<av>`（av 优先）在真实 Android/Bilibili 组合能否直达客户端内播放页；绕过 canOpenURL 后深链是否稳定拉起；
+- v1.9.0：音乐平台「试开当前平台搜索」真机诊断——各平台客户端搜索框是否自动填词（未填词为已知限制，路由未公开）；
+- v1.9.0：推分计划连续两次拖拽不再串位；牌子页筛选折叠 + 总计卡滚动；完成率损失单音符口径与 DX Rating 默认折叠摘要；设置页「详情页板块」顺序/折叠生效；
 - 本会话没有连接 Android 设备（`adb devices` 为空），因此以上真机结果不能虚报为已验证。
 
 ---
@@ -875,3 +880,11 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 其余实现：`src/data/bilibili-search.ts`（新增 `isBilibiliShortLink`/`extractBilibiliVideoId` 扩展形态/`resolveBilibiliShortLink` 跟随 302）；`src/data/bilibili-resolve.ts` 新建（解析结果会话内存缓存，不依赖 react-native 可被回归脚本直测）；`src/data/music-platforms.ts` 恢复候选深链表；`src/data/external-links.ts`（`openMusicPlatformSearch` 应用优先可关、`openBilibiliVideo` 短链先解析再深链）；`AppSettings.musicAppSearchFirst` 默认 true；设置页加实验开关与候选列表；牌子页 chips 改 flexWrap + 整树 key 重挂载；计划页 dragEpoch 重建 DraggableFlatList 内部缓存 + 键一致性校验；`src/data/achievement-loss.ts` 新建纯计算模块（口径见 §8 A1.5 第 6 条）；`src/components/AchievementLossCard.tsx` 新建双口径表格卡片插入详情页 Rating 与 Bilibili 板块之间。
 - 验证证据：本地全绿——`tsc --noEmit` 通过；feature-check 通过（新增扩展 ID 形态提取、短链判定、达成率损失矩阵断言：717/115/166/87 示例谱面 totalUnits=1880、单音符 Tap·Great=0.010638%、Break 合计 Good=0.1676%、全谱 Miss 合计=101.0000 理论上限、无 Break 谱面 breakRows=null）；route-check 通过（新 `(tabs)` 树）。本轮尚未触发云构建与发版。
 - 发布补记（同日）：版本升至 `1.8.0`（versionCode `16`，提交 `ed2632f`）并打标 `v1.8.0` 触发云构建 run `32970206183`，一次通过。Release 资产 `MaiMate-latest.apk` 大小 `62,090,006` bytes，SHA-256 `ff98747946007b50343f535e35f336add042d3abeccb698d47a5e1cb8d3f7238`（取自 CI「Print APK checksum」步骤输出）。落地页更新 v1.8.0 文案、日志与新 SHA 后经 wrangler 重新部署 Pages（deployment `d9c7f496.maimate-landing.pages.dev`）；线上校验通过——落地页 200 且含新文案与 SHA，HEAD `/MaiMate-latest.apk` 返回 200 / content-length `62,090,006` 与资产一致。SHA 回填提交 `ef2344d`。等待用户真机验收 §8 A1.5 六项。
+
+### 2026-08-26 — v1.9.0：深链与布局修复批次（6 项真机问题）
+
+- 用户目标（6 项，真机验收反馈）：① B 站点击仍跳网页搜索（深链失效）；② 音乐平台应用能打开但搜索框未自动填词；③ 返回导航已正常（无需处理）；④ 推分计划拖拽串位仍存在，需重新定位；⑤ 牌子页筛选区过高挡住曲目列表滚动，需折叠版本筛选、总计汇总保持展开但可滚动；⑥ 完成率损失口径问题——去掉标题「试算」、Break 之外的行都算的是类型总计而非单音符需统一、删底部规则说明脚注、DX Rating 预估板块默认收起、板块顺序与默认折叠进设置页可配置。
+- 修复①根因：Android 11+ package visibility 让 `canOpenURL` 对已声明 `<queries>` 之外的情况产生假阴性而误回退；改为 Android 上直接 `Linking.openURL` + 隐式 intent（不再带 packageName），并新增 `src/data/bilibili-bvid.ts` 本地 BV↔AV 互转（置换表 `[6,4,2,3,1,5,0,7,8]` 为对合置换，用公开接口 50 条权威 (aid,bvid) 双向全对），视频深链改为 `bilibili://video/<av>` 优先、BV 次选、多候选逐个尝试。
+- 修复④根因：`reorder` 走 `normalizeOrder` 会按陈旧 `order` 字段重新排序，把拖拽计算出的数组顺序整个丢弃（纯函数模拟确认拖拽为 no-op）；改为 `reorder` 信任传入数组顺序只做 `order=下标`，保留 dragEpoch 重建列表内部缓存，并新增连续两次拖拽的纯函数回归断言。
+- 其余实现：`src/data/achievement-loss.ts` 常规行改单音符口径（去掉 `count` 乘数）；`AchievementLossCard` 标题去「试算」+ 删脚注 + `defaultCollapsed`；`RatingPanel` 默认折叠、收起摘要「定数 · 100.5% → Rating」+ `defaultCollapsed`；`BilibiliSearchPanel` 加折叠；新增 `MusicPlatformBoard`；`types.ts`/`settings-store.ts` 加 `DetailBoardId`/`detailBoards`（默认 rating/achievement 折叠）；新增设置子页 `app/settings/detail-boards.tsx`（上下移动 + 折叠开关）；`app/song/[id].tsx` 按 `boardOrder` 渲染四个板块；牌子页筛选默认收起为单行摘要、总计卡分难度明细 `maxHeight` 可滚动；音乐平台设置页加「试开当前平台搜索」真机诊断；`scripts/feature-check.ts` 增 BV↔AV、拖拽连续两次、损失单音符断言；`scripts/route-check.mjs` settings 子页加 `detail-boards`。
+- 验证证据：`tsc --noEmit` 通过；feature-check 通过（BV1xx411c7mD↔2、BV17x411w7KC↔170001、拖拽 D→A→B 连续顺序、损失单音符口径）；route-check 通过。云构建与下载站部署见发布补记。

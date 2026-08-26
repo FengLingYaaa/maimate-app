@@ -6,7 +6,7 @@
  * AsyncStorage 持久化，保持本模块不依赖 react-native，便于回归脚本直测。
  */
 
-import { extractBilibiliVideoId, isBilibiliShortLink, resolveBilibiliShortLink } from './bilibili-search';
+import { extractBilibiliVideoId, getBilibiliVideoAppUrls, isBilibiliShortLink, resolveBilibiliShortLink } from './bilibili-search';
 
 const resolutionCache = new Map<string, string | null>();
 
@@ -15,20 +15,23 @@ export function getCachedResolvedUrl(url: string): string | null | undefined {
   return resolutionCache.get(url);
 }
 
-/** 同步取可用视频 ID：已缓存的长链直接提取；短链必须先 resolveAndCacheVideoUrl。 */
-export function getCachedVideoAppUrl(url: string): string | null {
+/** 同步取可用视频深链候选：已缓存的长链直接提取；短链必须先 resolveAndCacheVideoUrl。 */
+export function getCachedVideoAppUrls(url: string): string[] {
   const cached = resolutionCache.get(url);
-  if (cached === undefined) return getDirectVideoAppUrl(url);
-  if (cached === null) return null;
-  const id = extractBilibiliVideoId(cached);
-  return id ? `bilibili://video/${id}` : null;
+  if (cached === undefined) return getDirectVideoAppUrls(url);
+  if (cached === null) return [];
+  return getBilibiliVideoAppUrls(cached);
 }
 
-/** 非短链的直提深链（长链本地映射，不走网络）。 */
+/** 非短链的直提深链候选（长链本地映射，不走网络）。 */
+export function getDirectVideoAppUrls(url: string): string[] {
+  if (isBilibiliShortLink(url)) return [];
+  return getBilibiliVideoAppUrls(url);
+}
+
+/** 取首选直提深链（av 优先），无则 null。 */
 export function getDirectVideoAppUrl(url: string): string | null {
-  if (isBilibiliShortLink(url)) return null;
-  const id = extractBilibiliVideoId(url);
-  return id ? `bilibili://video/${id}` : null;
+  return getDirectVideoAppUrls(url)[0] ?? null;
 }
 
 /**

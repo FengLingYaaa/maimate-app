@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Colors } from '../../../src/constants';
 import { MUSIC_PLATFORM_OPTIONS } from '../../../src/data/settings-options';
 import { getMusicPlatformAppUrls } from '../../../src/data/music-platforms';
+import { openMusicPlatformSearch } from '../../../src/data/external-links';
+import type { MusicPlatform } from '../../../src/data/types';
 import { useSettingsStore } from '../../../src/store';
 
 export default function MusicPlatformSettings() {
@@ -11,6 +13,17 @@ export default function MusicPlatformSettings() {
   const current = useSettingsStore(s => s.settings.defaultMusicPlatform);
   const appSearchFirst = useSettingsStore(s => s.settings.musicAppSearchFirst);
   const updateSettings = useSettingsStore(s => s.updateSettings);
+  const [testResult, setTestResult] = useState<string | null>(null);
+
+  const tryOpen = async (platform: MusicPlatform) => {
+    setTestResult('试开中…');
+    try {
+      const result = await openMusicPlatformSearch(platform, '示例曲名', '示例曲师', { appSearchFirst: true });
+      setTestResult(result === 'app' ? '已打开应用（深链成功）' : '深链失败，已回退网页搜索');
+    } catch {
+      setTestResult('试开失败');
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -30,10 +43,14 @@ export default function MusicPlatformSettings() {
             thumbColor={appSearchFirst ? Colors.accent.primary : Colors.text.muted}
           />
         </View>
-        <Text style={styles.diagTitle}>候选深链（真机点测用）· 当前默认平台</Text>
+        <Text style={styles.diagTitle}>深链试开（真机点测）· 当前默认平台</Text>
         {getMusicPlatformAppUrls(current, '示例曲名', '示例曲师').map(url => (
           <Text key={url} style={styles.diagItem} numberOfLines={2}>{url}</Text>
         ))}
+        <Pressable style={styles.testButton} onPress={() => void tryOpen(current)}>
+          <Text style={styles.testButtonText}>▶ 试开当前平台搜索</Text>
+        </Pressable>
+        {testResult && <Text style={styles.testResult}>{testResult}</Text>}
         <Text style={styles.diagHint}>以上为搜索关键词占位示例；有效路由会被自动记忆使用，无需手动配置。</Text>
       </View>
 
@@ -60,6 +77,9 @@ const styles = StyleSheet.create({
   diagTitle: { fontSize: 11, fontWeight: '800', color: Colors.accent.secondary, paddingHorizontal: 16, paddingTop: 12 },
   diagItem: { fontSize: 10, lineHeight: 14, color: Colors.text.secondary, paddingHorizontal: 16, paddingVertical: 3 },
   diagHint: { fontSize: 10, lineHeight: 14, color: Colors.text.muted, paddingHorizontal: 16, paddingBottom: 12 },
+  testButton: { marginHorizontal: 16, marginTop: 8, alignItems: 'center', paddingVertical: 10, borderRadius: 8, backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.accent.secondary },
+  testButtonText: { fontSize: 12, fontWeight: '700', color: Colors.accent.secondary },
+  testResult: { fontSize: 11, lineHeight: 16, color: Colors.functional.success, paddingHorizontal: 16, paddingTop: 8 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Colors.border.light },
   radio: { fontSize: 20, color: Colors.text.muted },
   radioActive: { color: Colors.accent.primary },

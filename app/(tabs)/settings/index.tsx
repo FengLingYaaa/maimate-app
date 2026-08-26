@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../../src/constants';
@@ -93,6 +93,13 @@ export default function SettingsPage() {
             <Text style={styles.preferenceDescription}>曲库打开后可在筛选栏中临时切换</Text>
           </View>
           <Text style={styles.valueButtonText}>{getSortLabel(settings.defaultSort.mode)}　›</Text>
+        </Pressable>
+        <Pressable style={styles.preferenceRow} onPress={() => router.push('/settings/detail-boards' as any)}>
+          <View style={styles.preferenceText}>
+            <Text style={styles.preferenceTitle}>详情页板块</Text>
+            <Text style={styles.preferenceDescription}>调整歌曲详情页板块顺序与默认折叠状态</Text>
+          </View>
+          <Text style={styles.valueButtonText}>›</Text>
         </Pressable>
       </View>
 

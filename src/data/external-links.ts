@@ -7,7 +7,7 @@ import {
   getBilibiliSearchUrl,
   isBilibiliShortLink,
 } from './bilibili-search';
-import { getDirectVideoAppUrl, resolveAndCacheVideoUrl } from './bilibili-resolve';
+import { getDirectVideoAppUrls, resolveAndCacheVideoUrl } from './bilibili-resolve';
 import { getMusicPlatformSearchUrl, getMusicPlatformAppUrls } from './music-platforms';
 
 type AppCandidate = { url: string; packageName?: string };
@@ -21,9 +21,16 @@ const ANDROID_PACKAGES: Record<string, string> = {
   kugou: 'com.kugou.android',
 };
 
+/**
+ * 直接 openURL 拉起应用。Android 上刻意不做 canOpenURL 预判：
+ * Android 11+ 的 package visibility 会让 canOpenURL 对已安装应用
+ * 返回假阴性（未声明 <queries> 时），从而误跳过深链；openURL 本身
+ * 走隐式 intent 不受查询限制，拉不起才抛异常由调用方回退。
+ * iOS 上保留 canOpenURL 以避免未注册 scheme 时崩溃。
+ */
 async function tryLinkingApp(candidate: AppCandidate): Promise<boolean> {
   try {
-    if (!(await Linking.canOpenURL(candidate.url))) return false;
+    if (Platform.OS === 'ios' && !(await Linking.canOpenURL(candidate.url))) return false;
     await Linking.openURL(candidate.url);
     return true;
   } catch {
@@ -31,12 +38,12 @@ async function tryLinkingApp(candidate: AppCandidate): Promise<boolean> {
   }
 }
 
+/** 隐式 intent 兜底：不带 packageName，绕开 package visibility 限制。 */
 async function tryAndroidIntent(candidate: AppCandidate): Promise<boolean> {
   if (Platform.OS !== 'android') return false;
   try {
     await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
       data: candidate.url,
-      packageName: candidate.packageName,
     });
     return true;
   } catch {
@@ -89,16 +96,19 @@ export async function openMusicPlatformSearch(
 }
 
 /** 用户主动保存的单条 B 站视频：优先客户端内打开，失败回退网页。
- * b23.tv 短链会先解析成最终地址（结果缓存），再尝试 bilibili://video 深链。 */
+ * b23.tv 短链会先解析成最终地址（结果缓存），再按 av 优先逐个尝试深链。 */
 export async function openBilibiliVideo(url: string): Promise<void> {
   let target = url;
   if (isBilibiliShortLink(url)) {
     const resolved = await resolveAndCacheVideoUrl(url);
     if (resolved) target = resolved;
   }
-  const appUrl = getDirectVideoAppUrl(target);
-  if (appUrl && await tryLinkingApp({ url: appUrl, packageName: ANDROID_PACKAGES.bilibili })) return;
-  if (await tryAndroidIntent({ url: target, packageName: ANDROID_PACKAGES.bilibili })) return;
+  const appUrls = getDirectVideoAppUrls(target);
+  for (const appUrl of appUrls) {
+    if (await tryLinkingApp({ url: appUrl })) return;
+    if (await tryAndroidIntent({ url: appUrl })) return;
+  }
+  if (await tryAndroidIntent({ url: target })) return;
   await Linking.openURL(url);
 }
 

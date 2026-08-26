@@ -6,6 +6,8 @@
  * 由 bilibili-metadata.ts 另行按需缓存。
  */
 
+import { bv2av } from './bilibili-bvid';
+
 export type BilibiliDifficultyIndex = 2 | 3 | 4;
 
 /** b23.tv 短链域名：需要先网络解析成最终视频地址才能提取 BV/av。 */
@@ -66,14 +68,29 @@ export function extractBilibiliVideoId(url: string): string | null {
 }
 
 /**
- * 从用户保存的视频链接生成 B 站客户端深链。
- * 长链可直接本地映射；b23.tv 短链需先用 resolveBilibiliShortLink()
- * 解析成最终地址后再传入，解析失败返回 null 由调用方走 intent/网页回退。
+ * 从用户保存的视频链接生成 B 站客户端深链候选列表（按兼容面排序）。
+ * BV 号会本地转成 av 号后优先使用 bilibili://video/<av>（客户端路由
+ * 对数字 av 的兼容面更广），BV 形式作为次级候选；纯 av 链接直接给出。
+ * b23.tv 短链需先用 resolveBilibiliShortLink() 解析成最终地址后再传入。
  */
-export function getBilibiliVideoAppUrl(url: string): string | null {
-  if (isBilibiliShortLink(url)) return null;
+export function getBilibiliVideoAppUrls(url: string): string[] {
+  if (isBilibiliShortLink(url)) return [];
   const id = extractBilibiliVideoId(url);
-  return id ? `bilibili://video/${id}` : null;
+  if (!id) return [];
+  const candidates: string[] = [];
+  if (/^BV/i.test(id)) {
+    const aid = bv2av(id);
+    if (aid !== null) candidates.push(`bilibili://video/${aid}`);
+    candidates.push(`bilibili://video/${id}`);
+  } else {
+    candidates.push(`bilibili://video/${id}`);
+  }
+  return candidates;
+}
+
+/** 取首选深链（av 优先），无可提取 ID 返回 null。 */
+export function getBilibiliVideoAppUrl(url: string): string | null {
+  return getBilibiliVideoAppUrls(url)[0] ?? null;
 }
 
 /**

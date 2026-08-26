@@ -187,6 +187,16 @@ export interface BilibiliVideoLink {
   updatedAt: number;
 }
 
+/** 歌曲详情页可排序/可折叠的板块标识。 */
+export type DetailBoardId = 'rating' | 'achievement' | 'bilibili' | 'platform';
+
+export interface DetailBoardConfig {
+  /** 展示顺序（数值小者靠上）。 */
+  order: number;
+  /** 默认折叠（打开详情页时是否收起）。 */
+  collapsed: boolean;
+}
+
 export interface AppSettings {
   showChinaVersion: boolean;
   defaultSort: SortOptions;
@@ -194,6 +204,8 @@ export interface AppSettings {
   defaultMusicPlatform: MusicPlatform;
   /** 音乐平台搜索优先尝试客户端深链（失败自动回退 HTTPS）；v1.7.x 默认开启。 */
   musicAppSearchFirst: boolean;
+  /** 歌曲详情页板块排序与默认折叠状态。 */
+  detailBoards: Record<DetailBoardId, DetailBoardConfig>;
 }
 
 /** 推分计划 */
