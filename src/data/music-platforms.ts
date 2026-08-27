@@ -14,6 +14,11 @@ function encodeQuery(title: string, artist?: string): string {
   return encodeURIComponent(rawQuery(title, artist));
 }
 
+/** 用户需要复制到客户端搜索框的原始关键词（曲名 + 曲师）。 */
+export function getMusicPlatformSearchText(title: string, artist?: string): string {
+  return rawQuery(title, artist);
+}
+
 /** Stable HTTPS search pages used whenever the native client cannot handle a route. */
 export function getMusicPlatformSearchUrl(platform: MusicPlatform, title: string, artist?: string): string {
   const query = encodeQuery(title, artist);
@@ -49,6 +54,8 @@ export function getMusicPlatformAppUrls(platform: MusicPlatform, title: string, 
     default:
       return [
         `orpheus://search?keyword=${query}`,
+        `orpheus://search?query=${query}`,
+        `orpheus://nm/search?keyword=${query}`,
         `orpheus://search/m/?s=${query}&type=1`,
       ];
   }

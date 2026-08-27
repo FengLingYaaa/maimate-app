@@ -96,10 +96,10 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | v1.9.0 功能主体（前一代 `ef2344d` 为 v1.8.0 landing SHA 回填） |
-| 当前标签 | `v1.9.0`（v1.8.0 及更早标签均已发布） |
+| 当前提交 | v1.10.0 功能主体（前一代 `b98cbc0` 为 v1.9.0 landing SHA 回填） |
+| 当前标签 | `v1.10.0`（v1.9.0 及更早标签均已发布） |
 | Android applicationId | `cc.flya.maimate` |
-| App 版本 | `1.9.0`（Android versionCode `17`） |
+| App 版本 | `1.10.0`（Android versionCode `18`） |
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
@@ -889,3 +889,17 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 其余实现：`src/data/achievement-loss.ts` 常规行改单音符口径（去掉 `count` 乘数）；`AchievementLossCard` 标题去「试算」+ 删脚注 + `defaultCollapsed`；`RatingPanel` 默认折叠、收起摘要「定数 · 100.5% → Rating」+ `defaultCollapsed`；`BilibiliSearchPanel` 加折叠；新增 `MusicPlatformBoard`；`types.ts`/`settings-store.ts` 加 `DetailBoardId`/`detailBoards`（默认 rating/achievement 折叠）；新增设置子页 `app/settings/detail-boards.tsx`（上下移动 + 折叠开关）；`app/song/[id].tsx` 按 `boardOrder` 渲染四个板块；牌子页筛选默认收起为单行摘要、总计卡分难度明细 `maxHeight` 可滚动；音乐平台设置页加「试开当前平台搜索」真机诊断；`scripts/feature-check.ts` 增 BV↔AV、拖拽连续两次、损失单音符断言；`scripts/route-check.mjs` settings 子页加 `detail-boards`。
 - 验证证据：`tsc --noEmit` 通过；feature-check 通过（BV1xx411c7mD↔2、BV17x411w7KC↔170001、拖拽 D→A→B 连续顺序、损失单音符口径）；route-check 通过。云构建与下载站部署见发布补记。
 - 发布补记（当日，含 GitHub Actions 故障）：版本升至 `1.9.0`（versionCode `17`，功能提交 `2302ea9`）。首次以**附注标签**打 `v1.9.0` 推送触发云构建出现 `startup_failure`（v1.8.0 等历史标签均为轻量标签），改为**轻量标签**后 run 卡「queued/0 jobs」——经查系 GitHub Actions 官方 `major_outage`（数据库主库故障 + 上游 Vitess 问题，16:50Z 起恢复、17:54Z 缓解；期间 github.com:443 HTTPS 亦间歇不可达）。为规避同标签重推并发互卡，移除 workflow `concurrency` 块（提交 `b98cbc0`）并将标签移到 `b98cbc0`；故障恢复后删标签重推，触发 run `32998575544` 一次通过。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.9.0>；资产 `MaiMate-latest.apk` 大小 `62,101,346` bytes（59.2 MB），SHA-256 `70229f8c6ca050c82bf39c0eff6f1a0349ea6c8eca9281e5698ca182d5d9eec4`（取自 CI「Print APK checksum」步骤输出）。落地页更新 v1.9.0 文案、日志与 SHA 后经 wrangler 部署 Pages，线上校验落地页 200 且含新 SHA、`HEAD /MaiMate-latest.apk` 与资产一致。等待用户真机验收 §8 A1.5 六项。
+
+### 2026-08-27 — v1.10.0：拖拽彻底重写、音乐平台剪贴板兜底、牌子页滚动重构、数据备份/恢复与更新检查
+
+- 用户目标（Android only，iOS 明确延后）：① 音乐平台跳应用（仅测网易云）搜索框仍不自动填词、网页可正确填入 → 修复 + 把要填的信息复制到剪贴板作备用；② 拖拽仍串位 → 拖拽代码从头重写；③ 牌子页删除「根据本机已导入成绩…」提示行、完成度总计加入滚动（随页面下滑）、歌曲旁加曲绘；④ 完成率损失删掉 CP 列（CP 永不失完成率）；⑤ 设置页删除「牌子查询」入口（牌子已是底部 Tab）；⑥ 推分计划页面最下侧曲目目标达成率被下边栏遮挡 → 列表底部留白；⑦ 做数据导入导出与备份；⑧ 做应用内更新检查。
+- 拖拽重写（修②根因）：新增 `src/data/plan-entries.ts`（`createPlanEntryId`/`migratePlanEntryIds`/`migratePlanGraveyardIds`/`normalizePlanEntries`/`reorderPlanEntriesById`）；`PlanEntry` 增加持久 `entryId`（`types.ts`）；`plan-store.ts` 重写——首次加载为旧数据补发 entryId 并回写、写入串行队列、`reorderByIds(orderedIds)` 全量 ID 原子校验后替换、增 `removeEntryById`/`updateTargetScoreById`/`setPinById`；`PlanDragList.tsx` 独立组件（key=entryId、取消 Swipeable 手势叠加、置顶/置底改显式按钮、`onDragEnd` 只提交 ID 顺序、底部 `96+insets.bottom` 留白）；`canDragPlanRows` 改为对所有筛选维度全量判断（任何非空筛选禁用拖拽），彻底移除 dragEpoch 重挂载、业务拼接 key、`reorderVisibleEntries` 筛选槽位回填等旧补丁。
+- 音乐平台（修①）：`external-links.ts` 的 `openMusicPlatformSearch` 跳转前自动 `Clipboard.setStringAsync` 搜索词；`music-platforms.ts` 网易云候选增至 4 条（含 `orpheus://search?query=`、`orpheus://nm/search?keyword=`）；`MusicPlatformBoard` 展示搜索词 + 「复制搜索词」按钮；详情页 Toast 提示「搜索词已复制」。
+- 牌子页（修③）：`plates/index.tsx` 改为单一 `FlatList` + `ListHeaderComponent`（筛选、总计卡、批量按钮、提示全部随页面滚动），删除副标题提示行与内层 `maxHeight` ScrollView，`PlateRow` 加 `CoverImage` 曲绘（56×56），底部 `96+insets.bottom` 留白。
+- 完成率损失（修④）：`AchievementLossCard` 用 `VISIBLE_JUDGMENTS`（去掉 CP 头列与每行 CP 单元格，按显式 key 顺序渲染），CP 判定仍保留在底层计算但不再展示。
+- 设置页（修⑤⑥⑦⑧入口）：删除「牌子查询」入口；「数据与隐私」新增「数据备份与恢复」「检查更新」两行；`settings/_layout.tsx` 注册 `data-backup`/`update` 子页；`route-check.mjs` settings children 更新为 `['data-backup','detail-boards','index','music-platform','sort','update']`。
+- 数据备份/恢复（⑦）：新增 `src/data/backup.ts`（版本化 JSON schema `cc.flya.maimate.backup` v1，严格校验/迁移/数组上限/未来版本拒绝/非法数值剔除/B 站本机 coverUri 剥离）、`src/data/backup-io.ts`（导出→系统分享、导入→校验→回滚快照→`multiSet` 事务写入→reload stores；SecureStore Token 与曲库/封面缓存明确排除）、`src/data/settings-defaults.ts`（把 settings-store 默认值与 `mergeDetailBoards` 抽成纯模块复用）；设置子页 `data-backup.tsx`（导出/选择/摘要/二次确认恢复）。新增 `expo-document-picker`/`expo-sharing`/`expo-clipboard` 依赖。
+- 应用内更新检查（⑧）：新增 `src/api/app-update.ts`（GitHub `releases/latest` + 下载站 APK 地址、`AbortController` 15s 超时、draft/prerelease 忽略、SemVer 比较、仅 Android 参与下载）+ `src/data/semver.ts`（纯函数可测）；设置子页 `update.tsx`（当前版本/检查/新版本说明/下载与发布页按钮）。
+- 依赖与版本：`expo` 及若干 SDK 57 包对齐到 Expo 最新补丁（`expo-doctor` 21/21 全绿），`react-native` 升 `0.86.3`，`app.json` 升 `1.10.0`/versionCode `18`，`package.json` 升 `1.10.0`。
+- 回归测试：`scripts/feature-check.ts` 拖拽断言改为 entryId 语义（迁移幂等、合法/非法顺序拒绝、连续两次拖拽）；新增 `scripts/backup-check.ts`（round-trip/未知字段/损坏 JSON/未来 schema 拒绝/旧计划无 entryId 迁移/非法数值剔除/数组截断/coverUri 剥离）与 `scripts/update-check.ts`（SemVer）；`package.json` 增 `test:backup`/`test:update` 并接入 CI 门禁。
+- 发布补记：待云构建与下载站回填。

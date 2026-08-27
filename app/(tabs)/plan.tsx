@@ -1,30 +1,24 @@
 /** 推分计划：计划专属筛选、置顶分组拖拽、推歌英灵殿和自定义移除控件。 */
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import DraggableFlatList, { ScaleDecorator, type RenderItemParams } from 'react-native-draggable-flatlist';
-import { Swipeable } from 'react-native-gesture-handler';
-import { FilterBar, PlanEntryCard } from '../../src/components';
+import { FilterBar, PlanDragList, type PlanDragRow } from '../../src/components';
 import { Colors, DifficultyColorMap, DifficultyLabels } from '../../src/constants';
 import { getChinaVersionOptions, getVersionOptions } from '../../src/data/version-catalog';
 import { getMusicSearchScore, getOfficialChartConstant, matchesMusic } from '../../src/data/music-list';
-import { applyDragWithPinGroups, canDragPlanRows, reorderVisibleEntries } from '../../src/data/plan-order';
+import { canDragPlanRows } from '../../src/data/plan-order';
 import type { FilterOptions, MusicData, PlanEntry, PlayerScore, SortOptions } from '../../src/data/types';
 import { useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '../../src/store';
 import { planEntryKey } from '../../src/store/plan-store';
 
-type PlanRow = { music: MusicData; entry: PlanEntry };
+type PlanRow = PlanDragRow;
 
 interface ConfirmRequest {
   title: string;
   message: string;
   confirmText: string;
   onConfirm: () => void;
-}
-
-function rowKey(row: PlanRow): string {
-  return `${row.music.type}:${row.music.id}:${row.entry.difficultyIndex}`;
 }
 
 function requestedDifficultyMatches(entry: PlanEntry, difficulty: FilterOptions['difficulty']): boolean {
@@ -63,23 +57,19 @@ export default function PushPlan() {
   const router = useRouter();
   const entries = usePlanStore(s => s.entries);
   const graveyard = usePlanStore(s => s.graveyard);
-  const removeEntry = usePlanStore(s => s.removeEntry);
-  const updateTargetScore = usePlanStore(s => s.updateTargetScore);
-  const setPin = usePlanStore(s => s.setPin);
+  const removeEntryById = usePlanStore(s => s.removeEntryById);
+  const updateTargetScoreById = usePlanStore(s => s.updateTargetScoreById);
+  const setPinById = usePlanStore(s => s.setPinById);
   const bulkRemoveEntries = usePlanStore(s => s.bulkRemoveEntries);
   const purgeGraveyardEntry = usePlanStore(s => s.purgeGraveyardEntry);
   const restoreGraveyardEntry = usePlanStore(s => s.restoreGraveyardEntry);
-  const reorder = usePlanStore(s => s.reorder);
+  const reorderByIds = usePlanStore(s => s.reorderByIds);
   const rawData = useMusicStore(s => s.rawData);
   const scores = useScoreStore(s => s.scores);
   const settings = useSettingsStore(s => s.settings);
   const [filters, setFilters] = useState<FilterOptions>({});
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [graveyardVisible, setGraveyardVisible] = useState(false);
-  // 每次拖拽提交后自增：强制 DraggableFlatList 重建内部顺序缓存，
-  // 修复「拖完 A 后立刻长按 B 却调整了 A 的位置」的串位问题。
-  const [dragEpoch, setDragEpoch] = useState(0);
-
   const plannedRows = useMemo(() => entries
     .map(entry => {
       const music = rawData.find(item => item.id === entry.songId && (!entry.musicType || item.type === entry.musicType)) || rawData.find(item => item.id === entry.songId);
@@ -109,9 +99,9 @@ export default function PushPlan() {
       title: '移出计划',
       message: `把《${row.music.title}》移出推分计划？\n移除后会进入下方「推歌英灵殿」，可在那里复原或彻底删除。`,
       confirmText: '移除',
-      onConfirm: () => removeEntry(row.music.id, row.entry.difficultyIndex, row.music.type),
+      onConfirm: () => removeEntryById(row.entry.entryId),
     });
-  }, [removeEntry]);
+  }, [removeEntryById]);
 
   const handleClear = useCallback(() => {
     if (entries.length === 0) return;
@@ -122,25 +112,6 @@ export default function PushPlan() {
       onConfirm: () => bulkRemoveEntries(entries.map(planEntryKey)),
     });
   }, [bulkRemoveEntries, entries]);
-
-  const handleDragEnd = useCallback((data: PlanRow[]) => {
-    if (!manualOrderView || data.length === 0) return;
-    // 键一致性校验：拖拽结果与 store 现有条目必须一一对应且无重复，
-    // 不一致时丢弃本次结果，防止错乱写入持久层。
-    const storeKeys = new Set(entries.map(planEntryKey));
-    const dataKeys = data.map(rowKey);
-    if (new Set(dataKeys).size !== dataKeys.length || !dataKeys.every(key => storeKeys.has(key))) return;
-    // 置顶/置底条目只与同组交换位置：跨组拖拽会被收敛回各自分组块。
-    const legalOrder = applyDragWithPinGroups(data.map(row => row.entry));
-    const visibleKeys = new Set(data.map(rowKey));
-    const orderedEntries = [...entries].sort((left, right) => left.order - right.order);
-    const visibleIndices = orderedEntries.map((entry, index) => {
-      const music = rawData.find(item => item.id === entry.songId && (!entry.musicType || item.type === entry.musicType)) || rawData.find(item => item.id === entry.songId);
-      return music && visibleKeys.has(`${music.type}:${music.id}:${entry.difficultyIndex}`) ? index : -1;
-    }).filter(index => index >= 0);
-    reorder(reorderVisibleEntries(orderedEntries, visibleIndices, legalOrder));
-    setDragEpoch(epoch => epoch + 1);
-  }, [entries, manualOrderView, rawData, reorder]);
 
   const graveyardRows = useMemo(() => graveyard.map(item => ({
     ...item,
@@ -160,7 +131,7 @@ export default function PushPlan() {
             {entries.length > 0 && <Pressable onPress={handleClear}><Text style={styles.clearBtn}>清空</Text></Pressable>}
           </View>
         </View>
-        <Text style={styles.headerSub}>{entries.length > 0 ? `${entries.length} 首待练习` : '还没有添加歌曲'} · 左滑标记 📌/🔻，同组之间长按拖拽</Text>
+        <Text style={styles.headerSub}>{entries.length > 0 ? `${entries.length} 首待练习` : '还没有添加歌曲'} · 曲目下方 📌/🔻 置顶置底，同组之间长按拖拽</Text>
       </View>
       <FilterBar
         filters={filters}
@@ -180,14 +151,21 @@ export default function PushPlan() {
       ) : filteredRows.length === 0 ? (
         <View style={styles.empty}><Text style={styles.emptyText}>没有匹配的计划条目</Text><Pressable onPress={() => setFilters({})}><Text style={styles.clearLink}>清除筛选</Text></Pressable></View>
       ) : (
-        <DraggableFlatList
-          key={`plan-drag-${dragEpoch}`}
-          data={filteredRows}
-          keyExtractor={rowKey}
-          onDragEnd={({ data }) => handleDragEnd(data)}
-          activationDistance={8}
-          contentContainerStyle={styles.listContent}
-          renderItem={(params) => <SortablePlanRow {...params} canDrag={manualOrderView} showChinaVersion={settings.showChinaVersion} showProjectedRating={settings.showProjectedRating} rawData={rawData} getScore={getScore} onOpen={row => router.push({ pathname: '/song/[id]' as any, params: { id: row.music.id, type: row.music.type, difficultyIndex: String(row.entry.difficultyIndex), source: 'plan' } })} onRemove={handleRemove} onTarget={(row, value) => updateTargetScore(row.music.id, row.entry.difficultyIndex, value, row.music.type)} onPin={(row, pin) => setPin(row.music.id, row.entry.difficultyIndex, row.entry.pin === pin ? undefined : pin, row.music.type)} />}
+        <PlanDragList
+          rows={filteredRows}
+          canDrag={manualOrderView}
+          showChinaVersion={settings.showChinaVersion}
+          showProjectedRating={settings.showProjectedRating}
+          allSongs={rawData}
+          getScore={getScore}
+          onOpen={row => router.push({ pathname: '/song/[id]' as any, params: { id: row.music.id, type: row.music.type, difficultyIndex: String(row.entry.difficultyIndex), source: 'plan' } })}
+          onRemove={entryId => {
+            const row = filteredRows.find(item => item.entry.entryId === entryId);
+            if (row) handleRemove(row);
+          }}
+          onTarget={updateTargetScoreById}
+          onPin={setPinById}
+          onReorder={reorderByIds}
         />
       )}
 
@@ -264,44 +242,6 @@ function ConfirmDialog({ request, onCancel }: { request: ConfirmRequest | null; 
   );
 }
 
-function SortablePlanRow({ item, getIndex, drag, isActive, canDrag, showChinaVersion, showProjectedRating, rawData, getScore, onOpen, onRemove, onTarget, onPin }: RenderItemParams<PlanRow> & {
-  canDrag: boolean;
-  showChinaVersion: boolean;
-  showProjectedRating: boolean;
-  rawData: MusicData[];
-  getScore: (music: MusicData, entry: PlanEntry) => PlayerScore | undefined;
-  onOpen: (row: PlanRow) => void;
-  onRemove: (row: PlanRow) => void;
-  onTarget: (row: PlanRow, value: number | null) => void;
-  onPin: (row: PlanRow, pin: 'top' | 'bottom') => void;
-}) {
-  const swipeable = useRef<Swipeable>(null);
-  return (
-    <ScaleDecorator activeScale={1.03}>
-      <Swipeable ref={swipeable} overshootRight={false} renderRightActions={() => (
-        <View style={styles.swipeActions}>
-          <Pressable
-            style={[styles.swipeButton, item.entry.pin === 'top' ? styles.unpinButton : styles.topButton]}
-            onPress={() => { onPin(item, 'top'); swipeable.current?.close(); }}
-          >
-            <Text style={styles.swipeText}>{item.entry.pin === 'top' ? '取消' : '📌置顶'}</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.swipeButton, item.entry.pin === 'bottom' ? styles.unpinButton : styles.bottomButton]}
-            onPress={() => { onPin(item, 'bottom'); swipeable.current?.close(); }}
-          >
-            <Text style={styles.swipeText}>{item.entry.pin === 'bottom' ? '取消' : '🔻置底'}</Text>
-          </Pressable>
-        </View>
-      )}>
-        <View style={[styles.draggableRow, isActive && styles.activeRow]}>
-          <PlanEntryCard music={item.music} entry={item.entry} index={getIndex() ?? 0} allSongs={rawData} importedScore={getScore(item.music, item.entry)} showChinaVersion={showChinaVersion} showProjectedRating={showProjectedRating} onPress={() => onOpen(item)} onLongPress={canDrag ? drag : () => undefined} onRemove={() => onRemove(item)} onTarget={value => onTarget(item, value)} />
-        </View>
-      </Swipeable>
-    </ScaleDecorator>
-  );
-}
-
 function EmptyPlan() {
   return <View style={styles.empty}><Text style={styles.emptyIcon}>🎯</Text><Text style={styles.emptyText}>暂未添加推分歌曲</Text><Text style={styles.emptySub}>在曲库或牌子查询中打开歌曲详情，选择难度后加入推分计划</Text></View>;
 }
@@ -318,15 +258,6 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 26, fontWeight: '800', color: Colors.text.primary },
   headerSub: { fontSize: 12, lineHeight: 18, color: Colors.text.muted, marginTop: 2 },
   clearBtn: { fontSize: 14, color: Colors.functional.danger, fontWeight: '600' },
-  listContent: { paddingBottom: 80 },
-  draggableRow: { backgroundColor: Colors.bg.primary },
-  activeRow: { opacity: 0.92 },
-  swipeActions: { flexDirection: 'row', alignItems: 'stretch', marginVertical: 5, marginRight: 12, borderRadius: 12, overflow: 'hidden' },
-  swipeButton: { width: 58, alignItems: 'center', justifyContent: 'center' },
-  topButton: { backgroundColor: Colors.accent.secondary },
-  bottomButton: { backgroundColor: Colors.accent.primary },
-  unpinButton: { backgroundColor: Colors.text.muted },
-  swipeText: { color: '#fff', fontSize: 11, fontWeight: '800', textAlign: 'center' },
   sheetOverlay: { flex: 1, backgroundColor: Colors.bg.overlay, justifyContent: 'flex-end' },
   sheetCard: { backgroundColor: Colors.bg.secondary, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, maxHeight: '78%', gap: 10 },
   sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

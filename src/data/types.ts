@@ -94,6 +94,8 @@ export interface FilterOptions {
 
 /** 推分计划条目 */
 export interface PlanEntry {
+  /** 持久且唯一的记录身份；React key、拖拽和恢复都只使用它。 */
+  entryId: string;
   songId: string;
   difficultyIndex: number;  // 目标练习的难度
   /** 兼容旧计划；新条目保存 SD/DX，避免同 ID 曲目混淆。 */

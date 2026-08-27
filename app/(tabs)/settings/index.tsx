@@ -104,17 +104,6 @@ export default function SettingsPage() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>本地成绩工具</Text>
-        <Pressable style={styles.toolButton} onPress={() => router.push('/plates' as any)}>
-          <View style={styles.preferenceText}>
-            <Text style={styles.preferenceTitle}>牌子查询</Text>
-            <Text style={styles.preferenceDescription}>按本机导入成绩统计 FC、SSS、FS DX 和 AP</Text>
-          </View>
-          <Text style={styles.valueButtonText}>›</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Diving-Fish 成绩导入</Text>
         <Text style={styles.securityNote}>只读同步成绩。MaiMate 不会上传成绩、不保存 Shadowrocket 配置，也不会把 Token 写入日志或源码。</Text>
         <TextInput
@@ -167,6 +156,20 @@ export default function SettingsPage() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>数据与隐私</Text>
         <Text style={styles.securityNote}>曲库、推分计划和已导入成绩默认保存在本机。删除 Token 不会删除成绩；清除本地成绩不会影响服务器。</Text>
+        <Pressable style={styles.preferenceRow} onPress={() => router.push('/settings/data-backup' as any)}>
+          <View style={styles.preferenceText}>
+            <Text style={styles.preferenceTitle}>数据备份与恢复</Text>
+            <Text style={styles.preferenceDescription}>导出完整备份或从 JSON 文件恢复本机数据</Text>
+          </View>
+          <Text style={styles.valueButtonText}>›</Text>
+        </Pressable>
+        <Pressable style={styles.preferenceRow} onPress={() => router.push('/settings/update' as any)}>
+          <View style={styles.preferenceText}>
+            <Text style={styles.preferenceTitle}>检查更新</Text>
+            <Text style={styles.preferenceDescription}>检查并下载最新版本 MaiMate APK</Text>
+          </View>
+          <Text style={styles.valueButtonText}>›</Text>
+        </Pressable>
         <Pressable style={styles.resetButton} onPress={handleReset}>
           <Text style={styles.resetButtonText}>恢复默认显示设置</Text>
         </Pressable>

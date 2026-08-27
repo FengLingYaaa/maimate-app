@@ -23,8 +23,14 @@ export function compareByPinThenOrder(left: PlanEntry, right: PlanEntry): number
  * disabling drag there prevents a drag from being silently overwritten by the
  * next sort pass.
  */
-export function canDragPlanRows(filters: Pick<FilterOptions, 'titleSearch' | 'sort'>): boolean {
-  return !filters.titleSearch?.trim() && (!filters.sort || filters.sort.mode === 'relevance');
+export function canDragPlanRows(filters: FilterOptions): boolean {
+  return Object.entries(filters).every(([key, value]) => {
+    if (key === 'sort') return !value || (value as FilterOptions['sort'])?.mode === 'relevance';
+    if (value === undefined || value === null) return true;
+    if (typeof value === 'string') return value.trim() === '';
+    if (Array.isArray(value)) return value.length === 0;
+    return false;
+  });
 }
 
 /**
@@ -36,14 +42,4 @@ export function applyDragWithPinGroups<T extends PlanEntry>(dragged: T[]): T[] {
   const groups: Record<PinGroup, T[]> = { top: [], middle: [], bottom: [] };
   for (const entry of dragged) groups[pinGroupOf(entry)].push(entry);
   return [...groups.top, ...groups.middle, ...groups.bottom];
-}
-
-/** Reorder only the visible slots, preserving hidden plan entries in place. */
-export function reorderVisibleEntries<T>(entries: T[], visibleIndices: number[], reorderedVisible: T[]): T[] {
-  if (visibleIndices.length !== reorderedVisible.length) return entries;
-  const next = [...entries];
-  visibleIndices.forEach((entryIndex, visibleIndex) => {
-    if (entryIndex >= 0 && entryIndex < next.length) next[entryIndex] = reorderedVisible[visibleIndex];
-  });
-  return next;
 }

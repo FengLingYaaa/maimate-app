@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 import * as IntentLauncher from 'expo-intent-launcher';
+import * as Clipboard from 'expo-clipboard';
 import type { MusicPlatform } from './types';
 import {
   getBilibiliAppSearchUrl,
@@ -8,7 +9,7 @@ import {
   isBilibiliShortLink,
 } from './bilibili-search';
 import { getDirectVideoAppUrls, resolveAndCacheVideoUrl } from './bilibili-resolve';
-import { getMusicPlatformSearchUrl, getMusicPlatformAppUrls } from './music-platforms';
+import { getMusicPlatformSearchText, getMusicPlatformSearchUrl, getMusicPlatformAppUrls } from './music-platforms';
 
 type AppCandidate = { url: string; packageName?: string };
 
@@ -76,7 +77,8 @@ export async function openBilibiliSearch(
 
 /**
  * 音乐平台搜索跳转（v1.7.x 起应用优先、可关）。
- * 先逐个尝试客户端搜索深链候选（社区已知路由，无官方文档），
+ * 先自动复制搜索词到剪贴板（客户端深链若未预填搜索框，可立即粘贴），
+ * 再逐个尝试客户端搜索深链候选（社区已知路由，无官方文档），
  * 全部失败自动回退带关键词的 HTTPS 搜索结果页；回退永不阻塞。
  */
 export async function openMusicPlatformSearch(
@@ -85,6 +87,11 @@ export async function openMusicPlatformSearch(
   artist?: string,
   options?: { appSearchFirst?: boolean },
 ): Promise<ExternalOpenResult> {
+  try {
+    await Clipboard.setStringAsync(getMusicPlatformSearchText(title, artist));
+  } catch {
+    // 复制失败不阻断跳转。
+  }
   if (options?.appSearchFirst !== false) {
     for (const candidate of getMusicPlatformAppUrls(platform, title, artist)) {
       if (await tryLinkingApp({ url: candidate, packageName: ANDROID_PACKAGES[platform] })) return 'app';

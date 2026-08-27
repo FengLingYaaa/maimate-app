@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Stack } from 'expo-router';
 import { Colors } from '../../../src/constants';
 
@@ -14,6 +14,8 @@ export default function SettingsStackLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="data-backup" options={{ title: '数据备份' }} />
+      <Stack.Screen name="update" options={{ title: '检查更新' }} />
     </Stack>
   );
 }

@@ -18,6 +18,17 @@ interface Props {
 
 type Mode = 'percent' | 'eqTap';
 
+/** 展示的判定列：CP 永不失完成率，不参与损失展示。 */
+const VISIBLE_JUDGMENTS = [
+  { key: 'p2550', label: 'P·2550' },
+  { key: 'p2500', label: 'P·2500' },
+  { key: 'g2000', label: 'G·2000' },
+  { key: 'g1500', label: 'G·1500' },
+  { key: 'g1250', label: 'G·1250' },
+  { key: 'good', label: 'Good' },
+  { key: 'miss', label: 'Miss' },
+] as const;
+
 export function AchievementLossCard({ notes, defaultCollapsed = false }: Props) {
   const [expanded, setExpanded] = useState(!defaultCollapsed);
   const [mode, setMode] = useState<Mode>('percent');
@@ -70,21 +81,16 @@ export function AchievementLossCard({ notes, defaultCollapsed = false }: Props) 
             <View>
               <View style={styles.row}>
                 <View style={[styles.cell, styles.typeCell]}><Text style={styles.typeText}>音符</Text></View>
-                <View style={[styles.cell, styles.headCell]}><Text style={styles.headText}>CP</Text></View>
-                <View style={[styles.cell, styles.headCell]}><Text style={styles.headText}>P·2550</Text></View>
-                <View style={[styles.cell, styles.headCell]}><Text style={styles.headText}>P·2500</Text></View>
-                <View style={[styles.cell, styles.headCell]}><Text style={styles.headText}>G·2000</Text></View>
-                <View style={[styles.cell, styles.headCell]}><Text style={styles.headText}>G·1500</Text></View>
-                <View style={[styles.cell, styles.headCell]}><Text style={styles.headText}>G·1250</Text></View>
-                <View style={[styles.cell, styles.headCell]}><Text style={styles.headText}>Good</Text></View>
-                <View style={[styles.cell, styles.headCell]}><Text style={styles.headText}>Miss</Text></View>
+                {VISIBLE_JUDGMENTS.map(judgment => (
+                  <View key={judgment.key} style={[styles.cell, styles.headCell]}><Text style={styles.headText}>{judgment.label}</Text></View>
+                ))}
               </View>
               {rows.map(row => (
                 <View key={row.label} style={styles.row}>
                   <View style={[styles.cell, styles.typeCell]}><Text style={styles.typeText}>{row.label}</Text></View>
-                  {Object.values(row.cells).map((cell, index) => (
-                    <View key={index} style={styles.cell}>
-                      <Text style={styles.valueText}>{formatCell(cell)}</Text>
+                  {VISIBLE_JUDGMENTS.map(judgment => (
+                    <View key={judgment.key} style={styles.cell}>
+                      <Text style={styles.valueText}>{formatCell(row.cells[judgment.key])}</Text>
                     </View>
                   ))}
                 </View>

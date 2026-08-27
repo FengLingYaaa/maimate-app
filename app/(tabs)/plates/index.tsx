@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, DifficultyColorMap, DifficultyLabels, DifficultyShortLabels } from '../../../src/constants';
+import { CoverImage } from '../../../src/components';
 import { useMusicStore, usePlanStore, useScoreStore } from '../../../src/store';
 import {
   buildPlateEntries,
@@ -24,6 +26,7 @@ const PLATE_LABELS: Array<{ name: PlateBit; label: string; color: string }> = [
 
 export default function PlatesPage() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const rawData = useMusicStore(s => s.rawData);
   const scores = useScoreStore(s => s.scores);
   const entries = usePlanStore(s => s.entries);
@@ -99,14 +102,10 @@ export default function PlatesPage() {
     setLastBulkKeys([]);
   };
 
-  return (
-    // 整树 key 重挂载：切回本页时强制全新子树，彻底规避嵌套 Stack
-    // 首帧测量异常（配合 chips 换行容器修复初始无字问题）。
-    <View key={`plates-root-${focusTick}`} style={styles.container}>
-      <Stack.Screen options={{ title: '牌子查询', headerStyle: { backgroundColor: Colors.bg.primary }, headerTintColor: Colors.text.primary }} />
+  const listHeader = (
+    <>
       <View style={styles.header}>
         <Text style={styles.title}>🏅 本地牌子查询</Text>
-        <Text style={styles.subtitle}>根据本机已导入成绩计算，不会上传成绩，也不是逐局游玩历史。</Text>
       </View>
 
       <Pressable style={styles.filterToggle} onPress={() => setFiltersCollapsed(value => !value)}>
@@ -146,16 +145,14 @@ export default function PlatesPage() {
           <Text style={styles.totalLabel}>总计</Text>
           <View style={styles.summaryCells}>{PLATE_LABELS.map(item => <SummaryCell key={item.name} item={item} counts={total.counts} total={total.total} />)}</View>
         </View>
-        <ScrollView style={styles.summaryScroll} nestedScrollEnabled showsVerticalScrollIndicator={false}>
-          {byDifficulty.map(row => (
-            <View key={row.difficultyIndex} style={styles.summaryRow}>
-              <Text style={[styles.diffLabel, { color: DifficultyColorMap[row.difficultyIndex] }]}>
-                {DifficultyShortLabels[row.difficultyIndex] || `难度${row.difficultyIndex}`}
-              </Text>
-              <View style={styles.summaryCells}>{PLATE_LABELS.map(item => <SummaryCell key={item.name} item={item} counts={row.counts} total={row.total} />)}</View>
-            </View>
-          ))}
-        </ScrollView>
+        {byDifficulty.map(row => (
+          <View key={row.difficultyIndex} style={styles.summaryRow}>
+            <Text style={[styles.diffLabel, { color: DifficultyColorMap[row.difficultyIndex] }]}>
+              {DifficultyShortLabels[row.difficultyIndex] || `难度${row.difficultyIndex}`}
+            </Text>
+            <View style={styles.summaryCells}>{PLATE_LABELS.map(item => <SummaryCell key={item.name} item={item} counts={row.counts} total={row.total} />)}</View>
+          </View>
+        ))}
       </View>
 
       {(eligible14Plus.length > 0 || lastBulkKeys.length > 0) && (
@@ -175,20 +172,29 @@ export default function PlatesPage() {
         </View>
       )}
       {notice && <View style={styles.notice}><Text style={styles.noticeText}>{notice}</Text></View>}
+    </>
+  );
 
-      {scores.length === 0 ? (
-        <View style={styles.empty}><Text style={styles.emptyTitle}>暂无本地成绩</Text><Text style={styles.emptyText}>请先在设置中导入成绩，再查询 FC、SSS、FS 和 AP 牌子。</Text></View>
-      ) : filtered.length === 0 ? (
-        <View style={styles.empty}><Text style={styles.emptyTitle}>没有可查询的谱面</Text><Text style={styles.emptyText}>当前筛选条件没有匹配曲目。</Text></View>
-      ) : (
-        <FlatList
-          data={mergedRows}
-          keyExtractor={item => item.key}
-          removeClippedSubviews={false}
-          contentContainerStyle={styles.list}
-          renderItem={({ item }) => <PlateRow entry={item} plannedCount={entries.filter(e => e.songId === item.music.id).length} onPress={() => openSong(item)} />}
-        />
-      )}
+  const listEmpty = scores.length === 0 ? (
+    <View style={styles.empty}><Text style={styles.emptyTitle}>暂无本地成绩</Text><Text style={styles.emptyText}>请先在设置中导入成绩，再查询 FC、SSS、FS 和 AP 牌子。</Text></View>
+  ) : (
+    <View style={styles.empty}><Text style={styles.emptyTitle}>没有可查询的谱面</Text><Text style={styles.emptyText}>当前筛选条件没有匹配曲目。</Text></View>
+  );
+
+  return (
+    // 整树 key 重挂载：切回本页时强制全新子树，彻底规避嵌套 Stack
+    // 首帧测量异常（配合 chips 换行容器修复初始无字问题）。
+    <View key={`plates-root-${focusTick}`} style={styles.container}>
+      <Stack.Screen options={{ title: '牌子查询', headerStyle: { backgroundColor: Colors.bg.primary }, headerTintColor: Colors.text.primary }} />
+      <FlatList
+        data={mergedRows}
+        keyExtractor={item => item.key}
+        removeClippedSubviews={false}
+        contentContainerStyle={[styles.list, { paddingBottom: 96 + insets.bottom }]}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={listEmpty}
+        renderItem={({ item }) => <PlateRow entry={item} plannedCount={entries.filter(e => e.songId === item.music.id).length} onPress={() => openSong(item)} />}
+      />
     </View>
   );
 }
@@ -233,6 +239,7 @@ function PlateChartLine({ chart }: { chart: { difficultyIndex: number; mask: num
 function PlateRow({ entry, plannedCount, onPress }: { entry: ReturnType<typeof mergePlateRows>[number]; plannedCount: number; onPress: () => void }) {
   return (
     <Pressable style={({ pressed }) => [styles.row, pressed && styles.rowPressed]} onPress={onPress}>
+      <CoverImage music={entry.music} style={styles.cover} accessibilityLabel={`${entry.music.title} 曲绘`} />
       <View style={styles.rowInfo}>
         <View style={styles.titleLine}>
           <Text style={styles.rowTitle} numberOfLines={1}>{entry.music.title}</Text>
@@ -247,9 +254,8 @@ function PlateRow({ entry, plannedCount, onPress }: { entry: ReturnType<typeof m
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg.primary },
-  header: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8, gap: 4 },
+  header: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8 },
   title: { fontSize: 23, fontWeight: '800', color: Colors.text.primary },
-  subtitle: { fontSize: 11, lineHeight: 16, color: Colors.text.muted },
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -263,7 +269,6 @@ const styles = StyleSheet.create({
   filterToggleText: { flex: 1, fontSize: 11, fontWeight: '700', color: Colors.text.secondary },
   filterToggleArrow: { fontSize: 11, color: Colors.text.muted, fontWeight: '700' },
   summaryCard: { marginHorizontal: 12, marginVertical: 8, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12, backgroundColor: Colors.bg.secondary, borderWidth: 1, borderColor: Colors.border.light, gap: 6 },
-  summaryScroll: { maxHeight: 190 },
   summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   totalRow: { borderBottomWidth: 1, borderBottomColor: Colors.border.light, paddingBottom: 6, marginBottom: 2 },
   totalLabel: { fontSize: 12, fontWeight: '800', color: Colors.text.primary, width: 34 },
@@ -282,10 +287,11 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.75 },
   notice: { alignSelf: 'center', marginTop: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9, backgroundColor: 'rgba(25,25,34,0.94)' },
   noticeText: { fontSize: 11, color: '#fff', fontWeight: '700' },
-  list: { paddingHorizontal: 12, paddingBottom: 80, gap: 6 },
-  row: { padding: 11, borderRadius: 11, backgroundColor: Colors.bg.secondary, borderWidth: 1, borderColor: Colors.border.light },
+  list: { paddingHorizontal: 12, gap: 6 },
+  row: { padding: 11, borderRadius: 11, backgroundColor: Colors.bg.secondary, borderWidth: 1, borderColor: Colors.border.light, flexDirection: 'row', gap: 10 },
   rowPressed: { backgroundColor: Colors.bg.tertiary, borderColor: Colors.border.accent },
-  rowInfo: { gap: 4 },
+  cover: { width: 56, height: 56, borderRadius: 8, backgroundColor: Colors.bg.tertiary },
+  rowInfo: { flex: 1, gap: 4 },
   titleLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   rowTitle: { flexShrink: 1, fontSize: 13, fontWeight: '700', color: Colors.text.primary },
   planTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: `${Colors.accent.primary}22` },
@@ -296,7 +302,7 @@ const styles = StyleSheet.create({
   diffBadgeText: { fontSize: 10, fontWeight: '800', textAlign: 'center' },
   badgeMarks: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   mark: { fontSize: 10, fontWeight: '800' },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 7, paddingBottom: 80 },
+  empty: { alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 48 },
   emptyTitle: { fontSize: 16, color: Colors.text.primary, fontWeight: '700' },
   emptyText: { fontSize: 12, color: Colors.text.muted },
 });

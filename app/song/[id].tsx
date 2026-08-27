@@ -22,7 +22,7 @@ import { DifficultyLabels, getChinaVersionName } from '../../src/constants/game'
 import { getOfficialChartConstant, getTotalNotes } from '../../src/data/music-list';
 import { formatAchievement, normalizeAchievement } from '../../src/data/rating';
 import { openMusicPlatformSearch } from '../../src/data/external-links';
-import { MUSIC_PLATFORM_LABELS } from '../../src/data/music-platforms';
+import { getMusicPlatformSearchText, MUSIC_PLATFORM_LABELS } from '../../src/data/music-platforms';
 import type { ChartData, DetailBoardId, MusicPlatform } from '../../src/data/types';
 
 export default function SongDetail() {
@@ -152,7 +152,8 @@ export default function SongDetail() {
   const openMusicPlatform = async (platform: MusicPlatform) => {
     try {
       const result = await openMusicPlatformSearch(platform, music.title, music.basic_info.artist, { appSearchFirst: settings.musicAppSearchFirst });
-      showToast(result === 'app' ? `已打开${MUSIC_PLATFORM_LABELS[platform]}应用` : `已打开${MUSIC_PLATFORM_LABELS[platform]}网页`);
+      const channel = result === 'app' ? `${MUSIC_PLATFORM_LABELS[platform]}应用` : `${MUSIC_PLATFORM_LABELS[platform]}网页`;
+      showToast(`已打开${channel}，搜索词已复制`);
     } catch {
       showToast('无法打开音乐平台');
     }
@@ -321,6 +322,7 @@ export default function SongDetail() {
                         key="platform"
                         defaultPlatform={settings.defaultMusicPlatform}
                         defaultCollapsed={settings.detailBoards.platform.collapsed}
+                        searchText={getMusicPlatformSearchText(music.title, music.basic_info.artist)}
                         onOpen={platform => void openMusicPlatform(platform)}
                       />;
                     default:

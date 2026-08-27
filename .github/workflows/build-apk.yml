@@ -48,6 +48,8 @@ jobs:
           npm run test:features
           npm run test:phase-af
           npm run test:rating
+          npm run test:backup
+          npm run test:update
 
       - name: Validate Expo project and Android export
         run: |

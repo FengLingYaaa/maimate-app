@@ -15,7 +15,8 @@ import {
   filterEntriesByMinLevel,
   PLATE_BITS,
 } from '../src/data/plates.ts';
-import { applyDragWithPinGroups, canDragPlanRows, compareByPinThenOrder, pinGroupOf, reorderVisibleEntries } from '../src/data/plan-order.ts';
+import { applyDragWithPinGroups, canDragPlanRows, compareByPinThenOrder, pinGroupOf } from '../src/data/plan-order.ts';
+import { migratePlanEntryIds, normalizePlanEntries, reorderPlanEntriesById } from '../src/data/plan-entries.ts';
 import { getBilibiliVideoAppUrls } from '../src/data/bilibili-search.ts';
 import { extractBilibiliVideoId, isBilibiliShortLink } from '../src/data/bilibili-search.ts';
 import { av2bv, bv2av } from '../src/data/bilibili-bvid.ts';
@@ -80,7 +81,9 @@ assert.equal(Versions.some(version => /FiNALE/i.test(version) && version !== 'ma
 assert.equal(canDragPlanRows({}), true);
 assert.equal(canDragPlanRows({ titleSearch: 'Song 1' }), false);
 assert.equal(canDragPlanRows({ sort: { mode: 'titleAsc' } }), false);
-assert.deepEqual(reorderVisibleEntries(['A', 'B', 'C'], [0, 2], ['C', 'A']), ['C', 'B', 'A']);
+assert.equal(canDragPlanRows({ genre: '流行&动漫' }), false);
+assert.equal(canDragPlanRows({ difficulty: 3 }), false);
+assert.equal(canDragPlanRows({ version: ['SD'] }), false);
 
 const score = { songId: '1', type: 'DX', difficultyIndex: 3, achievement: 100.5, dxScore: 1000, fc: 'ap', fs: 'fsd', importedAt: 1 };
 assert.equal(getPlateMask(score), PLATE_BITS.FC | PLATE_BITS.SSS | PLATE_BITS.FSD | PLATE_BITS.AP);
@@ -118,22 +121,34 @@ const dragged = [pinB, botD, midC, pinA];
 const legal = applyDragWithPinGroups(dragged);
 assert.deepEqual(legal.map(entry => entry.order), [1, 0, 2, 3]);
 
-// v1.9.0：拖拽串位修复——store.reorder 必须信任传入数组顺序（order=下标），
-// 连续两次拖拽后顺序正确、互不串位。
-const renumber = (list) => list.map((entry, index) => ({ ...entry, order: index }));
-const mkEntry = (id: string, order: number) => ({ songId: id, difficultyIndex: 3, musicType: 'DX', order, addedAt: 1 });
+// v1.9.0：拖拽串位修复——store.reorder 必须信任传入数组顺序（order=下标）。
+// v1.10.0：改用持久 entryId 作为唯一身份，旧数据加载时补发并写回，连续拖拽不串位。
+const mkEntry = (id: string, order: number) => ({ songId: id, difficultyIndex: 3, musicType: 'DX' as const, order, addedAt: 1 });
+const legacySeq = [mkEntry('A', 0), mkEntry('B', 1), mkEntry('C', 2), mkEntry('D', 3)];
+const migrated = migratePlanEntryIds(legacySeq as any);
+assert.equal(migrated.migrated, true);
+assert.equal(new Set(migrated.entries.map(entry => entry.entryId)).size, 4);
+// 第二次迁移（已含 id）不再变更身份。
+const secondPass = migratePlanEntryIds(migrated.entries as any);
+assert.equal(secondPass.migrated, false);
+assert.deepEqual(secondPass.entries.map(entry => entry.entryId), migrated.entries.map(entry => entry.entryId));
+
 function simulateDrag(entries: any[], draggedIds: string[]): any[] {
-  const ordered = [...entries].sort((a, b) => a.order - b.order);
-  const data = draggedIds.map(id => ordered.find(entry => entry.songId === id)!).filter(Boolean);
-  const legalOrder = applyDragWithPinGroups(data);
-  const visibleIndices = ordered.map((entry, index) => index);
-  return renumber(reorderVisibleEntries(ordered, visibleIndices, legalOrder));
+  const ordered = normalizePlanEntries(entries);
+  const result = reorderPlanEntriesById(ordered, draggedIds);
+  assert.ok(result, 'valid drag must produce a result');
+  return result!;
 }
-const seq = [mkEntry('A', 0), mkEntry('B', 1), mkEntry('C', 2), mkEntry('D', 3)];
-const afterFirst = simulateDrag(seq, ['D', 'A', 'B', 'C']);
+const seq = migrated.entries;
+const seqIds = seq.map(entry => entry.entryId);
+const afterFirst = simulateDrag(seq, [seqIds[3], seqIds[0], seqIds[1], seqIds[2]]);
 assert.deepEqual(afterFirst.map(e => e.songId), ['D', 'A', 'B', 'C']);
-const afterSecond = simulateDrag(afterFirst, ['B', 'D', 'A', 'C']);
+const afterSecond = simulateDrag(afterFirst, [afterFirst[2].entryId, afterFirst[0].entryId, afterFirst[1].entryId, afterFirst[3].entryId]);
 assert.deepEqual(afterSecond.map(e => e.songId), ['B', 'D', 'A', 'C']);
+// 非法顺序（缺失 / 重复 / 长度不符）必须被拒绝。
+assert.equal(reorderPlanEntriesById(seq, [seqIds[0], seqIds[1], seqIds[2]]), null);
+assert.equal(reorderPlanEntriesById(seq, [seqIds[0], seqIds[0], seqIds[2], seqIds[3]]), null);
+assert.equal(reorderPlanEntriesById(seq, ['bogus', seqIds[1], seqIds[2], seqIds[3]]), null);
 
 // v1.7.0：B 站视频深链提取；b23.tv 短链无法本地展开。
 // v1.9.0 起深链 av 优先：BV 号本地转 av 后优先 bilibili://video/<av>。
