@@ -103,8 +103,9 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
-| 最新 Release APK SHA-256（v1.11.0，待 v1.12.0 构建后更新） | `5a4a0992c7783de264f210270e8a7e62e87c67417a35de4c2168a3a026f39f75`（CI「Print APK checksum」步骤输出） |
-| 最新 Release APK 大小 | 62,426,874 bytes（59.5 MB，v1.11.0；待 v1.12.0 构建后更新） |
+| 最新 Release APK SHA-256（v1.12.0） | `72557b93f6bcf9301d222a551fb422778c0603bcb17b957f1c105440b9cb4e3e`（CI「Print APK checksum」步骤输出） |
+| 最新 Release APK 大小 | 62,292,306 bytes（59.4 MB） |
+| 下载站同步状态 | 已部署：v1.12.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | 下载站同步状态 | 已部署：v1.11.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | APK 构建方式 | GitHub Actions 云构建：先跑 lint/route/feature/phase/rating 回归、Expo Doctor 和 Android export 门禁，再出 arm64-v8a debug keystore 内测包 |
 
@@ -929,4 +930,5 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 曲库更新按钮删除（修⑦）：`app/(tabs)/index.tsx` 删「更新 / 下载」按钮、样式与 `openDownloadSite`/`Linking` 导入（用户改走设置→检查更新）。
 - 附加四项：`SongCard` 新增 `b50Badge` prop（曲库行标题旁「B50 #池内排名」徽标，新曲青色/旧曲灰色，`app/(tabs)/index.tsx` 以 `computeB50` 结果建 songId→最佳排名映射传入）；新增 `src/data/scores-csv-core.ts`（纯函数 `buildScoresCsv`/`CSV_HEADER`/`CsvScoreRow`，RFC 4180 转义、CRLF 行尾）与 `src/data/scores-csv.ts`（IO 壳：store 收集成绩→曲库补全 title/ds/level→写缓存文件→系统分享→清理），设置页「数据与隐私」加「导出成绩 CSV」入口；B50 池切换状态保持（useState 天然保持，useFocusEffect 不重置）；`plan-store` 新增 `clearAchievedTargets(entryIds)`，`plan.tsx` 计算已达标条目（当前达成率 ≥ 目标），头部条件渲染「清已达」按钮，确认后批量清除目标分数（曲目保留）。
 - 回归测试：feature-check 删除 v1.11 跨组拖拽断言；新增 ties 断言（40 首同分旧曲 → 35 入榜 + 5 未入榜 ties 且 ID 稳定 985–989）、`computeB50Gain` 断言（非法目标/不在库→null、Song 1 成绩 90→100.5 增量=新旧单谱 Rating 差、低定数谱面即使 100.5% 也进不了池→+0）、CSV 断言（表头逐列、含逗号引号值转义、CRLF 结尾）。
-- 版本与验证：`app.json` 升 `1.12.0`/versionCode `20`，`package.json` 升 `1.12.0`；本地全绿——tsc、route/feature/phase-af/rating/backup/update 六组回归、`expo-doctor` 21/21、`expo export --platform android`（4.4MB hbc）。发布补记待构建后回填。
+- 版本与验证：`app.json` 升 `1.12.0`/versionCode `20`，`package.json` 升 `1.12.0`；本地全绿——tsc、route/feature/phase-af/rating/backup/update 六组回归、`expo-doctor` 21/21、`expo export --platform android`（4.4MB hbc）。
+- 发布补记（当日）：功能提交 `8f03358`，打轻量标签 `v1.12.0` 推送（GitHub 间歇阻断约 5 分钟，第 3 次重试成功）触发云构建 run `33097427159`，一次通过（lint + 6 组回归 + expo-doctor + Android export + arm64 gradle 全绿）。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.12.0>；资产 `MaiMate-latest.apk` 大小 `62,292,306` bytes（59.4 MB），SHA-256 `72557b93f6bcf9301d222a551fb422778c0603bcb17b957f1c105440b9cb4e3e`（取自 CI「Print APK checksum」步骤输出）。落地页更新 v1.12.0 文案、日志与 SHA 后经 wrangler 部署 Pages（deployment `647c6a8e.maimate-landing.pages.dev`）；线上校验落地页 200 且含 v1.12.0 与新 SHA、`HEAD /MaiMate-latest.apk` 返回 200 / content-length `62,292,306` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（无分组拖拽、B50 分池/染色/同分附加、目标增量、曲库徽标、CSV 导出、清已达）。
