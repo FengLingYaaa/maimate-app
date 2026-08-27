@@ -247,7 +247,7 @@
     <!-- Download -->
     <div class="download-card">
       <h3>📦 下载 MaiMate</h3>
-      <p class="info">当前版本：v1.10.0（Android arm64 内测）</p>
+      <p class="info">当前版本：v1.11.0（Android arm64 内测）</p>
       <a href="/MaiMate-latest.apk" class="download-btn disabled" id="dlBtn" aria-disabled="true" onclick="return false;">
         ⏳ 检查下载地址
       </a>
@@ -255,8 +255,8 @@
         正在检查最新 APK；下载后即可直接安装
         
       </p>
-      <span class="size-badge" id="apkSize">Android · arm64-v8a · 59.4 MB · debug 签名</span>
-       <p class="download-hint">SHA-256：<code id="apkSha">969e5c02ea5da00139627b596c1e09cf23ca015825aebdfabdcebe0f34daced0</code></p>
+      <span class="size-badge" id="apkSize">Android · arm64-v8a · 59.5 MB · debug 签名</span>
+       <p class="download-hint">SHA-256：<code id="apkSha">5a4a0992c7783de264f210270e8a7e62e87c67417a35de4c2168a3a026f39f75</code></p>
     </div>
 
     <!-- Features -->
@@ -286,6 +286,19 @@
     <!-- Changelog -->
     <div class="changelog">
       <h3>📝 更新日志</h3>
+      <div class="entry">
+        <span class="version">v1.11.0 · Android 内测</span><span class="date">2026-08-27</span>
+        <ul>
+          <li>新增「B50 总览」：按 Diving-Fish 口径本地估算旧曲 B35 + 新曲 B15，总分/两池合计/官方 Rating 对照一目了然，50 首明细含曲绘、定数与单谱 Rating。</li>
+          <li>B50 页内新增成绩趋势折线图：基于本地同步快照绘制本地估算（实线）与服务器 RA（虚线）双线走势。</li>
+          <li>曲绘本地缓存：首次加载后封面落盘，之后离线也可显示；下载失败自动回退在线加载。</li>
+          <li>更新红点：有新版本时设置 Tab 亮起红点，进入更新页即熄灭；应用启动后静默检查（24 小时节流，不打扰）。</li>
+          <li>推分计划禁止跨组拖拽：置顶/普通/置底组之间不再互换，组内拖拽不受影响；删除曲目下方拖拽提示文字。</li>
+          <li>牌子查询默认聚焦 Master/ReMaster：Basic/Advanced/Expert 收起，可一键展开。</li>
+          <li>完成率损失表按判定着色：P 判定橙色、G 判定粉色、Good 绿色、Miss 保持灰色。</li>
+          <li>检查更新页删除 GitHub Releases 说明文字。</li>
+        </ul>
+      </div>
       <div class="entry">
         <span class="version">v1.10.0 · Android 内测</span><span class="date">2026-08-27</span>
         <ul>
