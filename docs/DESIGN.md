@@ -103,9 +103,9 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
-| 最新 Release APK SHA-256（v1.9.0） | `70229f8c6ca050c82bf39c0eff6f1a0349ea6c8eca9281e5698ca182d5d9eec4`（CI「Print APK checksum」步骤输出） |
-| 最新 Release APK 大小 | 62,101,346 bytes（59.2 MB） |
-| 下载站同步状态 | 已部署：v1.9.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
+| 最新 Release APK SHA-256（v1.10.0） | `969e5c02ea5da00139627b596c1e09cf23ca015825aebdfabdcebe0f34daced0`（CI「Print APK checksum」步骤输出） |
+| 最新 Release APK 大小 | 62,260,714 bytes（59.4 MB） |
+| 下载站同步状态 | 已部署：v1.10.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | APK 构建方式 | GitHub Actions 云构建：先跑 lint/route/feature/phase/rating 回归、Expo Doctor 和 Android export 门禁，再出 arm64-v8a debug keystore 内测包 |
 
 当前 App Git 仓库在第三阶段提交之后应保持干净；设计文档本身位于仓库外的工作区镜像和 App 仓库内的文档副本中，更新文档会让 App 仓库产生文档变更，这是预期行为。
@@ -902,4 +902,4 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 应用内更新检查（⑧）：新增 `src/api/app-update.ts`（GitHub `releases/latest` + 下载站 APK 地址、`AbortController` 15s 超时、draft/prerelease 忽略、SemVer 比较、仅 Android 参与下载）+ `src/data/semver.ts`（纯函数可测）；设置子页 `update.tsx`（当前版本/检查/新版本说明/下载与发布页按钮）。
 - 依赖与版本：`expo` 及若干 SDK 57 包对齐到 Expo 最新补丁（`expo-doctor` 21/21 全绿），`react-native` 升 `0.86.3`，`app.json` 升 `1.10.0`/versionCode `18`，`package.json` 升 `1.10.0`。
 - 回归测试：`scripts/feature-check.ts` 拖拽断言改为 entryId 语义（迁移幂等、合法/非法顺序拒绝、连续两次拖拽）；新增 `scripts/backup-check.ts`（round-trip/未知字段/损坏 JSON/未来 schema 拒绝/旧计划无 entryId 迁移/非法数值剔除/数组截断/coverUri 剥离）与 `scripts/update-check.ts`（SemVer）；`package.json` 增 `test:backup`/`test:update` 并接入 CI 门禁。
-- 发布补记：待云构建与下载站回填。
+- 发布补记（当日）：版本升至 `1.10.0`（versionCode `18`，功能提交 `0740d3f`）。打轻量标签 `v1.10.0` 推送触发云构建 run `33037908454`，一次通过（lint + 6 组回归 + expo-doctor + Android export + arm64 gradle 全绿）。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.10.0>；资产 `MaiMate-latest.apk` 大小 `62,260,714` bytes（59.4 MB），SHA-256 `969e5c02ea5da00139627b596c1e09cf23ca015825aebdfabdcebe0f34daced0`（取自 CI「Print APK checksum」步骤输出）。落地页更新 v1.10.0 文案、日志与 SHA 后经 wrangler 部署 Pages（deployment `790e41d1.maimate-landing.pages.dev`）；线上校验落地页 200 且含新 SHA、`HEAD /MaiMate-latest.apk` 返回 200 / content-length `62,260,714` 与资产一致。等待用户真机验收（拖拽、网易云搜索填词/剪贴板、牌子滚动、备份/恢复、更新检查）。

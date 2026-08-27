@@ -247,7 +247,7 @@
     <!-- Download -->
     <div class="download-card">
       <h3>📦 下载 MaiMate</h3>
-      <p class="info">当前版本：v1.9.0（Android arm64 内测）</p>
+      <p class="info">当前版本：v1.10.0（Android arm64 内测）</p>
       <a href="/MaiMate-latest.apk" class="download-btn disabled" id="dlBtn" aria-disabled="true" onclick="return false;">
         ⏳ 检查下载地址
       </a>
@@ -255,8 +255,8 @@
         正在检查最新 APK；下载后即可直接安装
         
       </p>
-      <span class="size-badge" id="apkSize">Android · arm64-v8a · 59.2 MB · debug 签名</span>
-       <p class="download-hint">SHA-256：<code id="apkSha">70229f8c6ca050c82bf39c0eff6f1a0349ea6c8eca9281e5698ca182d5d9eec4</code></p>
+      <span class="size-badge" id="apkSize">Android · arm64-v8a · 59.4 MB · debug 签名</span>
+       <p class="download-hint">SHA-256：<code id="apkSha">969e5c02ea5da00139627b596c1e09cf23ca015825aebdfabdcebe0f34daced0</code></p>
     </div>
 
     <!-- Features -->
@@ -286,6 +286,18 @@
     <!-- Changelog -->
     <div class="changelog">
       <h3>📝 更新日志</h3>
+      <div class="entry">
+        <span class="version">v1.10.0 · Android 内测</span><span class="date">2026-08-27</span>
+        <ul>
+          <li>推分计划拖拽彻底重写：改用持久 entryId 作为唯一身份，首次加载自动迁移旧数据，拖拽结束原子提交全量顺序，连续拖拽不再串位。</li>
+          <li>修复计划列表最下侧曲目目标达成率被底部栏遮挡：列表底部按安全区 + 标签栏高度留白。</li>
+          <li>音乐平台搜索跳转前自动复制「曲名+曲师」到剪贴板，客户端未预填时直接粘贴即可；网易云新增多条搜索深链候选。</li>
+          <li>牌子查询改为单一滚动列表：完成度总计随页面下滑滚动，曲目旁新增曲绘，删除顶部提示行。</li>
+          <li>完成率损失表删除 CP 列（CP 永不失完成率）；设置页删除重复的「牌子查询」入口（牌子已是底部 Tab）。</li>
+          <li>新增「数据备份与恢复」：导出完整备份为 JSON（计划/成绩/快照/B 站链接/设置/运势种子），可随时选择文件恢复，Diving-Fish Token 永不写入备份。</li>
+          <li>新增「检查更新」：应用内查询 GitHub Releases 最新版本并跳转下载站。</li>
+        </ul>
+      </div>
       <div class="entry">
         <span class="version">v1.9.0 · Android 内测</span><span class="date">2026-08-26</span>
         <ul>
