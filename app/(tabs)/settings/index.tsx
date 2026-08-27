@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Colors } from '../../../src/constants';
 import { useScoreStore, useSettingsStore } from '../../../src/store';
 import { MUSIC_PLATFORM_OPTIONS, getSortLabel } from '../../../src/data/settings-options';
+import { exportScoresCsvToShare } from '../../../src/data/scores-csv';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -21,6 +22,21 @@ export default function SettingsPage() {
   const [tokenInput, setTokenInput] = useState('');
   const [tokenMessage, setTokenMessage] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
+
+  const exportCsv = async () => {
+    if (working) return;
+    setWorking(true);
+    try {
+      const { rowCount } = await exportScoresCsvToShare();
+      if (rowCount === 0) {
+        setTokenMessage('没有已导入的成绩可导出');
+      }
+    } catch (error) {
+      setTokenMessage(error instanceof Error ? error.message : 'CSV 导出失败');
+    } finally {
+      setWorking(false);
+    }
+  };
 
   useEffect(() => {
     if (tokenConfigured) setTokenInput('');
@@ -163,6 +179,13 @@ export default function SettingsPage() {
           <View style={styles.preferenceText}>
             <Text style={styles.preferenceTitle}>数据备份与恢复</Text>
             <Text style={styles.preferenceDescription}>导出完整备份或从 JSON 文件恢复本机数据</Text>
+          </View>
+          <Text style={styles.valueButtonText}>›</Text>
+        </Pressable>
+        <Pressable style={styles.preferenceRow} onPress={() => void exportCsv()}>
+          <View style={styles.preferenceText}>
+            <Text style={styles.preferenceTitle}>导出成绩 CSV</Text>
+            <Text style={styles.preferenceDescription}>把已导入的成绩导出为 CSV 文件，方便在电脑上分析</Text>
           </View>
           <Text style={styles.valueButtonText}>›</Text>
         </Pressable>

@@ -60,11 +60,11 @@ export default function PushPlan() {
   const graveyard = usePlanStore(s => s.graveyard);
   const removeEntryById = usePlanStore(s => s.removeEntryById);
   const updateTargetScoreById = usePlanStore(s => s.updateTargetScoreById);
-  const setPinById = usePlanStore(s => s.setPinById);
   const bulkRemoveEntries = usePlanStore(s => s.bulkRemoveEntries);
   const purgeGraveyardEntry = usePlanStore(s => s.purgeGraveyardEntry);
   const restoreGraveyardEntry = usePlanStore(s => s.restoreGraveyardEntry);
   const reorderByIds = usePlanStore(s => s.reorderByIds);
+  const clearAchievedTargets = usePlanStore(s => s.clearAchievedTargets);
   const rawData = useMusicStore(s => s.rawData);
   const scores = useScoreStore(s => s.scores);
   const settings = useSettingsStore(s => s.settings);
@@ -119,6 +119,27 @@ export default function PushPlan() {
     music: rawData.find(m => m.id === item.entry.songId && (!item.entry.musicType || m.type === item.entry.musicType)) || rawData.find(m => m.id === item.entry.songId),
   })), [graveyard, rawData]);
 
+  // v1.12.0：已达标条目（当前达成率 ≥ 目标），用于「清除已达标目标」按钮。
+  const achievedEntryIds = useMemo(() => plannedRows
+    .filter(row => row.entry.targetScore !== undefined)
+    .filter(row => {
+      const score = scores.find(item => item.songId === row.music.id
+        && item.type === row.music.type
+        && item.difficultyIndex === row.entry.difficultyIndex);
+      return score ? score.achievement >= row.entry.targetScore! : false;
+    })
+    .map(row => row.entry.entryId), [plannedRows, scores]);
+
+  const handleClearAchieved = useCallback(() => {
+    if (achievedEntryIds.length === 0) return;
+    setConfirmRequest({
+      title: '清除已达标目标',
+      message: `${achievedEntryIds.length} 个条目已达成目标。清除它们的目标分数？曲目保留在计划中。`,
+      confirmText: '清除',
+      onConfirm: () => clearAchievedTargets(achievedEntryIds),
+    });
+  }, [achievedEntryIds, clearAchievedTargets]);
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -129,10 +150,11 @@ export default function PushPlan() {
               <Text style={styles.graveyardIcon}>🗑️</Text>
               {graveyard.length > 0 && <View style={styles.graveyardBadge}><Text style={styles.graveyardBadgeText}>{graveyard.length}</Text></View>}
             </Pressable>
+            {achievedEntryIds.length > 0 && <Pressable onPress={handleClearAchieved}><Text style={styles.clearBtn}>清已达</Text></Pressable>}
             {entries.length > 0 && <Pressable onPress={handleClear}><Text style={styles.clearBtn}>清空</Text></Pressable>}
           </View>
         </View>
-        <Text style={styles.headerSub}>{entries.length > 0 ? `${entries.length} 首待练习` : '还没有添加歌曲'} · 曲目下方 📌/🔻 置顶置底，同组之间长按拖拽</Text>
+        <Text style={styles.headerSub}>{entries.length > 0 ? `${entries.length} 首待练习` : '还没有添加歌曲'} · 长按曲目拖拽排序</Text>
         <Pressable style={styles.b50Entry} onPress={() => router.push('/b50')}>
           <Text style={styles.b50EntryText}>B50 总览 →</Text>
         </Pressable>
@@ -161,6 +183,7 @@ export default function PushPlan() {
           showChinaVersion={settings.showChinaVersion}
           showProjectedRating={settings.showProjectedRating}
           allSongs={rawData}
+          allScores={scores}
           getScore={getScore}
           onOpen={row => router.push({ pathname: '/song/[id]' as any, params: { id: row.music.id, type: row.music.type, difficultyIndex: String(row.entry.difficultyIndex), source: 'plan' } })}
           onRemove={entryId => {
@@ -168,7 +191,6 @@ export default function PushPlan() {
             if (row) handleRemove(row);
           }}
           onTarget={updateTargetScoreById}
-          onPin={setPinById}
           onReorder={reorderByIds}
         />
       )}

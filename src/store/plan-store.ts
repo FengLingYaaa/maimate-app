@@ -38,6 +38,8 @@ interface PlanStore {
   updateNote: (songId: string, difficultyIndex: number, note: string, musicType?: 'SD' | 'DX') => void;
   updateTargetScore: (songId: string, difficultyIndex: number, score: number | null, musicType?: 'SD' | 'DX') => void;
   updateTargetScoreById: (entryId: string, score: number | null) => void;
+  /** v1.12.0：批量清除指定条目的目标分数（保留条目）。 */
+  clearAchievedTargets: (achievedEntryIds: string[]) => void;
   setPin: (songId: string, difficultyIndex: number, pin: PlanEntry['pin'] | undefined, musicType?: 'SD' | 'DX') => void;
   setPinById: (entryId: string, pin: PlanEntry['pin'] | undefined) => void;
   reorderByIds: (orderedIds: string[]) => boolean;
@@ -224,6 +226,14 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
 
   updateTargetScoreById: (entryId, score) => {
     const entries = get().entries.map(entry => entry.entryId === entryId ? withTargetScore(entry, score) : entry);
+    set({ entries });
+    void enqueuePlanPersist(entries);
+  },
+
+  /** v1.12.0：批量清除已达标条目的目标分数（保留条目本身）。 */
+  clearAchievedTargets: achievedEntryIds => {
+    const achieved = new Set(achievedEntryIds);
+    const entries = get().entries.map(entry => achieved.has(entry.entryId) ? withTargetScore(entry, null) : entry);
     set({ entries });
     void enqueuePlanPersist(entries);
   },

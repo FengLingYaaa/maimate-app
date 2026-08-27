@@ -1,9 +1,8 @@
 import React, { useCallback, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import DraggableFlatList, { ScaleDecorator, type RenderItemParams } from 'react-native-draggable-flatlist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../constants';
-import { isLegalDragResult } from '../data/plan-order';
 import type { MusicData, PlanEntry, PlayerScore } from '../data/types';
 import { PlanEntryCard } from './PlanEntryCard';
 
@@ -18,17 +17,18 @@ interface Props {
   showChinaVersion: boolean;
   showProjectedRating: boolean;
   allSongs: MusicData[];
+  allScores: PlayerScore[];
   getScore: (music: MusicData, entry: PlanEntry) => PlayerScore | undefined;
   onOpen: (row: PlanDragRow) => void;
   onRemove: (entryId: string) => void;
   onTarget: (entryId: string, value: number | null) => void;
-  onPin: (entryId: string, pin: PlanEntry['pin'] | undefined) => void;
   onReorder: (orderedIds: string[]) => boolean;
 }
 
 /**
  * 推分计划唯一的可排序视图。业务页面不接触拖拽 index，也不缓存 Row 对象；
  * 所有更新只通过持久 entryId 寻址，拖拽结束一次性提交完整 ID 顺序。
+ * v1.12.0：置顶/置底功能删除，所有曲目一个分组，长按即可拖拽。
  */
 export function PlanDragList({
   rows,
@@ -36,11 +36,11 @@ export function PlanDragList({
   showChinaVersion,
   showProjectedRating,
   allSongs,
+  allScores,
   getScore,
   onOpen,
   onRemove,
   onTarget,
-  onPin,
   onReorder,
 }: Props) {
   const insets = useSafeAreaInsets();
@@ -53,13 +53,13 @@ export function PlanDragList({
       showChinaVersion={showChinaVersion}
       showProjectedRating={showProjectedRating}
       allSongs={allSongs}
+      allScores={allScores}
       getScore={getScore}
       onOpen={onOpen}
       onRemove={onRemove}
       onTarget={onTarget}
-      onPin={onPin}
     />
-  ), [allSongs, canDrag, getScore, onOpen, onPin, onRemove, onTarget, showChinaVersion, showProjectedRating]);
+  ), [allSongs, allScores, canDrag, getScore, onOpen, onRemove, onTarget, showChinaVersion, showProjectedRating]);
 
   return (
     <DraggableFlatList
@@ -78,8 +78,6 @@ export function PlanDragList({
         const orderedIds = data.map(row => row.entry.entryId);
         const currentIds = rows.map(row => row.entry.entryId);
         if (orderedIds.every((id, index) => id === currentIds[index])) return;
-        // 跨分组拖拽直接作废：置顶/普通/置底块必须保持连续分区。
-        if (!isLegalDragResult(data.map(row => row.entry))) return;
         onReorder(orderedIds);
       }}
       contentContainerStyle={styles.content}
@@ -100,11 +98,11 @@ function PlanDragRowView({
   showChinaVersion,
   showProjectedRating,
   allSongs,
+  allScores,
   getScore,
   onOpen,
   onRemove,
   onTarget,
-  onPin,
 }: RenderItemParams<PlanDragRow> & Omit<Props, 'rows' | 'onReorder'>) {
   const entryId = item.entry.entryId;
   return (
@@ -115,6 +113,7 @@ function PlanDragRowView({
           entry={item.entry}
           index={getIndex() ?? item.entry.order}
           allSongs={allSongs}
+          allScores={allScores}
           importedScore={getScore(item.music, item.entry)}
           showChinaVersion={showChinaVersion}
           showProjectedRating={showProjectedRating}
@@ -123,22 +122,6 @@ function PlanDragRowView({
           onRemove={() => onRemove(entryId)}
           onTarget={value => onTarget(entryId, value)}
         />
-        <View style={styles.rowActions}>
-          <Pressable
-            style={[styles.pinButton, item.entry.pin === 'top' && styles.pinButtonActive]}
-            onPress={() => onPin(entryId, item.entry.pin === 'top' ? undefined : 'top')}
-            accessibilityLabel={item.entry.pin === 'top' ? '取消置顶' : '置顶'}
-          >
-            <Text style={[styles.pinText, item.entry.pin === 'top' && styles.pinTextActive]}>{item.entry.pin === 'top' ? '取消置顶' : '📌 置顶'}</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.pinButton, item.entry.pin === 'bottom' && styles.pinButtonActive]}
-            onPress={() => onPin(entryId, item.entry.pin === 'bottom' ? undefined : 'bottom')}
-            accessibilityLabel={item.entry.pin === 'bottom' ? '取消置底' : '置底'}
-          >
-            <Text style={[styles.pinText, item.entry.pin === 'bottom' && styles.pinTextActive]}>{item.entry.pin === 'bottom' ? '取消置底' : '🔻 置底'}</Text>
-          </Pressable>
-        </View>
       </View>
     </ScaleDecorator>
   );
@@ -148,24 +131,4 @@ const styles = StyleSheet.create({
   content: { paddingTop: 2 },
   row: { backgroundColor: Colors.bg.primary },
   activeRow: { opacity: 0.96, backgroundColor: Colors.bg.tertiary },
-  rowActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 7,
-    marginHorizontal: 14,
-    marginTop: -2,
-    marginBottom: 5,
-  },
-  pinButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 7,
-    borderWidth: 1,
-    borderColor: Colors.border.light,
-    backgroundColor: Colors.bg.secondary,
-  },
-  pinButtonActive: { borderColor: Colors.accent.secondary, backgroundColor: `${Colors.accent.secondary}22` },
-  pinText: { fontSize: 9.5, color: Colors.text.secondary, fontWeight: '700' },
-  pinTextActive: { color: Colors.accent.secondary },
 });

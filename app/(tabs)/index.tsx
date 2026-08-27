@@ -1,16 +1,17 @@
-﻿/**
+/**
  * 曲库首页 — 歌曲浏览器
  * 支持筛选、搜索、列表展示
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, Pressable, Linking } from 'react-native';
+import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useMusicStore, useSettingsStore } from '../../src/store';
+import { useMusicStore, useScoreStore, useSettingsStore } from '../../src/store';
 import { SongCard, FilterBar, TitleRecognizer } from '../../src/components';
 import { Colors } from '../../src/constants';
 import { getMatchingDifficultyIndices, MusicList } from '../../src/data/music-list';
 import { getChinaVersionOptions, getVersionOptions } from '../../src/data/version-catalog';
+import { computeB50 } from '../../src/data/b50';
 import type { FilterOptions, MusicData } from '../../src/data/types';
 
 function formatCacheTime(timestamp: number | null): string {
@@ -32,6 +33,21 @@ export default function SongBrowser() {
   const clearFilters = useMusicStore(s => s.clearFilters);
   const settings = useSettingsStore(s => s.settings);
   const settingsLoaded = useSettingsStore(s => s.loaded);
+  const scores = useScoreStore(s => s.scores);
+
+  // v1.12.0：曲库行 B50 徽标（songId → 池内最高排名，取该曲在榜内最好的一个谱面）。
+  const b50BadgeBySong = useMemo(() => {
+    if (scores.length === 0) return null;
+    const b50 = computeB50(rawData, scores);
+    const map = new Map<string, { rank: number; pool: 'new' | 'old' }>();
+    for (const entry of b50.entries) {
+      const existing = map.get(entry.songId);
+      if (!existing || entry.poolRank < existing.rank) {
+        map.set(entry.songId, { rank: entry.poolRank, pool: entry.pool });
+      }
+    }
+    return map;
+  }, [rawData, scores]);
 
   useEffect(() => {
     if (settingsLoaded && settings.defaultSort.mode !== 'relevance' && filters.sort === undefined) {
@@ -59,10 +75,6 @@ export default function SongBrowser() {
     }));
     return [...values].sort();
   }, [rawData]);
-
-  const openDownloadSite = useCallback(() => {
-    void Linking.openURL('https://maimate.flya.ccwu.cc/');
-  }, []);
 
   const openRecognizedSong = useCallback((music: MusicData) => {
     restoreTitleRecognizerOnFocus.current = true;
@@ -103,9 +115,6 @@ export default function SongBrowser() {
             <Pressable style={styles.scanButton} onPress={() => setTitleRecognizerVisible(true)} accessibilityRole="button">
               <Text style={styles.scanButtonText}>拍照识别</Text>
             </Pressable>
-            <Pressable style={styles.updateButton} onPress={openDownloadSite} accessibilityRole="button">
-              <Text style={styles.updateButtonText}>更新 / 下载</Text>
-            </Pressable>
           </View>
         </View>
         <Text style={styles.headerSub}>{rawData.length} 首歌曲 · 更新于 {formatCacheTime(cacheTimestamp)}</Text>
@@ -144,6 +153,7 @@ export default function SongBrowser() {
                 showChinaVersion={settings.showChinaVersion}
                 allSongs={rawData}
                 highlightedDifficulties={highlighted.size > 0 ? [...highlighted] : undefined}
+                b50Badge={b50BadgeBySong?.get(item.id) ?? null}
               />
             </View>
           );
@@ -209,19 +219,6 @@ const styles = StyleSheet.create({
   scanButtonText: {
     fontSize: 11,
     color: Colors.accent.secondary,
-    fontWeight: '800',
-  },
-  updateButton: {
-    paddingHorizontal: 9,
-    paddingVertical: 7,
-    borderRadius: 10,
-    backgroundColor: `${Colors.accent.primary}22`,
-    borderWidth: 1,
-    borderColor: Colors.accent.primary,
-  },
-  updateButtonText: {
-    fontSize: 11,
-    color: Colors.accent.primary,
     fontWeight: '800',
   },
   headerSub: {

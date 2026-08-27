@@ -20,6 +20,8 @@ interface Props {
   selectedDifficultyIndex?: number;
   showChinaVersion?: boolean;
   allSongs?: MusicData[];
+  /** v1.12.0：曲库行 B50 徽标（该曲任一谱面在 B50 榜内时显示「B50 #池内排名」）。 */
+  b50Badge?: { rank: number; pool: 'new' | 'old' } | null;
 }
 
 export const SongCard = memo(function SongCard({
@@ -30,6 +32,7 @@ export const SongCard = memo(function SongCard({
   selectedDifficultyIndex,
   showChinaVersion = true,
   allSongs = [],
+  b50Badge = null,
 }: Props) {
   const selected = selectedDifficultyIndex !== undefined
     ? music.level[selectedDifficultyIndex] !== undefined
@@ -46,9 +49,16 @@ export const SongCard = memo(function SongCard({
     >
       <CoverImage music={music} allSongs={allSongs} style={styles.cover} accessibilityLabel={`${music.title} 曲绘`} />
       <View style={styles.info}>
-        <Text style={styles.title} numberOfLines={1}>
-          {music.title}
-        </Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title} numberOfLines={1}>
+            {music.title}
+          </Text>
+          {b50Badge && (
+            <View style={[styles.b50Badge, b50Badge.pool === 'new' ? styles.b50BadgeNew : styles.b50BadgeOld]}>
+              <Text style={styles.b50BadgeText}>B50 #{b50Badge.rank}</Text>
+            </View>
+          )}
+        </View>
         <Text style={styles.artist} numberOfLines={1}>
           {music.basic_info.artist}
         </Text>
@@ -107,6 +117,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 2,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  b50Badge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  b50BadgeNew: { backgroundColor: `${Colors.accent.secondary}22`, borderWidth: 1, borderColor: `${Colors.accent.secondary}66` },
+  b50BadgeOld: { backgroundColor: `${Colors.text.secondary}22`, borderWidth: 1, borderColor: `${Colors.text.secondary}66` },
+  b50BadgeText: { fontSize: 9, fontWeight: '800', color: Colors.text.primary },
   title: {
     fontSize: 15,
     fontWeight: '700',

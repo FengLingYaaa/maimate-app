@@ -1,80 +1,85 @@
 /**
- * B50 总览页（v1.11.0 新增，根级路由 /b50）。
+ * B50 总览页（根级路由 /b50）。
  *
- * - 本地按 Diving-Fish 口径估算 B50：旧曲 TOP35 + 新曲 TOP15；
- * - 顶部展示总分、两池合计与官方 Rating 对照；
- * - 基于 ≤6 次本地快照绘制 B50 走势折线（本地估算 + 服务器 RA 双线）；
- * - 明细列表展示每张谱面的定数/达成率/单谱 Rating 与曲绘。
+ * v1.12.0 重做：
+ * - 删除折线图走势与「本地估算」措辞（本地口径与服务器一致）；
+ * - 新曲 TOP15 / 旧曲 TOP35 分两个可切换页（SegmentedControl），池选择状态保持；
+ * - 每行标注难度并按难度染色（Basic 绿/Advanced 黄/Expert 红/Master 紫/ReMaster 浅紫白）；
+ * - 每个池页面末尾用提示条隔开，展示与池内最后一首同 Rating 的未入榜曲目；
+ * - 明细点击跳歌曲详情，返回后保持当前池。
  */
 
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Polyline, Circle } from 'react-native-svg';
-import { Colors } from '../src/constants';
+import { Colors, DifficultyColorMap, DifficultyLabels } from '../src/constants';
 import { CoverImage } from '../src/components/CoverImage';
-import { computeB50 } from '../src/data/b50';
+import { computeB50, type B50Entry } from '../src/data/b50';
 import { formatAchievement } from '../src/data/rating';
 import { useMusicStore, useScoreStore } from '../src/store';
-import type { MusicData, PlayerScore } from '../src/data/types';
 
-const CHART_HEIGHT = 132;
-const CHART_WIDTH = 320;
+type PoolTab = 'new' | 'old';
 
-function buildTrend(
-  musicData: MusicData[],
-  snapshots: Array<{ syncedAt: number; scores: PlayerScore[]; serverRating: number | null }>,
-  currentScores: PlayerScore[],
-  currentServerRating: number | null,
-): Array<{ label: string; local: number; server: number | null }> {
-  const points = snapshots.map(snapshot => ({
-    label: new Date(snapshot.syncedAt).toLocaleDateString(undefined, { 'month': 'numeric', 'day': 'numeric' }),
-    local: computeB50(musicData, snapshot.scores).total,
-    server: snapshot.serverRating,
-  }));
-  points.push({
-    label: '当前',
-    local: computeB50(musicData, currentScores).total,
-    server: currentServerRating,
-  });
-  return points;
+function EntryRow({ entry, music, allSongs, onPress }: {
+  entry: B50Entry;
+  music?: ReturnType<ReturnType<typeof useMusicStore.getState>['musicList']['byId']>;
+  allSongs: Parameters<typeof computeB50>[0];
+  onPress: () => void;
+}) {
+  const difficultyColor = DifficultyColorMap[entry.difficultyIndex] || Colors.accent.secondary;
+  return (
+    <Pressable style={styles.entryRow} onPress={onPress}>
+      <Text style={[styles.rank, entry.pool === 'new' ? styles.rankNew : styles.rankOld]}>{entry.poolRank}</Text>
+      <CoverImage
+        music={music ?? {
+          id: entry.songId,
+          title: entry.title,
+          type: entry.musicType,
+          ds: [],
+          level: [],
+          cids: [],
+          charts: [],
+          basic_info: { title: entry.title, artist: '', genre: '', is_new: entry.pool === 'new', bpm: 0, from: '', release_date: '' },
+        }}
+        allSongs={allSongs}
+        style={styles.cover}
+      />
+      <View style={styles.entryInfo}>
+        <Text style={styles.entryTitle} numberOfLines={1}>{entry.title}</Text>
+        <Text style={styles.entryMeta}>{entry.musicType === 'DX' ? 'DX' : 'SD'} · 定数 {entry.ds.toFixed(1)} · {formatAchievement(entry.achievement)}</Text>
+      </View>
+      <View style={styles.entryRight}>
+        <Text style={[styles.diffChip, { color: difficultyColor, borderColor: `${difficultyColor}88`, backgroundColor: `${difficultyColor}1a` }]}>
+          {DifficultyLabels[entry.difficultyIndex] || `难度 ${entry.difficultyIndex}`}
+        </Text>
+        <Text style={styles.entryRating}>{entry.rating}</Text>
+      </View>
+    </Pressable>
+  );
 }
 
 export default function B50Screen() {
   const musicList = useMusicStore(state => state.musicList);
   const musicData = useMemo(() => musicList.all(), [musicList]);
   const scores = useScoreStore(state => state.scores);
-  const snapshots = useScoreStore(state => state.snapshots);
   const profile = useScoreStore(state => state.profile);
   const insets = useSafeAreaInsets();
 
-  const b50 = useMemo(() => computeB50(musicData, scores), [musicData, scores]);
-  const trend = useMemo(
-    () => buildTrend(musicData, snapshots, scores, profile?.rating ?? null),
-    [musicData, snapshots, scores, profile],
-  );
+  // 池切换状态：从详情页返回后 useFocusEffect 不会重置 useState，状态天然保持。
+  const [poolTab, setPoolTab] = useState<PoolTab>('new');
 
-  const chart = useMemo(() => {
-    if (trend.length < 2) return null;
-    const localValues = trend.map(point => point.local);
-    const serverValues = trend.map(point => point.server).filter((value): value is number => value !== null);
-    const all = [...localValues, ...serverValues];
-    const min = Math.min(...all);
-    const max = Math.max(...all);
-    const span = Math.max(max - min, 30);
-    const stepX = CHART_WIDTH / (trend.length - 1);
-    const toXY = (value: number, index: number) => {
-      const x = index * stepX;
-      const y = CHART_HEIGHT - ((value - min) / span) * (CHART_HEIGHT - 16) - 8;
-      return { x, y };
-    };
-    return {
-      labels: trend.map(point => point.label),
-      localPoints: localValues.map(toXY),
-      serverPoints: serverValues.length === trend.length ? serverValues.map(toXY) : null,
-    };
-  }, [trend]);
+  const b50 = useMemo(() => computeB50(musicData, scores), [musicData, scores]);
+
+  // 回前台时不需要重算——scores 变化会经 store 订阅自动触发 useMemo。
+  useFocusEffect(useCallback(() => { /* 池选择状态保持 */ }, []));
+
+  const poolEntries = b50.entries.filter(entry => entry.pool === poolTab);
+  const ties = poolTab === 'new' ? b50.newTies : b50.oldTies;
+
+  const openSong = useCallback((entry: B50Entry) => {
+    router.push({ pathname: '/song/[id]' as const, params: { id: entry.songId, type: entry.musicType, difficultyIndex: String(entry.difficultyIndex) } });
+  }, []);
 
   const hasScores = scores.length > 0;
 
@@ -100,14 +105,14 @@ export default function B50Screen() {
             <View style={styles.summaryRow}>
               <View style={[styles.summaryCard, styles.totalCard]}>
                 <Text style={styles.totalValue}>{b50.total}</Text>
-                <Text style={styles.totalLabel}>本地估算 B50</Text>
+                <Text style={styles.totalLabel}>B50 总分</Text>
               </View>
               <View style={styles.summarySide}>
                 <View style={styles.summaryCard}>
-                  <Text style={styles.sideValue}>{b50.oldSum} <Text style={styles.sideSub}>/ 旧曲 B35{b50.oldFull ? '' : '（未满）'}</Text></Text>
+                  <Text style={styles.sideValue}>{b50.newSum} <Text style={styles.sideSub}>/ 新曲 15{b50.newFull ? '' : '（未满）'}</Text></Text>
                 </View>
                 <View style={styles.summaryCard}>
-                  <Text style={styles.sideValue}>{b50.newSum} <Text style={styles.sideSub}>/ 新曲 B15{b50.newFull ? '' : '（未满）'}</Text></Text>
+                  <Text style={styles.sideValue}>{b50.oldSum} <Text style={styles.sideSub}>/ 旧曲 35{b50.oldFull ? '' : '（未满）'}</Text></Text>
                 </View>
                 {profile?.rating != null && (
                   <View style={styles.summaryCard}>
@@ -117,75 +122,41 @@ export default function B50Screen() {
               </View>
             </View>
 
-            {chart && (
-              <View style={styles.chartCard}>
-                <Text style={styles.cardTitle}>B50 走势（最多最近 6 次同步）</Text>
-                <View style={styles.chartWrap}>
-                  <Svg width={CHART_WIDTH} height={CHART_HEIGHT} style={styles.chartSvg}>
-                    {chart.serverPoints && (
-                      <Polyline
-                        points={chart.serverPoints.map(point => `${point.x},${point.y}`).join(' ')}
-                        fill="none"
-                        stroke={Colors.accent.secondary}
-                        strokeWidth={1.6}
-                        strokeDasharray="4 3"
-                      />
-                    )}
-                    <Polyline
-                      points={chart.localPoints.map(point => `${point.x},${point.y}`).join(' ')}
-                      fill="none"
-                      stroke={Colors.accent.primary}
-                      strokeWidth={2.2}
-                    />
-                    {chart.localPoints.map((point, index) => (
-                      <Circle key={index} cx={point.x} cy={point.y} r={3} fill={Colors.accent.primary} />
-                    ))}
-                  </Svg>
-                  <View style={styles.chartLabels}>
-                    {chart.labels.map((label, index) => (
-                      <Text key={`${label}-${index}`} style={styles.chartLabel}>{label}</Text>
-                    ))}
-                  </View>
-                </View>
-                <View style={styles.legend}>
-                  <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: Colors.accent.primary }]} /><Text style={styles.legendText}>本地估算</Text></View>
-                  {chart.serverPoints && <View style={styles.legendItem}><View style={[styles.legendLine, { backgroundColor: Colors.accent.secondary }]} /><Text style={styles.legendText}>服务器 RA</Text></View>}
-                </View>
-                {snapshots.length < 2 && <Text style={styles.chartHint}>快照不足 2 次，多点同步几次就能看到完整曲线。</Text>}
-              </View>
-            )}
-
-            <Text style={styles.cardTitle}>B50 明细（新曲 15 + 旧曲 35）</Text>
-            {b50.entries.map(entry => (
-              <Pressable
-                key={`${entry.pool}-${entry.poolRank}`}
-                style={styles.entryRow}
-                onPress={() => router.push(`/song/${entry.songId}` as const)}
-              >
-                <Text style={[styles.rank, entry.pool === 'new' ? styles.rankNew : styles.rankOld]}>{entry.rank}</Text>
-                <CoverImage
-                  music={musicList.byId(entry.songId) ?? {
-                    id: entry.songId,
-                    title: entry.title,
-                    type: entry.musicType,
-                    ds: [],
-                    level: [],
-                    cids: [],
-                    charts: [],
-                    basic_info: { title: entry.title, artist: '', genre: '', is_new: entry.pool === 'new', bpm: 0, from: '', release_date: '' },
-                  }}
-                  style={styles.cover}
-                />
-                <View style={styles.entryInfo}>
-                  <Text style={styles.entryTitle} numberOfLines={1}>{entry.title}</Text>
-                  <Text style={styles.entryMeta}>
-                    {entry.musicType === 'DX' ? 'DX' : 'SD'} · {'Master Remaster Expert Advanced Basic'.split(' ')[Math.min(entry.difficultyIndex, 4)]} · 定数 {entry.ds.toFixed(1)}
-                  </Text>
-                  <Text style={styles.entryMeta}>{formatAchievement(entry.achievement)}</Text>
-                </View>
-                <Text style={styles.entryRating}>{entry.rating}</Text>
+            <View style={styles.poolSwitch}>
+              <Pressable style={[styles.poolTab, poolTab === 'new' && styles.poolTabActive]} onPress={() => setPoolTab('new')}>
+                <Text style={[styles.poolTabText, poolTab === 'new' && styles.poolTabTextActive]}>新曲 TOP15</Text>
               </Pressable>
+              <Pressable style={[styles.poolTab, poolTab === 'old' && styles.poolTabActive]} onPress={() => setPoolTab('old')}>
+                <Text style={[styles.poolTabText, poolTab === 'old' && styles.poolTabTextActive]}>旧曲 TOP35</Text>
+              </Pressable>
+            </View>
+
+            {poolEntries.map(entry => (
+              <EntryRow
+                key={`${entry.songId}:${entry.musicType}:${entry.difficultyIndex}`}
+                entry={entry}
+                music={musicList.byId(entry.songId)}
+                allSongs={musicData}
+                onPress={() => openSong(entry)}
+              />
             ))}
+
+            {ties.length > 0 && (
+              <>
+                <View style={styles.tieDivider}>
+                  <Text style={styles.tieDividerText}>以下 {ties.length} 首与第 {poolTab === 'new' ? 15 : 35} 名同 Rating，暂未计入总分</Text>
+                </View>
+                {ties.map(entry => (
+                  <EntryRow
+                    key={`tie-${entry.songId}:${entry.musicType}:${entry.difficultyIndex}`}
+                    entry={entry}
+                    music={musicList.byId(entry.songId)}
+                    allSongs={musicData}
+                    onPress={() => openSong(entry)}
+                  />
+                ))}
+              </>
+            )}
           </>
         )}
       </ScrollView>
@@ -221,18 +192,11 @@ const styles = StyleSheet.create({
   summarySide: { flex: 1, gap: 8 },
   sideValue: { fontSize: 15, fontWeight: '800', color: Colors.text.primary },
   sideSub: { fontSize: 10, fontWeight: '500', color: Colors.text.muted },
-  chartCard: { backgroundColor: Colors.bg.secondary, borderRadius: 14, padding: 12, gap: 8 },
-  cardTitle: { fontSize: 12, fontWeight: '800', color: Colors.text.primary },
-  chartWrap: { alignItems: 'center' },
-  chartSvg: { backgroundColor: Colors.bg.tertiary, borderRadius: 10 },
-  chartLabels: { flexDirection: 'row', justifyContent: 'space-between', width: CHART_WIDTH, marginTop: 4 },
-  chartLabel: { fontSize: 9, color: Colors.text.muted },
-  legend: { flexDirection: 'row', gap: 14 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendLine: { width: 14, height: 2, borderRadius: 1 },
-  legendText: { fontSize: 10, color: Colors.text.secondary },
-  chartHint: { fontSize: 10, color: Colors.text.muted },
+  poolSwitch: { flexDirection: 'row', backgroundColor: Colors.bg.secondary, borderRadius: 10, padding: 3, gap: 3 },
+  poolTab: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 8 },
+  poolTabActive: { backgroundColor: Colors.bg.tertiary },
+  poolTabText: { fontSize: 12, fontWeight: '700', color: Colors.text.muted },
+  poolTabTextActive: { color: Colors.text.primary },
   entryRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -241,12 +205,24 @@ const styles = StyleSheet.create({
     padding: 10,
     gap: 10,
   },
-  rank: { width: 26, fontSize: 14, fontWeight: '900', textAlign: 'center' },
+  rank: { width: 24, fontSize: 14, fontWeight: '900', textAlign: 'center' },
   rankNew: { color: Colors.accent.secondary },
   rankOld: { color: Colors.text.secondary },
   cover: { width: 44, height: 44, borderRadius: 8, backgroundColor: Colors.bg.tertiary },
   entryInfo: { flex: 1, gap: 2 },
   entryTitle: { fontSize: 13, fontWeight: '700', color: Colors.text.primary },
   entryMeta: { fontSize: 10, color: Colors.text.muted },
-  entryRating: { fontSize: 16, fontWeight: '900', color: Colors.accent.primary, minWidth: 44, textAlign: 'right' },
+  entryRight: { alignItems: 'flex-end', gap: 3 },
+  diffChip: { fontSize: 9, fontWeight: '800', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, borderWidth: 1, overflow: 'hidden' },
+  entryRating: { fontSize: 16, fontWeight: '900', color: Colors.accent.primary },
+  tieDivider: {
+    alignItems: 'center',
+    paddingVertical: 6,
+    marginVertical: 2,
+    borderRadius: 8,
+    backgroundColor: `${Colors.bg.tertiary}`,
+    borderWidth: 1,
+    borderColor: Colors.border.light,
+  },
+  tieDividerText: { fontSize: 10, color: Colors.text.muted, fontWeight: '700' },
 });

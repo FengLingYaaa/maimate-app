@@ -15,10 +15,11 @@ import {
   filterEntriesByMinLevel,
   PLATE_BITS,
 } from '../src/data/plates.ts';
-import { applyDragWithPinGroups, canDragPlanRows, compareByPinThenOrder, isLegalDragResult, pinGroupOf } from '../src/data/plan-order.ts';
+import { applyDragWithPinGroups, canDragPlanRows, compareByPinThenOrder, pinGroupOf } from '../src/data/plan-order.ts';
 import { migratePlanEntryIds, normalizePlanEntries, reorderPlanEntriesById } from '../src/data/plan-entries.ts';
-import { computeB50, B35_SIZE, B15_SIZE } from '../src/data/b50.ts';
+import { computeB50, computeB50Gain, B35_SIZE, B15_SIZE } from '../src/data/b50.ts';
 import { getCoverCacheFilename, isCoverCacheFileForSong } from '../src/data/cover-cache-names.ts';
+import { buildScoresCsv, CSV_HEADER } from '../src/data/scores-csv-core.ts';
 import { getBilibiliVideoAppUrls } from '../src/data/bilibili-search.ts';
 import { extractBilibiliVideoId, isBilibiliShortLink } from '../src/data/bilibili-search.ts';
 import { av2bv, bv2av } from '../src/data/bilibili-bvid.ts';
@@ -207,21 +208,9 @@ for (let day = 0; day < 30; day += 1) {
 const onlyBanquet = generateFortune('seed-x', [makeMusic('9', 'maimai でらっくす BUDDiES', 'DX', '宴会場')], '2026-08-26');
 assert.equal(onlyBanquet.recommendedSongId, null);
 
-// v1.11.0：跨组拖拽直接作废——拖拽结果的分组序必须保持「置顶→普通→置底」单调。
-const pinnedSeq = [
-  { ...pinA }, { ...pinB }, { ...midC }, { ...botD },
-];
-assert.equal(isLegalDragResult(pinnedSeq), true);
-// 置顶曲目被拖到普通块之后 → 非法。
-assert.equal(isLegalDragResult([{ ...pinA }, { ...midC }, { ...pinB }, { ...botD }]), false);
-// 置底曲目被拖到最前 → 非法。
-assert.equal(isLegalDragResult([{ ...botD }, { ...pinA }, { ...pinB }, { ...midC }]), false);
-// 同组内拖拽（置顶内部互换）仍合法。
-assert.equal(isLegalDragResult([{ ...pinB }, { ...pinA }, { ...midC }, { ...botD }]), true);
-// 普通曲目拖进置顶块之间 → 非法。
-assert.equal(isLegalDragResult([{ ...pinA }, { ...midC }, { ...pinB }, { ...botD }].reverse()), false);
+// v1.11.0：跨组拖拽禁令自 v1.12.0 起随置顶/置底功能一并删除（不再有分组拖拽）。
 
-// v1.11.0：B50 估算（旧曲 TOP35 + 新曲 TOP15）。
+// v1.12.0：B50（旧曲 TOP35 + 新曲 TOP15）与同分附加展示、目标增量。
 const b50Music = Array.from({ length: 60 }, (_, index) => ({
   id: String(index + 1),
   type: 'DX' as const,
@@ -253,6 +242,53 @@ for (const pool of ['new', 'old'] as const) {
 // 新曲池必须全部来自 is_new 曲目。
 assert.equal(b50.entries.filter(entry => entry.pool === 'new').every(entry => entry.rank <= 15), true);
 
+// v1.12.0：同分附加（ties）——构造与池末位同分的未入榜曲目。
+// b50Music 的谱面 ds 递增（12 + index/10），把 Song 20（旧曲）成绩改成与旧曲池末位同分很难对齐；
+// 直接构造一个小库：3 首旧曲，两首 rating 相同（ds 相同 + 成绩相同）。
+const tieMusic = [
+  { ...b50Music[0], id: '900', basic_info: { ...b50Music[0].basic_info, is_new: false } },
+  { ...b50Music[0], id: '901', basic_info: { ...b50Music[0].basic_info, is_new: false } },
+  { ...b50Music[0], id: '902', basic_info: { ...b50Music[0].basic_info, is_new: false } },
+];
+const tieScores = [
+  { songId: '900', type: 'DX' as const, difficultyIndex: 4, achievement: 95, dxScore: 1000, importedAt: 1 },
+  { songId: '901', type: 'DX' as const, difficultyIndex: 4, achievement: 95, dxScore: 1000, importedAt: 1 },
+  { songId: '902', type: 'DX' as const, difficultyIndex: 4, achievement: 95, dxScore: 1000, importedAt: 1 },
+];
+const tieResult = computeB50(tieMusic, tieScores);
+// 池大小 35 → 只入榜 3 首，全部入榜，无 ties。
+assert.equal(tieResult.oldTies.length, 0);
+// 加第 4 首同分曲，仍只有 3 首能入榜？不——池 35 远未满，4 首全部入榜。
+// 要构造 ties 必须让同分曲目数超过池剩余空间；用 15 首同分旧曲。
+const manyTieMusic = Array.from({ length: 40 }, (_, index) => ({
+  ...b50Music[0],
+  id: String(950 + index),
+  basic_info: { ...b50Music[0].basic_info, is_new: false },
+}));
+const manyTieScores = manyTieMusic.map(music => ({ songId: music.id, type: 'DX' as const, difficultyIndex: 4, achievement: 95, dxScore: 1000, importedAt: 1 }));
+const manyTie = computeB50(manyTieMusic, manyTieScores);
+// 40 首全部同 rating，池 35 → 入榜 35 首，5 首未入榜同分。
+assert.equal(manyTie.oldTies.length, 5);
+assert.equal(manyTie.oldTies.every(entry => entry.rating === manyTie.entries[manyTie.entries.length - 1].rating), true);
+// ties 排序：定数同则按 songId 稳定（未入榜的是 id 985–989）。
+assert.deepEqual(manyTie.oldTies.map(entry => entry.songId), ['985', '986', '987', '988', '989']);
+
+// v1.12.0：目标增量 computeB50Gain（重算口径）。
+// 无目标（非法值）→ null；谱面不在库 → null。
+assert.equal(computeB50Gain(b50Music, b50Scores, { songId: '1', musicType: 'DX', difficultyIndex: 4 }, 0), null);
+assert.equal(computeB50Gain(b50Music, b50Scores, { songId: 'notexist', musicType: 'DX', difficultyIndex: 4 }, 100), null);
+// 把 Song 1（旧曲池内 rating 最低的入榜曲）成绩从 90 提到 100.5：排名提升但不改变池成员 → gain = 新旧单谱 Rating 差。
+const song1Old = b50.entries.find(entry => entry.songId === '1');
+assert.ok(song1Old);
+const song1NewRating = Math.floor((12 + 0 / 10) * 1.005 * 22.4);
+const gain1 = computeB50Gain(b50Music, b50Scores, { songId: '1', musicType: 'DX', difficultyIndex: 4 }, 100.5);
+assert.equal(gain1, song1NewRating - song1Old.rating);
+// 进不了 TOP50 的情形：把一首 ds 很低的谱面提升到 100.5 也进不了池 → gain = 0。
+const lowMusic = [...b50Music, { ...b50Music[0], id: '9999', ds: [0.5, 0.5, 0.5, 1, 1] }];
+const lowScores = [...b50Scores, { songId: '9999', type: 'DX' as const, difficultyIndex: 4, achievement: 50, dxScore: 1000, importedAt: 1 }];
+const gainLow = computeB50Gain(lowMusic, lowScores, { songId: '9999', musicType: 'DX', difficultyIndex: 4 }, 100.5);
+assert.equal(gainLow, 0);
+
 // v1.11.0：曲绘缓存文件名（同 URL 稳定、不同 URL 不同、可按歌曲识别）。
 const coverNameA = getCoverCacheFilename('123', 'https://a.example/x.png');
 const coverNameB = getCoverCacheFilename('123', 'https://a.example/y.png');
@@ -260,5 +296,14 @@ assert.equal(coverNameA, getCoverCacheFilename('123', 'https://a.example/x.png')
 assert.notEqual(coverNameA, coverNameB);
 assert.equal(isCoverCacheFileForSong(coverNameA, '123'), true);
 assert.equal(isCoverCacheFileForSong(coverNameA, '456'), false);
+
+// v1.12.0：CSV 导出（RFC 4180 转义 + 表头）。
+const csv = buildScoresCsv([{
+  songId: '1', title: 'Song, "1"', type: 'DX', difficultyIndex: 4, ds: 14.5, level: '14+',
+  achievement: 100.5, dxScore: 1000, rate: 'SSS+', fc: 'ap', fs: 'fsd', serverRating: 500, importedAt: 1735689600000,
+}]);
+assert.equal(csv.split('\r\n')[0], CSV_HEADER.join(','));
+assert.ok(csv.includes('"Song, ""1"""'), 'CSV must escape comma/quote values');
+assert.ok(csv.endsWith('\r\n'));
 
 console.log('Feature checks passed (deep links, Bilibili parsing, version groups, local plates, pins, fortune)');

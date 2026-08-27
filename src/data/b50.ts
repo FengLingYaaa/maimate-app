@@ -1,8 +1,8 @@
 /**
- * B50（旧曲 B35 + 新曲 B15）本地估算。
+ * B50（旧曲 B35 + 新曲 B15）本地计算。
  *
- * 口径与 Diving-Fish B50 一致：
- * - 单曲 Rating = floor(ds × achievement/100 × coefficient)，见 rating.ts；
+ * 口径与 Diving-Fish B50 完全一致（v1.12.0 起删除「本地估算」措辞）：
+ * - 单谱 Rating = floor(ds × achievement/100 × coefficient)，见 rating.ts；
  * - 「新曲」= 当前版本（basic_info.is_new）曲目，取最好 15 张；
  *   其余全部按旧曲池取最好 35 张；
  * - B50 = 旧曲池之和 + 新曲池之和。
@@ -16,11 +16,11 @@ export const B35_SIZE = 35;
 export const B15_SIZE = 15;
 
 export interface B50Entry {
-  /** 排名（1 起，先新曲池后旧曲池，同分按定数高者靠前）。 */
+  /** 排名（1 起，先新曲池后旧曲池，池内按 rating 降序）。 */
   rank: number;
   /** 所属池：new=当前版本 B15，old=旧曲 B35。 */
   pool: 'new' | 'old';
-  /** 池内排名（1 起）。 */
+  /** 普内排名（1 起）。 */
   poolRank: number;
   rating: number;
   ds: number;
@@ -41,6 +41,10 @@ export interface B50Result {
   /** 池是否已满（未满时总分偏低，UI 可提示）。 */
   oldFull: boolean;
   newFull: boolean;
+  /** v1.12.0：与第 15 名同 Rating 但未入榜的新曲（按定数高者靠前）。 */
+  newTies: B50Entry[];
+  /** v1.12.0：与第 35 名同 Rating 但未入榜的旧曲（按定数高者靠前）。 */
+  oldTies: B50Entry[];
 }
 
 interface Candidate {
@@ -59,7 +63,7 @@ function buildCandidates(musicList: MusicData[], scores: PlayerScore[]): Candida
   for (const score of scores) {
     byChart.set(`${score.type}:${score.songId}:${score.difficultyIndex}`, score);
   }
-  const candidates: Candidate[] = [];
+  const candidates: Candidate[] = []
   for (const music of musicList) {
     const isNew = Boolean(music.basic_info?.is_new);
     for (let difficultyIndex = 0; difficultyIndex < music.charts.length; difficultyIndex += 1) {
@@ -84,15 +88,31 @@ function buildCandidates(musicList: MusicData[], scores: PlayerScore[]): Candida
   return candidates;
 }
 
-function pickTop(candidates: Candidate[], size: number): Candidate[] {
-  return [...candidates]
-    .sort((left, right) => right.rating - left.rating || right.ds - left.ds || left.songId.localeCompare(right.songId) || left.difficultyIndex - right.difficultyIndex)
-    .slice(0, size);
+/** 池内排序：rating 降序，同分按定数高者靠前，再按 ID/难度稳定。 */
+function compareCandidates(left: Candidate, right: Candidate): number {
+  return right.rating - left.rating
+    || right.ds - left.ds
+    || left.songId.localeCompare(right.songId)
+    || left.difficultyIndex - right.difficultyIndex;
 }
 
-function toEntries(pool: 'new' | 'old', picked: Candidate[]): B50Entry[] {
+function pickTop(candidates: Candidate[], size: number): Candidate[] {
+  return [...candidates].sort(compareCandidates).slice(0, size);
+}
+
+/** 找出与池末位同 rating 的未入榜曲目（同分按定数高者靠前）。 */
+function pickTies(candidates: Candidate[], picked: Candidate[], size: number): Candidate[] {
+  if (picked.length < size) return [];
+  const lastRating = picked[picked.length - 1].rating;
+  const pickedKeys = new Set(picked.map(candidate => `${candidate.musicType}:${candidate.songId}:${candidate.difficultyIndex}`));
+  return [...candidates]
+    .filter(candidate => candidate.rating === lastRating && !pickedKeys.has(`${candidate.musicType}:${candidate.songId}:${candidate.difficultyIndex}`))
+    .sort(compareCandidates);
+}
+
+function toEntries(pool: 'new' | 'old', picked: Candidate[], startRank: number): B50Entry[] {
   return picked.map((candidate, index) => ({
-    rank: 0,
+    rank: startRank + index,
     pool,
     poolRank: index + 1,
     rating: candidate.rating,
@@ -105,7 +125,7 @@ function toEntries(pool: 'new' | 'old', picked: Candidate[]): B50Entry[] {
   }));
 }
 
-/** 计算 B50：旧曲 TOP35 + 新曲 TOP15。 */
+/** 计算 B50：旧曲 TOP35 + 新曲 TOP15，并给出与池末位同分的未入榜曲目。 */
 export function computeB50(musicList: MusicData[], scores: PlayerScore[]): B50Result {
   const candidates = buildCandidates(musicList, scores);
   const newPicked = pickTop(candidates.filter(candidate => candidate.isNew), B15_SIZE);
@@ -113,9 +133,7 @@ export function computeB50(musicList: MusicData[], scores: PlayerScore[]): B50Re
   const newSum = newPicked.reduce((sum, entry) => sum + entry.rating, 0);
   const oldSum = oldPicked.reduce((sum, entry) => sum + entry.rating, 0);
 
-  // 统一排名：新曲池在前，池内与跨池都按 rating 降序；同分保持池内次序。
-  const entries = [...toEntries('new', newPicked), ...toEntries('old', oldPicked)]
-    .map((entry, index) => ({ ...entry, rank: index + 1 }));
+  const entries = [...toEntries('new', newPicked, 1), ...toEntries('old', oldPicked, newPicked.length + 1)];
 
   return {
     entries,
@@ -124,10 +142,42 @@ export function computeB50(musicList: MusicData[], scores: PlayerScore[]): B50Re
     total: oldSum + newSum,
     oldFull: oldPicked.length >= B35_SIZE,
     newFull: newPicked.length >= B15_SIZE,
+    newTies: toEntries('new', pickTies(candidates.filter(candidate => candidate.isNew), newPicked, B15_SIZE), 0).map(entry => ({ ...entry, rank: 0, poolRank: 0 })),
+    oldTies: toEntries('old', pickTies(candidates.filter(candidate => !candidate.isNew), oldPicked, B35_SIZE), 0).map(entry => ({ ...entry, rank: 0, poolRank: 0 })),
   };
 }
 
-/** 基于一份历史成绩重算 B50 总分（用于快照趋势）。 */
-export function computeB50Total(musicList: MusicData[], scores: PlayerScore[]): number {
-  return computeB50(musicList, scores).total;
+/**
+ * v1.12.0：目标达成增量——把指定谱面的成绩替换为目标达成率后重算 B50，
+ * 返回与当前总分的差值。目标无效（非有限正数）返回 null；谱面不在曲库中返回 null。
+ */
+export function computeB50Gain(
+  musicList: MusicData[],
+  scores: PlayerScore[],
+  chart: { songId: string; musicType: 'SD' | 'DX'; difficultyIndex: number },
+  targetAchievement: number,
+): number | null {
+  if (!Number.isFinite(targetAchievement) || targetAchievement <= 0) return null;
+  const target = Math.min(100.5, targetAchievement);
+  const music = musicList.find(candidate => candidate.id === chart.songId && candidate.type === chart.musicType);
+  if (!music) return null;
+  const ds = music.ds[chart.difficultyIndex];
+  if (!Number.isFinite(ds) || ds <= 0) return null;
+
+  const replaced: PlayerScore = {
+    songId: chart.songId,
+    type: chart.musicType,
+    difficultyIndex: chart.difficultyIndex,
+    achievement: target,
+    dxScore: 0,
+    importedAt: 0,
+  };
+  const nextScores = scores.filter(score => !(score.songId === chart.songId
+    && score.type === chart.musicType
+    && score.difficultyIndex === chart.difficultyIndex));
+  nextScores.push(replaced);
+
+  const before = computeB50(musicList, scores).total;
+  const after = computeB50(musicList, nextScores).total;
+  return after - before;
 }

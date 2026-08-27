@@ -96,15 +96,15 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | v1.11.0 功能主体（前一代 `61d0ebf` 为 v1.10.0 landing SHA 回填） |
-| 当前标签 | v1.11.0 待打（v1.10.0 及更早标签均已发布） |
+| 当前提交 | v1.12.0 功能主体（前一代 `213e7c6` 为 v1.11.0 landing SHA 回填） |
+| 当前标签 | v1.12.0 待打（v1.11.0 及更早标签均已发布） |
 | Android applicationId | `cc.flya.maimate` |
-| App 版本 | `1.11.0`（Android versionCode `19`） |
+| App 版本 | `1.12.0`（Android versionCode `20`） |
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
-| 最新 Release APK SHA-256（v1.11.0） | `5a4a0992c7783de264f210270e8a7e62e87c67417a35de4c2168a3a026f39f75`（CI「Print APK checksum」步骤输出） |
-| 最新 Release APK 大小 | 62,426,874 bytes（59.5 MB） |
+| 最新 Release APK SHA-256（v1.11.0，待 v1.12.0 构建后更新） | `5a4a0992c7783de264f210270e8a7e62e87c67417a35de4c2168a3a026f39f75`（CI「Print APK checksum」步骤输出） |
+| 最新 Release APK 大小 | 62,426,874 bytes（59.5 MB，v1.11.0；待 v1.12.0 构建后更新） |
 | 下载站同步状态 | 已部署：v1.11.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | APK 构建方式 | GitHub Actions 云构建：先跑 lint/route/feature/phase/rating 回归、Expo Doctor 和 Android export 门禁，再出 arm64-v8a debug keystore 内测包 |
 
@@ -918,3 +918,15 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 回归测试：`feature-check.ts` 新增 `isLegalDragResult` 五组断言（同组合法、置顶拖入普通块拒绝、置底拖到最前拒绝、置顶组内互换合法、普通拖入置顶块拒绝）、`computeB50` 断言（35+15 池满、池内 rating 非递增 + poolRank 连续、total=oldSum+newSum）、曲绘缓存文件名断言（同 URL 稳定、异 URL 不同、按歌曲前缀识别）；`route-check.mjs` 断言 `b50` 为根级 route、settings children 不变。
 - 版本与验证：`app.json` 升 `1.11.0`/versionCode `19`，`package.json` 升 `1.11.0`；本地全绿——tsc、route/feature/phase-af/rating/backup/update 六组回归、`expo-doctor` 21/21、`expo export --platform android`（1785→1789 模块、4.5MB hbc）。
 - 发布补记（当日）：功能提交 `4f93d1f`，打轻量标签 `v1.11.0` 推送触发云构建 run `33083384357`，一次通过（lint + 6 组回归 + expo-doctor + Android export + arm64 gradle 全绿）。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.11.0>；资产 `MaiMate-latest.apk` 大小 `62,426,874` bytes（59.5 MB），SHA-256 `5a4a0992c7783de264f210270e8a7e62e87c67417a35de4c2168a3a026f39f75`（取自 CI「Print APK checksum」步骤输出）。落地页更新 v1.11.0 文案、日志与 SHA 后经 wrangler 部署 Pages（deployment `bfb1b42f.maimate-landing.pages.dev`）；线上校验落地页 200 且含 v1.11.0 与新 SHA、`HEAD /MaiMate-latest.apk` 返回 200 / content-length `62,426,874` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（跨组拖拽禁令、牌子页高难聚焦、判定着色、B50/折线图、曲绘离线、更新红点）。
+
+### 2026-08-27 — v1.12.0：删置顶置底、B50 页重做（分池切换/难度染色/同分附加）、目标增量（+**）、曲库 B50 徽标、CSV 导出、批量清除已达标
+
+- 用户目标：① 推分计划拖拽排序仍有问题 → 删除置顶置底功能；② B50 删除折线图走势；③ 新曲15/旧曲35 分成两个可切换页面，每首歌标注难度并按难度染色；④ 删除「本地估算」措辞（本地口径与服务器一致）；⑤ B50 各池页面下方用提示条隔开，展示与最后一首同 Rating 的曲目；⑥ 推分计划目标 Rating 右侧加「（+**）」显示达成后可为 B50 增加的分数（重算口径），无目标不显示；⑦ 删曲库页「更新 / 下载」按钮。附加四项：曲库行 B50 徽标、成绩 CSV 导出、B50 池切换状态保持、批量清除已达标目标。完成后云构建并同步下载站。
+- 置顶置底删除（修①）：`PlanDragList` 移除 📌/🔻 按钮列、`onPin` prop、`isLegalDragResult` 调用（无分组后任何拖拽天然合法），保留 entryId 落点长度校验与原子提交；`PlanEntryCard` 删 pin 标记渲染；`plan.tsx` 删 `setPinById` 引用、头部文案改「长按曲目拖拽排序」。`entry.pin` 字段、store `setPin`/`setPinById`、`normalizePlanEntries` 的 pin 排序全部保留（数据不迁移，UI 不再展示生效）。
+- B50 页重做（修②③④⑤）：`app/b50.tsx` 重写——删除折线图（Svg/Polyline/buildTrend 全删）；标题改「B50 总分」不再称本地估算；新曲 TOP15 / 旧曲 TOP35 用分段切换器分两页展示（useState 池选择状态，返回后保持）；每行加难度 chip 按 `DifficultyColorMap` 染色（Master 紫/Re:MASTER 浅紫白等）；各池末尾提示条「以下 N 首与第 15/35 名同 Rating，暂未计入总分」+ 同分未入榜曲目列表（点击同样跳详情）。
+- B50 纯函数（支撑③⑤⑥）：`computeB50` 返回值新增 `newTies`/`oldTies`（与池末位同 rating 的未入榜曲目，按定数高者靠前、ID/难度稳定排序，池未满时为空）；新增 `computeB50Gain(musicList, scores, chart, targetAchievement)`——把指定谱面成绩替换为目标达成率后重算 B50 总分，返回与当前总分的差值（目标非法或谱面不在库返回 null）。
+- 目标增量（修⑥）：`PlanEntryCard` 新增 `allScores` prop（全量成绩，plan.tsx 传入），`b50Gain` memo 一次重算，目标 Rating 右侧渲染 `（+N）`/`（−N）`，无目标不显示；+0 如实显示（该谱面进不了 TOP50）。
+- 曲库更新按钮删除（修⑦）：`app/(tabs)/index.tsx` 删「更新 / 下载」按钮、样式与 `openDownloadSite`/`Linking` 导入（用户改走设置→检查更新）。
+- 附加四项：`SongCard` 新增 `b50Badge` prop（曲库行标题旁「B50 #池内排名」徽标，新曲青色/旧曲灰色，`app/(tabs)/index.tsx` 以 `computeB50` 结果建 songId→最佳排名映射传入）；新增 `src/data/scores-csv-core.ts`（纯函数 `buildScoresCsv`/`CSV_HEADER`/`CsvScoreRow`，RFC 4180 转义、CRLF 行尾）与 `src/data/scores-csv.ts`（IO 壳：store 收集成绩→曲库补全 title/ds/level→写缓存文件→系统分享→清理），设置页「数据与隐私」加「导出成绩 CSV」入口；B50 池切换状态保持（useState 天然保持，useFocusEffect 不重置）；`plan-store` 新增 `clearAchievedTargets(entryIds)`，`plan.tsx` 计算已达标条目（当前达成率 ≥ 目标），头部条件渲染「清已达」按钮，确认后批量清除目标分数（曲目保留）。
+- 回归测试：feature-check 删除 v1.11 跨组拖拽断言；新增 ties 断言（40 首同分旧曲 → 35 入榜 + 5 未入榜 ties 且 ID 稳定 985–989）、`computeB50Gain` 断言（非法目标/不在库→null、Song 1 成绩 90→100.5 增量=新旧单谱 Rating 差、低定数谱面即使 100.5% 也进不了池→+0）、CSV 断言（表头逐列、含逗号引号值转义、CRLF 结尾）。
+- 版本与验证：`app.json` 升 `1.12.0`/versionCode `20`，`package.json` 升 `1.12.0`；本地全绿——tsc、route/feature/phase-af/rating/backup/update 六组回归、`expo-doctor` 21/21、`expo export --platform android`（4.4MB hbc）。发布补记待构建后回填。

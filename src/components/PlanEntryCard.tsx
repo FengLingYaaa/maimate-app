@@ -1,8 +1,9 @@
-import React, { memo, useState } from 'react';
+import React, { memo, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Colors, DifficultyColorMap, DifficultyLabels, getChinaVersionName } from '../constants';
 import { calculateRating, formatAchievement } from '../data/rating';
 import { getOfficialChartConstant } from '../data/music-list';
+import { computeB50Gain } from '../data/b50';
 import { CoverImage } from './CoverImage';
 import type { MusicData, PlanEntry, PlayerScore } from '../data/types';
 
@@ -11,6 +12,7 @@ interface Props {
   entry: PlanEntry;
   index: number;
   allSongs: MusicData[];
+  allScores: PlayerScore[];
   importedScore?: PlayerScore;
   showChinaVersion: boolean;
   showProjectedRating: boolean;
@@ -20,9 +22,15 @@ interface Props {
   onTarget: (score: number | null) => void;
 }
 
-export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, allSongs, importedScore, showChinaVersion, showProjectedRating, onPress, onLongPress, onRemove, onTarget }: Props) {
+export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, allSongs, allScores, importedScore, showChinaVersion, showProjectedRating, onPress, onLongPress, onRemove, onTarget }: Props) {
   const officialConstant = getOfficialChartConstant(music, entry.difficultyIndex);
   const targetRating = entry.targetScore === undefined ? null : calculateRating(officialConstant ?? undefined, entry.targetScore);
+  // v1.12.0：达成目标后 B50 总分增量（重算口径），无目标不显示。
+  const b50Gain = useMemo(() => (
+    entry.targetScore === undefined
+      ? null
+      : computeB50Gain(allSongs, allScores, { songId: music.id, musicType: music.type, difficultyIndex: entry.difficultyIndex }, entry.targetScore)
+  ), [allSongs, allScores, music.id, music.type, entry.difficultyIndex, entry.targetScore]);
   const chinaName = getChinaVersionName(music.basic_info.from);
   const difficultyColor = DifficultyColorMap[entry.difficultyIndex] || Colors.accent.secondary;
   const [editingTarget, setEditingTarget] = useState(false);
@@ -67,7 +75,7 @@ export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, 
         ) : (
           <Pressable style={styles.targetSummary} onPress={() => setEditingTarget(true)}>
             <Text style={styles.targetSummaryText}>目标：{entry.targetScore!.toFixed(4)}%</Text>
-            {showProjectedRating && <Text style={styles.targetRating}>目标 Rating：{targetRating ?? '—'}</Text>}
+            {showProjectedRating && <Text style={styles.targetRating}>目标 Rating：{targetRating ?? '—'}{b50Gain !== null ? `（${b50Gain >= 0 ? '+' : ''}${b50Gain}）` : ''}</Text>}
             <Text style={styles.editHint}>点击重新选择</Text>
           </Pressable>
         )}
