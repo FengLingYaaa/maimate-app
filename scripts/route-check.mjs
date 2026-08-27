@@ -33,6 +33,7 @@ assert.ok(tree, 'Expo Router route tree should be generated');
 const rootRoutes = new Map(tree.children.map(route => [route.route, route]));
 assert.equal(rootRoutes.get('(tabs)')?.type, 'layout', '(tabs) must be the root tab group layout');
 assert.equal(rootRoutes.get('song')?.type, 'layout', 'song must be a root-level Stack sibling of (tabs)');
+assert.equal(rootRoutes.get('b50')?.type, 'route', 'b50 must be a root-level Stack screen sibling of (tabs)');
 const tabsChildren = new Map(rootRoutes.get('(tabs)')?.children.map(route => [route.route, route]));
 for (const name of ['index', 'random', 'plan', 'fortune']) {
   assert.equal(tabsChildren.get(name)?.type, 'route', `${name} must live inside (tabs) as a leaf screen`);
@@ -48,6 +49,7 @@ assert.equal(rootRoutes.has('settings/detail-boards'), false, 'settings child mu
 assert.equal(rootRoutes.has('settings/data-backup'), false, 'settings child must not be a root route');
 assert.equal(rootRoutes.has('settings/update'), false, 'settings child must not be a root route');
 assert.equal(rootRoutes.has('song/[id]'), false, 'song detail must not be a root route');
+assert.equal(rootRoutes.has('index'), false, 'b50 must not shadow tab screens');
 const settingsNode = tabsChildren.get('settings');
 assert.deepEqual(
   settingsNode?.children.map(route => route.route).sort(),
@@ -57,4 +59,4 @@ assert.deepEqual(rootRoutes.get('song')?.children.map(route => route.route), ['[
 const platesNode = tabsChildren.get('plates');
 assert.deepEqual(platesNode?.children.map(route => route.route), ['index']);
 
-console.log('Route checks passed ((tabs) group + root-level song detail with nested Stack layouts)');
+console.log('Route checks passed ((tabs) group + root-level song/b50 screens with nested Stack layouts)');

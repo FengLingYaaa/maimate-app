@@ -1,4 +1,4 @@
-﻿/**
+/**
  * MaiMate Root Layout
  * 根 Stack：(tabs) 主框架 + song 歌曲详情。
  * 详情页压在 Tabs 之上，返回时自然回到进入前的 Tab
@@ -52,6 +52,7 @@ export default function RootLayout() {
       >
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="song" />
+        <Stack.Screen name="b50" />
       </Stack>
     </GestureHandlerRootView>
   );

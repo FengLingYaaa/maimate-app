@@ -3,6 +3,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+
 import { FilterBar, PlanDragList, type PlanDragRow } from '../../src/components';
 import { Colors, DifficultyColorMap, DifficultyLabels } from '../../src/constants';
 import { getChinaVersionOptions, getVersionOptions } from '../../src/data/version-catalog';
@@ -132,6 +133,9 @@ export default function PushPlan() {
           </View>
         </View>
         <Text style={styles.headerSub}>{entries.length > 0 ? `${entries.length} 首待练习` : '还没有添加歌曲'} · 曲目下方 📌/🔻 置顶置底，同组之间长按拖拽</Text>
+        <Pressable style={styles.b50Entry} onPress={() => router.push('/b50')}>
+          <Text style={styles.b50EntryText}>B50 总览 →</Text>
+        </Pressable>
       </View>
       <FilterBar
         filters={filters}
@@ -257,6 +261,8 @@ const styles = StyleSheet.create({
   graveyardBadgeText: { fontSize: 9, color: '#fff', fontWeight: '800' },
   headerTitle: { fontSize: 26, fontWeight: '800', color: Colors.text.primary },
   headerSub: { fontSize: 12, lineHeight: 18, color: Colors.text.muted, marginTop: 2 },
+  b50Entry: { alignSelf: 'flex-start', marginTop: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 9, backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.light },
+  b50EntryText: { fontSize: 11, fontWeight: '800', color: Colors.accent.secondary },
   clearBtn: { fontSize: 14, color: Colors.functional.danger, fontWeight: '600' },
   sheetOverlay: { flex: 1, backgroundColor: Colors.bg.overlay, justifyContent: 'flex-end' },
   sheetCard: { backgroundColor: Colors.bg.secondary, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, maxHeight: '78%', gap: 10 },

@@ -15,8 +15,10 @@ import {
   filterEntriesByMinLevel,
   PLATE_BITS,
 } from '../src/data/plates.ts';
-import { applyDragWithPinGroups, canDragPlanRows, compareByPinThenOrder, pinGroupOf } from '../src/data/plan-order.ts';
+import { applyDragWithPinGroups, canDragPlanRows, compareByPinThenOrder, isLegalDragResult, pinGroupOf } from '../src/data/plan-order.ts';
 import { migratePlanEntryIds, normalizePlanEntries, reorderPlanEntriesById } from '../src/data/plan-entries.ts';
+import { computeB50, B35_SIZE, B15_SIZE } from '../src/data/b50.ts';
+import { getCoverCacheFilename, isCoverCacheFileForSong } from '../src/data/cover-cache-names.ts';
 import { getBilibiliVideoAppUrls } from '../src/data/bilibili-search.ts';
 import { extractBilibiliVideoId, isBilibiliShortLink } from '../src/data/bilibili-search.ts';
 import { av2bv, bv2av } from '../src/data/bilibili-bvid.ts';
@@ -204,5 +206,59 @@ for (let day = 0; day < 30; day += 1) {
 }
 const onlyBanquet = generateFortune('seed-x', [makeMusic('9', 'maimai でらっくす BUDDiES', 'DX', '宴会場')], '2026-08-26');
 assert.equal(onlyBanquet.recommendedSongId, null);
+
+// v1.11.0：跨组拖拽直接作废——拖拽结果的分组序必须保持「置顶→普通→置底」单调。
+const pinnedSeq = [
+  { ...pinA }, { ...pinB }, { ...midC }, { ...botD },
+];
+assert.equal(isLegalDragResult(pinnedSeq), true);
+// 置顶曲目被拖到普通块之后 → 非法。
+assert.equal(isLegalDragResult([{ ...pinA }, { ...midC }, { ...pinB }, { ...botD }]), false);
+// 置底曲目被拖到最前 → 非法。
+assert.equal(isLegalDragResult([{ ...botD }, { ...pinA }, { ...pinB }, { ...midC }]), false);
+// 同组内拖拽（置顶内部互换）仍合法。
+assert.equal(isLegalDragResult([{ ...pinB }, { ...pinA }, { ...midC }, { ...botD }]), true);
+// 普通曲目拖进置顶块之间 → 非法。
+assert.equal(isLegalDragResult([{ ...pinA }, { ...midC }, { ...pinB }, { ...botD }].reverse()), false);
+
+// v1.11.0：B50 估算（旧曲 TOP35 + 新曲 TOP15）。
+const b50Music = Array.from({ length: 60 }, (_, index) => ({
+  id: String(index + 1),
+  type: 'DX' as const,
+  title: `Song ${index + 1}`,
+  ds: [1, 2, 3, 10 + index / 10, 12 + index / 10],
+  level: ['1', '2', '3', '12', '13'],
+  cids: [1, 2, 3, 4, 5],
+  charts: [chart, chart, chart, chart, chart],
+  basic_info: { title: `Song ${index + 1}`, artist: 'A', genre: '流行&动漫', bpm: 120, release_date: '', from: '', is_new: index >= 45 },
+}));
+const b50Scores = b50Music
+  .filter((_, index) => index < 35 || index >= 45)
+  .map(music => ({ songId: music.id, type: 'DX' as const, difficultyIndex: 4, achievement: 90 + (music.id.charCodeAt(0) % 10), dxScore: 1000, importedAt: 1 }));
+const b50 = computeB50(b50Music, b50Scores);
+assert.equal(b50.entries.filter(entry => entry.pool === 'new').length, B15_SIZE);
+assert.equal(b50.entries.filter(entry => entry.pool === 'old').length, B35_SIZE);
+assert.equal(b50.total, b50.oldSum + b50.newSum);
+// 成绩覆盖 35 首旧曲 + 15 首新曲，两池恰好满。
+assert.equal(b50.oldFull, true);
+assert.equal(b50.newFull, true);
+// 排名规则：新曲池在前、旧曲池在后，池内按 rating 降序（允许同分相邻）。
+for (const pool of ['new', 'old'] as const) {
+  const poolEntries = b50.entries.filter(entry => entry.pool === pool);
+  for (let i = 1; i < poolEntries.length; i += 1) {
+    assert.ok(poolEntries[i - 1].rating >= poolEntries[i].rating, `${pool} pool must be non-increasing by rating`);
+    assert.equal(poolEntries[i].poolRank, poolEntries[i - 1].poolRank + 1, `${pool} poolRank must be contiguous`);
+  }
+}
+// 新曲池必须全部来自 is_new 曲目。
+assert.equal(b50.entries.filter(entry => entry.pool === 'new').every(entry => entry.rank <= 15), true);
+
+// v1.11.0：曲绘缓存文件名（同 URL 稳定、不同 URL 不同、可按歌曲识别）。
+const coverNameA = getCoverCacheFilename('123', 'https://a.example/x.png');
+const coverNameB = getCoverCacheFilename('123', 'https://a.example/y.png');
+assert.equal(coverNameA, getCoverCacheFilename('123', 'https://a.example/x.png'));
+assert.notEqual(coverNameA, coverNameB);
+assert.equal(isCoverCacheFileForSong(coverNameA, '123'), true);
+assert.equal(isCoverCacheFileForSong(coverNameA, '456'), false);
 
 console.log('Feature checks passed (deep links, Bilibili parsing, version groups, local plates, pins, fortune)');

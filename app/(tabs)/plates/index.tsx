@@ -12,6 +12,7 @@ import {
   getPlateChinaVersionOptions,
   getPlateLegacyVersionOptions,
   mergePlateRows,
+  PLATE_BITS,
   summarizePlates,
   summarizePlatesByDifficulty,
   type PlateBit,
@@ -41,6 +42,8 @@ export default function PlatesPage() {
   const [notice, setNotice] = useState<string | null>(null);
   // 版本筛选默认收起：避免筛选区过高挤占曲目列表。
   const [filtersCollapsed, setFiltersCollapsed] = useState(true);
+  // v1.11.0：默认聚焦 Master/ReMaster，低难度（Basic/Advanced/Expert）收起。
+  const [showLowDifficulties, setShowLowDifficulties] = useState(false);
   // 进入页面时强制刷新一次：修复嵌套 Stack 初次渲染偶发空白、
   // 点击筛选后才显示的问题。
   const [focusTick, setFocusTick] = useState(0);
@@ -65,6 +68,30 @@ export default function PlatesPage() {
   const byDifficulty = useMemo(() => summarizePlatesByDifficulty(filtered), [filtered]);
   const total = useMemo(() => summarizePlates(filtered), [filtered]);
   const mergedRows = useMemo(() => mergePlateRows(filtered), [filtered]);
+  // 总计卡与曲目行按同一开关过滤低难度；空数组表示全难度。
+  const visibleDifficulties = useMemo(
+    () => (showLowDifficulties ? undefined : [3, 4]),
+    [showLowDifficulties],
+  );
+  const visibleByDifficulty = useMemo(
+    () => (visibleDifficulties ? byDifficulty.filter(row => visibleDifficulties.includes(row.difficultyIndex)) : byDifficulty),
+    [byDifficulty, visibleDifficulties],
+  );
+  const visibleTotal = useMemo(
+    () => (visibleDifficulties
+      ? {
+        total: filtered.filter(entry => visibleDifficulties.includes(entry.difficultyIndex)).length,
+        counts: PLATE_LABELS.reduce((acc, item) => {
+          acc[item.name] = filtered
+            .filter(entry => visibleDifficulties.includes(entry.difficultyIndex))
+            .reduce((sum, entry) => sum + ((entry.mask & PLATE_BITS[item.name]) !== 0 ? 1 : 0), 0);
+          return acc;
+        }, {} as Record<PlateBit, number>),
+      }
+      : total),
+    [filtered, total, visibleDifficulties],
+  );
+  const hasLowDifficulties = useMemo(() => byDifficulty.some(row => row.difficultyIndex <= 2), [byDifficulty]);
 
   const eligible14Plus = useMemo(() => filterEntriesByMinLevel(filtered, 14), [filtered]);
   const pendingCount = useMemo(
@@ -143,9 +170,9 @@ export default function PlatesPage() {
       <View style={styles.summaryCard}>
         <View style={[styles.summaryRow, styles.totalRow]}>
           <Text style={styles.totalLabel}>总计</Text>
-          <View style={styles.summaryCells}>{PLATE_LABELS.map(item => <SummaryCell key={item.name} item={item} counts={total.counts} total={total.total} />)}</View>
+          <View style={styles.summaryCells}>{PLATE_LABELS.map(item => <SummaryCell key={item.name} item={item} counts={visibleTotal.counts} total={visibleTotal.total} />)}</View>
         </View>
-        {byDifficulty.map(row => (
+        {visibleByDifficulty.map(row => (
           <View key={row.difficultyIndex} style={styles.summaryRow}>
             <Text style={[styles.diffLabel, { color: DifficultyColorMap[row.difficultyIndex] }]}>
               {DifficultyShortLabels[row.difficultyIndex] || `难度${row.difficultyIndex}`}
@@ -153,6 +180,11 @@ export default function PlatesPage() {
             <View style={styles.summaryCells}>{PLATE_LABELS.map(item => <SummaryCell key={item.name} item={item} counts={row.counts} total={row.total} />)}</View>
           </View>
         ))}
+        {hasLowDifficulties && (
+          <Pressable style={styles.diffToggleButton} onPress={() => setShowLowDifficulties(value => !value)}>
+            <Text style={styles.diffToggleText}>{showLowDifficulties ? '收起低难度' : `展开低难度（${byDifficulty.filter(row => row.difficultyIndex <= 2).length} 行）`}</Text>
+          </Pressable>
+        )}
       </View>
 
       {(eligible14Plus.length > 0 || lastBulkKeys.length > 0) && (
@@ -193,7 +225,14 @@ export default function PlatesPage() {
         contentContainerStyle={[styles.list, { paddingBottom: 96 + insets.bottom }]}
         ListHeaderComponent={listHeader}
         ListEmptyComponent={listEmpty}
-        renderItem={({ item }) => <PlateRow entry={item} plannedCount={entries.filter(e => e.songId === item.music.id).length} onPress={() => openSong(item)} />}
+        renderItem={({ item }) => (
+          <PlateRow
+            entry={item}
+            plannedCount={entries.filter(e => e.songId === item.music.id).length}
+            showLowDifficulties={showLowDifficulties}
+            onPress={() => openSong(item)}
+          />
+        )}
       />
     </View>
   );
@@ -236,7 +275,13 @@ function PlateChartLine({ chart }: { chart: { difficultyIndex: number; mask: num
   );
 }
 
-function PlateRow({ entry, plannedCount, onPress }: { entry: ReturnType<typeof mergePlateRows>[number]; plannedCount: number; onPress: () => void }) {
+function PlateRow({ entry, plannedCount, showLowDifficulties, onPress }: {
+  entry: ReturnType<typeof mergePlateRows>[number];
+  plannedCount: number;
+  showLowDifficulties: boolean;
+  onPress: () => void;
+}) {
+  const visibleCharts = showLowDifficulties ? entry.charts : entry.charts.filter(chart => chart.difficultyIndex >= 3);
   return (
     <Pressable style={({ pressed }) => [styles.row, pressed && styles.rowPressed]} onPress={onPress}>
       <CoverImage music={entry.music} style={styles.cover} accessibilityLabel={`${entry.music.title} 曲绘`} />
@@ -246,7 +291,7 @@ function PlateRow({ entry, plannedCount, onPress }: { entry: ReturnType<typeof m
           {plannedCount > 0 && <View style={styles.planTag}><Text style={styles.planTagText}>计划×{plannedCount}</Text></View>}
         </View>
         <Text style={styles.rowMeta}>{entry.music.type} · {entry.music.basic_info.from}</Text>
-        {entry.charts.map(chart => <PlateChartLine key={chart.difficultyIndex} chart={chart} />)}
+        {visibleCharts.map(chart => <PlateChartLine key={chart.difficultyIndex} chart={chart} />)}
       </View>
     </Pressable>
   );
@@ -278,6 +323,8 @@ const styles = StyleSheet.create({
   summaryLabel: { fontSize: 10, fontWeight: '800' },
   summaryValue: { fontSize: 12, color: Colors.text.primary, fontWeight: '800' },
   summaryTotal: { fontSize: 9, color: Colors.text.muted, fontWeight: '600' },
+  diffToggleButton: { alignSelf: 'center', marginTop: 2, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: Colors.border.light, backgroundColor: Colors.bg.tertiary },
+  diffToggleText: { fontSize: 10, fontWeight: '700', color: Colors.accent.secondary },
   bulkBar: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 4, gap: 8 },
   bulkButton: { flex: 1, backgroundColor: Colors.accent.primary, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
   bulkDisabled: { opacity: 0.45 },

@@ -96,15 +96,15 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | v1.10.0 功能主体（前一代 `b98cbc0` 为 v1.9.0 landing SHA 回填） |
-| 当前标签 | `v1.10.0`（v1.9.0 及更早标签均已发布） |
+| 当前提交 | v1.11.0 功能主体（前一代 `61d0ebf` 为 v1.10.0 landing SHA 回填） |
+| 当前标签 | v1.11.0 待打（v1.10.0 及更早标签均已发布） |
 | Android applicationId | `cc.flya.maimate` |
-| App 版本 | `1.10.0`（Android versionCode `18`） |
+| App 版本 | `1.11.0`（Android versionCode `19`） |
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
-| 最新 Release APK SHA-256（v1.10.0） | `969e5c02ea5da00139627b596c1e09cf23ca015825aebdfabdcebe0f34daced0`（CI「Print APK checksum」步骤输出） |
-| 最新 Release APK 大小 | 62,260,714 bytes（59.4 MB） |
+| 最新 Release APK SHA-256（v1.10.0，待 v1.11.0 构建后更新） | `969e5c02ea5da00139627b596c1e09cf23ca015825aebdfabdcebe0f34daced0`（CI「Print APK checksum」步骤输出） |
+| 最新 Release APK 大小 | 62,260,714 bytes（59.4 MB，v1.10.0；待 v1.11.0 构建后更新） |
 | 下载站同步状态 | 已部署：v1.10.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | APK 构建方式 | GitHub Actions 云构建：先跑 lint/route/feature/phase/rating 回归、Expo Doctor 和 Android export 门禁，再出 arm64-v8a debug keystore 内测包 |
 
@@ -903,3 +903,17 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 依赖与版本：`expo` 及若干 SDK 57 包对齐到 Expo 最新补丁（`expo-doctor` 21/21 全绿），`react-native` 升 `0.86.3`，`app.json` 升 `1.10.0`/versionCode `18`，`package.json` 升 `1.10.0`。
 - 回归测试：`scripts/feature-check.ts` 拖拽断言改为 entryId 语义（迁移幂等、合法/非法顺序拒绝、连续两次拖拽）；新增 `scripts/backup-check.ts`（round-trip/未知字段/损坏 JSON/未来 schema 拒绝/旧计划无 entryId 迁移/非法数值剔除/数组截断/coverUri 剥离）与 `scripts/update-check.ts`（SemVer）；`package.json` 增 `test:backup`/`test:update` 并接入 CI 门禁。
 - 发布补记（当日）：版本升至 `1.10.0`（versionCode `18`，功能提交 `0740d3f`）。打轻量标签 `v1.10.0` 推送触发云构建 run `33037908454`，一次通过（lint + 6 组回归 + expo-doctor + Android export + arm64 gradle 全绿）。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.10.0>；资产 `MaiMate-latest.apk` 大小 `62,260,714` bytes（59.4 MB），SHA-256 `969e5c02ea5da00139627b596c1e09cf23ca015825aebdfabdcebe0f34daced0`（取自 CI「Print APK checksum」步骤输出）。落地页更新 v1.10.0 文案、日志与 SHA 后经 wrangler 部署 Pages（deployment `790e41d1.maimate-landing.pages.dev`）；线上校验落地页 200 且含新 SHA、`HEAD /MaiMate-latest.apk` 返回 200 / content-length `62,260,714` 与资产一致。等待用户真机验收（拖拽、网易云搜索填词/剪贴板、牌子滚动、备份/恢复、更新检查）。
+
+### 2026-08-27 — v1.11.0：五项体验修复 + B50 总览 + 成绩折线图 + 曲绘本地缓存 + 更新红点
+
+- 用户目标：① 置顶曲目与未置顶曲目之间拖拽仍出问题 → 应当不允许不同组之间拖拽；② 每首歌下方「长按曲目信息拖拽」提示删除；③ 牌子查询默认聚焦 Master/ReMaster，收起歌曲和总计两个板块中的前三个难度并提供展开按钮；④ 完成率损失表格 P 判定橙色、G 判定粉色、Good 绿色、Miss 保持灰色（含具体损失数字）；⑤ 检查更新页删除「检查通过 GitHub Release…」提示行；⑥ 做 B50 总览；⑦ 做成绩折线图；⑧ 做曲绘本地缓存；⑨ 做更新红点。⑥–⑨ 完成后触发云构建并同步下载站。
+- 跨组拖拽禁令（修①）：`src/data/plan-order.ts` 新增纯函数 `isLegalDragResult`（拖拽结果分组序必须保持「置顶→普通→置底」单调，否则返回 false）；`PlanDragList.onDragEnd` 落点校验失败即作废（不写 Store），列表自动回弹；同组内拖拽不受影响。
+- 行内提示删除（修②）：`PlanDragList` 移除「长按曲目信息拖拽…」文字块及样式。
+- 牌子页聚焦高难（修③）：默认 `showLowDifficulties=false`，歌曲行与总计卡都只统计/展示 `difficultyIndex >= 3`（Master/ReMaster）；总计卡底部新增「展开低难度（N 行）/ 收起低难度」按钮；`PlateRow` 接收 `showLowDifficulties` 同步控制行内明细。
+- 完成率损失配色（修④）：`AchievementLossCard` 的 `VISIBLE_JUDGMENTS` 每列带判定色——P·2550/P·2500 `#fb923c` 橙、G·2000/G·1500/G·1250 `#ff6b9d` 粉、Good 绿（`Colors.functional.success`）、Miss 灰（`Colors.text.muted`）；表头与数值单元格同色。
+- 更新页文案（修⑤）：`settings/update.tsx` 删除底部 GitHub Releases hint 文案与样式。
+- B50 总览（⑥⑦）：新增 `src/data/b50.ts`（纯函数 `computeB50`：单谱 Rating=calculateRating，新曲池 TOP15 + 旧曲池 TOP35，池内 rating 降序、并列按定数高/ID/difficulty 稳定排序，输出统一 rank/pool/poolRank、oldSum/newSum/total 与池满标记）；新增根级路由 `app/b50.tsx`（总分卡 + 两池合计 + 服务器 Rating 对照、`react-native-svg` 双线折线图——本地估算实线粉 + 服务器 RA 虚线青、最多 7 点=6 快照+当前、不足 2 点提示、明细列表 50 行含曲绘/定数/达成率/单谱 Rating，点击进歌曲详情）；`_layout.tsx` 注册 `b50` 根级 Screen；设置页成绩导入区加「查看 B50 总览」、推分计划页头部加「B50 总览 →」入口。
+- 曲绘本地缓存（⑧）：新增 `src/data/cover-cache-names.ts`（纯函数：`getCoverCacheFilename` = `cover-<songId>-<fnv1a(url)>.png`、`isCoverCacheFileForSong` 前缀识别，node 可测）与 `src/data/cover-cache.ts`（`resolveCoverCacheUri`：本地命中直读、未命中守卫去重后 `downloadAsync` 临时文件再 `moveAsync` 原子落盘、失败静默回退远端；`clearCoverCache` 清空 covers 目录）；`CoverImage` 改为逐候选「先本地后远端」加载，不劣于 v1.10 行为。
+- 更新红点（⑨）：`src/api/app-update.ts` 增 `UpdateState` 持久化（AsyncStorage）与 `autoCheckForUpdate`（启动延迟 4s 静默检查、≥24h 节流、写 `knownLatestVersion`）、`hasUpdateBadge`/`markUpdateSeen`（进更新页即熄灭）；`(tabs)/_layout.tsx` 设置 Tab 图标加红点组件（`useFocusEffect` 回前台复核）；`settings/update.tsx` 改用 `manualCheckForUpdate`。
+- 回归测试：`feature-check.ts` 新增 `isLegalDragResult` 五组断言（同组合法、置顶拖入普通块拒绝、置底拖到最前拒绝、置顶组内互换合法、普通拖入置顶块拒绝）、`computeB50` 断言（35+15 池满、池内 rating 非递增 + poolRank 连续、total=oldSum+newSum）、曲绘缓存文件名断言（同 URL 稳定、异 URL 不同、按歌曲前缀识别）；`route-check.mjs` 断言 `b50` 为根级 route、settings children 不变。
+- 版本与验证：`app.json` 升 `1.11.0`/versionCode `19`，`package.json` 升 `1.11.0`；本地全绿——tsc、route/feature/phase-af/rating/backup/update 六组回归、`expo-doctor` 21/21、`expo export --platform android`（1785→1789 模块、4.5MB hbc）。发布补记待构建后回填。

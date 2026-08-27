@@ -121,6 +121,9 @@ export default function SettingsPage() {
         </Pressable>
         {tokenConfigured && <Text style={styles.configuredText}>状态：已配置（Token 内容已隐藏）</Text>}
         {!!tokenMessage && <Text style={styles.messageText}>{tokenMessage}</Text>}
+        <Pressable style={styles.secondaryButton} onPress={() => router.push('/b50' as any)}>
+          <Text style={styles.secondaryButtonText}>查看 B50 总览</Text>
+        </Pressable>
         <View style={styles.buttonRow}>
           <Pressable style={styles.secondaryButton} onPress={() => void syncScores()}>
             <Text style={styles.secondaryButtonText}>立即同步成绩</Text>

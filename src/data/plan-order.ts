@@ -43,3 +43,19 @@ export function applyDragWithPinGroups<T extends PlanEntry>(dragged: T[]): T[] {
   for (const entry of dragged) groups[pinGroupOf(entry)].push(entry);
   return [...groups.top, ...groups.middle, ...groups.bottom];
 }
+
+/**
+ * v1.11.0：拖拽落点校验。仅当拖拽结果的分组序保持单调
+ * （置顶块全部在普通块前、普通块全部在置底块前，即没有任何条目
+ * 越过自己分组块的边界）时才接受；跨组拖拽返回 false，
+ * 调用方直接作废本次结果让列表回弹。
+ */
+export function isLegalDragResult<T extends Pick<PlanEntry, 'pin'>>(result: T[]): boolean {
+  let lastRank = 0;
+  for (const entry of result) {
+    const rank = GROUP_ORDER[pinGroupOf(entry)];
+    if (rank < lastRank) return false;
+    lastRank = rank;
+  }
+  return true;
+}

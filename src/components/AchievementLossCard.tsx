@@ -18,16 +18,16 @@ interface Props {
 
 type Mode = 'percent' | 'eqTap';
 
-/** 展示的判定列：CP 永不失完成率，不参与损失展示。 */
-const VISIBLE_JUDGMENTS = [
-  { key: 'p2550', label: 'P·2550' },
-  { key: 'p2500', label: 'P·2500' },
-  { key: 'g2000', label: 'G·2000' },
-  { key: 'g1500', label: 'G·1500' },
-  { key: 'g1250', label: 'G·1250' },
-  { key: 'good', label: 'Good' },
-  { key: 'miss', label: 'Miss' },
-] as const;
+/** 展示的判定列：CP 永不失完成率，不参与损失展示。颜色区分判定档位。 */
+const VISIBLE_JUDGMENTS: Array<{ key: string; label: string; color: string }> = [
+  { key: 'p2550', label: 'P·2550', color: '#fb923c' },
+  { key: 'p2500', label: 'P·2500', color: '#fb923c' },
+  { key: 'g2000', label: 'G·2000', color: Colors.accent.primary },
+  { key: 'g1500', label: 'G·1500', color: Colors.accent.primary },
+  { key: 'g1250', label: 'G·1250', color: Colors.accent.primary },
+  { key: 'good', label: 'Good', color: Colors.functional.success },
+  { key: 'miss', label: 'Miss', color: Colors.text.muted },
+];
 
 export function AchievementLossCard({ notes, defaultCollapsed = false }: Props) {
   const [expanded, setExpanded] = useState(!defaultCollapsed);
@@ -82,7 +82,7 @@ export function AchievementLossCard({ notes, defaultCollapsed = false }: Props) 
               <View style={styles.row}>
                 <View style={[styles.cell, styles.typeCell]}><Text style={styles.typeText}>音符</Text></View>
                 {VISIBLE_JUDGMENTS.map(judgment => (
-                  <View key={judgment.key} style={[styles.cell, styles.headCell]}><Text style={styles.headText}>{judgment.label}</Text></View>
+                  <View key={judgment.key} style={[styles.cell, styles.headCell]}><Text style={[styles.headText, { color: judgment.color }]}>{judgment.label}</Text></View>
                 ))}
               </View>
               {rows.map(row => (
@@ -90,7 +90,7 @@ export function AchievementLossCard({ notes, defaultCollapsed = false }: Props) 
                   <View style={[styles.cell, styles.typeCell]}><Text style={styles.typeText}>{row.label}</Text></View>
                   {VISIBLE_JUDGMENTS.map(judgment => (
                     <View key={judgment.key} style={styles.cell}>
-                      <Text style={styles.valueText}>{formatCell(row.cells[judgment.key])}</Text>
+                      <Text style={[styles.valueText, { color: judgment.color }]}>{formatCell(row.cells[judgment.key])}</Text>
                     </View>
                   ))}
                 </View>

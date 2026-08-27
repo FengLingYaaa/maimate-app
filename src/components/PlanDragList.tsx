@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import DraggableFlatList, { ScaleDecorator, type RenderItemParams } from 'react-native-draggable-flatlist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../constants';
+import { isLegalDragResult } from '../data/plan-order';
 import type { MusicData, PlanEntry, PlayerScore } from '../data/types';
 import { PlanEntryCard } from './PlanEntryCard';
 
@@ -74,7 +75,12 @@ export function PlanDragList({
       onDragEnd={({ data }) => {
         draggingRef.current = false;
         if (!canDrag || data.length !== rows.length) return;
-        onReorder(data.map(row => row.entry.entryId));
+        const orderedIds = data.map(row => row.entry.entryId);
+        const currentIds = rows.map(row => row.entry.entryId);
+        if (orderedIds.every((id, index) => id === currentIds[index])) return;
+        // 跨分组拖拽直接作废：置顶/普通/置底块必须保持连续分区。
+        if (!isLegalDragResult(data.map(row => row.entry))) return;
+        onReorder(orderedIds);
       }}
       contentContainerStyle={styles.content}
       ListFooterComponent={<View style={{ height: 96 + insets.bottom }} />}
@@ -118,7 +124,6 @@ function PlanDragRowView({
           onTarget={value => onTarget(entryId, value)}
         />
         <View style={styles.rowActions}>
-          <Text style={styles.dragHint}>{canDrag ? '长按曲目信息拖拽排序' : '清除筛选/排序后可拖拽'}</Text>
           <Pressable
             style={[styles.pinButton, item.entry.pin === 'top' && styles.pinButtonActive]}
             onPress={() => onPin(entryId, item.entry.pin === 'top' ? undefined : 'top')}
@@ -152,7 +157,6 @@ const styles = StyleSheet.create({
     marginTop: -2,
     marginBottom: 5,
   },
-  dragHint: { flex: 1, fontSize: 9, color: Colors.text.muted },
   pinButton: {
     paddingHorizontal: 8,
     paddingVertical: 5,

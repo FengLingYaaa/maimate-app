@@ -1,9 +1,14 @@
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { compareSemver } from '../data/semver';
 
 const GITHUB_API_URL = 'https://api.github.com/repos/FengLingYaaa/maimate-app/releases/latest';
 const DOWNLOAD_SITE_APK_URL = 'https://maimate.flya.ccwu.cc/MaiMate-latest.apk';
 const REQUEST_TIMEOUT_MS = 15000;
+/** 更新红点状态与节流时间戳的存储键。 */
+const UPDATE_STATE_KEY = 'maimate_update_state';
+/** 静默检查节流间隔。 */
+const AUTO_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 export interface UpdateCheckResult {
   status: 'update' | 'latest' | 'error';
@@ -16,7 +21,86 @@ export interface UpdateCheckResult {
   error?: string;
 }
 
+interface UpdateState {
+  lastCheckedAt: number | null;
+  /** 已知最新版本（驱动设置页红点）。 */
+  knownLatestVersion: string | null;
+  /** 用户选择忽略的版本（不再亮红点）。 */
+  dismissedVersion: string | null;
+}
+
 export { compareSemver } from '../data/semver';
+
+async function readUpdateState(): Promise<UpdateState> {
+  try {
+    const raw = await AsyncStorage.getItem(UPDATE_STATE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<UpdateState>;
+      return {
+        lastCheckedAt: typeof parsed.lastCheckedAt === 'number' ? parsed.lastCheckedAt : null,
+        knownLatestVersion: typeof parsed.knownLatestVersion === 'string' ? parsed.knownLatestVersion : null,
+        dismissedVersion: typeof parsed.dismissedVersion === 'string' ? parsed.dismissedVersion : null,
+      };
+    }
+  } catch {
+    // 读取失败按无状态处理。
+  }
+  return { lastCheckedAt: null, knownLatestVersion: null, dismissedVersion: null };
+}
+
+async function writeUpdateState(state: UpdateState): Promise<void> {
+  try {
+    await AsyncStorage.setItem(UPDATE_STATE_KEY, JSON.stringify(state));
+  } catch {
+    // 写失败不影响本次结果。
+  }
+}
+
+/** 设置页红点：有比当前版本新的已知版本且未被忽略时为 true。 */
+export async function hasUpdateBadge(currentVersion: string): Promise<boolean> {
+  const state = await readUpdateState();
+  if (!state.knownLatestVersion) return false;
+  if (state.dismissedVersion && compareSemver(state.dismissedVersion, state.knownLatestVersion) >= 0) return false;
+  return compareSemver(state.knownLatestVersion, currentVersion) > 0;
+}
+
+/** 用户进入更新页即视为已知晓，红点清除。 */
+export async function markUpdateSeen(currentVersion: string): Promise<void> {
+  const state = await readUpdateState();
+  if (state.knownLatestVersion && compareSemver(state.knownLatestVersion, currentVersion) <= 0) {
+    await writeUpdateState(state);
+    return;
+  }
+  await writeUpdateState({ ...state, dismissedVersion: state.knownLatestVersion });
+}
+
+/** 启动后台静默检查：≥24h 才真正请求；结果写入已知版本供红点判断。 */
+export async function autoCheckForUpdate(currentVersion: string): Promise<UpdateCheckResult | null> {
+  const state = await readUpdateState();
+  const now = Date.now();
+  if (state.lastCheckedAt && now - state.lastCheckedAt < AUTO_CHECK_INTERVAL_MS) return null;
+  const result = await checkForUpdate(currentVersion);
+  if (result.status === 'update' && result.latestVersion) {
+    await writeUpdateState({ ...state, lastCheckedAt: now, knownLatestVersion: result.latestVersion });
+    return result;
+  }
+  if (result.status === 'latest') {
+    await writeUpdateState({ ...state, lastCheckedAt: now, knownLatestVersion: currentVersion });
+  }
+  return null;
+}
+
+/** 手动检查（设置页按钮）：更新节流时间与已知版本，但不改变用户忽略状态。 */
+export async function manualCheckForUpdate(currentVersion: string): Promise<UpdateCheckResult> {
+  const result = await checkForUpdate(currentVersion);
+  const state = await readUpdateState();
+  if (result.status === 'update' && result.latestVersion) {
+    await writeUpdateState({ ...state, lastCheckedAt: Date.now(), knownLatestVersion: result.latestVersion });
+  } else if (result.status === 'latest') {
+    await writeUpdateState({ ...state, lastCheckedAt: Date.now(), knownLatestVersion: currentVersion, dismissedVersion: null });
+  }
+  return result;
+}
 
 interface GitHubRelease {
   tag_name?: string;

@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import Constants from 'expo-constants';
 import { Colors } from '../../../src/constants';
-import { checkForUpdate } from '../../../src/api/app-update';
+import { manualCheckForUpdate, markUpdateSeen } from '../../../src/api/app-update';
 import type { UpdateCheckResult } from '../../../src/api/app-update';
 
 export default function UpdateScreen() {
@@ -11,11 +11,16 @@ export default function UpdateScreen() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<UpdateCheckResult | null>(null);
 
+  // 进入页面即视为已知晓已知更新，熄灭设置页红点。
+  useEffect(() => {
+    markUpdateSeen(currentVersion).catch(() => undefined);
+  }, [currentVersion]);
+
   const handleCheck = async () => {
     setBusy(true);
     setResult(null);
     try {
-      setResult(await checkForUpdate(currentVersion));
+      setResult(await manualCheckForUpdate(currentVersion));
     } finally {
       setBusy(false);
     }
@@ -69,8 +74,6 @@ export default function UpdateScreen() {
           )}
         </View>
       )}
-
-      <Text style={styles.hint}>检查通过 GitHub Releases 与官方下载站完成，不申请安装权限、不静默下载；更新需手动在系统提示中确认安装。</Text>
     </ScrollView>
   );
 }
@@ -95,5 +98,4 @@ const styles = StyleSheet.create({
   downloadButtonText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   linkButton: { alignItems: 'center', paddingVertical: 11, borderRadius: 10, backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.medium },
   linkButtonText: { fontSize: 12, fontWeight: '700', color: Colors.accent.secondary },
-  hint: { fontSize: 11, lineHeight: 17, color: Colors.text.muted },
 });
