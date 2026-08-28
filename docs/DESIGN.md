@@ -96,15 +96,15 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | v1.15.0 功能主体（前一代 `b802c0d` 为 v1.14.0 文档收尾） |
-| 当前标签 | v1.15.0 已推送（触发云构建，构建结果见 §12/发布补记） |
+| 当前提交 | v1.15.1 功能主体（前一代 `8b6cfb1` 为 v1.15.0 文档收尾） |
+| 当前标签 | v1.15.1 已推送（触发云构建，构建结果见发布补记） |
 | Android applicationId | `cc.flya.maimate` |
-| App 版本 | `1.15.0`（Android versionCode `23`） |
+| App 版本 | `1.15.1`（Android versionCode `24`） |
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
-| 最新 Release APK SHA-256（v1.15.0） | `9979d845350d4cfc063d095600c499202060f713f2292deecdfc5a716b184a98`（CI「Print APK checksum」步骤输出） |
-| 最新 Release APK 大小 | 62,550,008 bytes（59.6 MB） |
+| 最新 Release APK SHA-256（v1.15.1） | `75c1debd58af7b7401da72d9264eb2387e834527b044f680b5e06dc88a16c89c`（CI「Print APK checksum」步骤输出） |
+| 最新 Release APK 大小 | 62,552,316 bytes（59.6 MB） |
 | 下载站同步状态 | 已部署：v1.15.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | 下载站同步状态 | 已部署：v1.14.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | 下载站同步状态 | 已部署：v1.11.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
@@ -998,3 +998,10 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 回归与版本：feature-check 新增拟合 50（Rating 数值/缺 fit_diff 排除/排序切换）、快照战报（上分 +12/新增/总变化）、快照上限归一化断言；六组本地回归全绿；`expo-doctor` 21/21（expo、expo-constants 对齐 ~57.0.18/~57.0.16）；`expo export --platform android` 通过；`app.json` 升 `1.15.0`/versionCode `23`，`package.json` 升 `1.15.0`。
 - 工程事故记录：版本号用 `Set-Content -Encoding UTF8` 批量替换时给 package.json/app.json 写入 BOM（PS 5.1 UTF8 = UTF-8 BOM），tsx 因 BOM 解析 package.json 失败导致三组回归报错；app.json 中文内容被 GBK 写坏后 `git restore` 恢复。教训：PowerShell 5.1 批量改文件必须用 `[System.IO.File]::WriteAllText`（无 BOM 重载）或 edit 工具。
 - 发布补记（当日）：功能提交 `e1d5846`（22 文件 +1168/−486）、补充 `884b35f`（拟合 50 加载提示）；轻量标签 `v1.15.0` git 推送一次成功（本季度首次未被阻断）。云构建 run `33171695275` 一次通过。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.15.0>；资产 `MaiMate-latest.apk` 大小 `62,550,008` bytes（59.6 MB），SHA-256 `9979d845350d4cfc063d095600c499202060f713f2292deecdfc5a716b184a98`。落地页更新 v1.15.0 文案、日志与 SHA 后经 wrangler 部署 Pages（deployment `c4012395.maimate-landing.pages.dev`）；线上校验落地页 200 且含 v1.15.0 与新 SHA（CDN 缓存约 40s 内刷新）、`HEAD /MaiMate-latest.apk` 返回 200 / content-length `62,550,008` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（A3 全部 11 项：顶栏安全区、池切换、计划底部、B50/拟合50 分享卡表格、拟合 50 榜单与排序、曲绘大图、两处删减、快照战报、计划缺口排序、网格底纹、快照数量设置）。
+
+### v1.15.1（2026-08-28，第四轮用户反馈）
+
+- 用户反馈与处置：① 存相册要求整个相册权限——Android 13+ 系统行为（媒体权限组不可只写），`requestPermissionsAsync({ writeOnly: true })` 让 iOS 弹「仅添加照片」；② 分享卡一行 4 个——卡片内容区 320px 放不下 5×62+gap，CELL 62→61（5×61+4×3=317≤320）精确一行；③ 图片超屏看不到——ShareCardOverlay 预览包 ScrollView（captureRef 拍 holder 全量内容不受滚动/裁剪影响，出图完整）；④ 曲绘左上角加歌曲 ID——B50/拟合50 分享卡与 app 内网格格都加左上角 ID 角标（拟合 50 卡排名 #n 移到右上角）；⑤ 删除「缺口优先」排序，计划页恢复 v1.14 布局（B50 总览按钮按用户要求一并删除）；⑥ 完成率损失板块新增「等效容错 ≈ x 个 Tap(Great)」（x = (当前达成率−100.5)/tapGreatUnit 向下取整一位小数，复用 achievement-loss.ts 的 tapGreatUnit，达成率<100.5% 显示提示文案，未导入成绩不显示该行）；⑦ 拟合 50 入口缺失——根因是 v1.15.0 的 screenMode state 从未接到任何切换 UI（setScreenMode 只在声明处出现），顶栏标题下方补 B50/拟合50 segment；⑧ 新增「信息查询」🔎 tab（曲库|抽歌|计划|信息查询|设置 五 tab）：聚合 B50/牌子/运势/快照管理入口卡，牌子与运势 tab 用 `href: null` 隐藏（路由保留），删设置页「管理快照 →」与「查看 B50 总览」入口。
+- 工程记录：explore.tsx 首次 write 工具产出损坏（`</Title>`、`</图标说明>`），heredoc 重写解决；Expo Router 会把 (tabs) 目录下所有文件自动注册 tab，必须显式 `href: null` 隐藏；route-check.mjs 增加 explore 叶子断言。
+- 回归与版本：六组本地回归全绿；`expo-doctor` 21/21；`expo export --platform android` 通过；`app.json` 升 `1.15.1`/versionCode `24`。发布补记待构建后回填。
+- 发布补记（当日）：功能提交 `0f4b71c`（15 文件 +195/−78）；轻量标签 `v1.15.1` git 推送一次成功。云构建 run `33178995317` 一次通过。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.15.1>；资产 `MaiMate-latest.apk` 大小 `62,552,316` bytes（59.6 MB），SHA-256 `75c1debd58af7b7401da72d9264eb2387e834527b044f680b5e06dc88a16c89c`。落地页更新 v1.15.1 文案、日志与 SHA 后经 wrangler 部署 Pages（deployment `4826c5c8.maimate-landing.pages.dev`）；线上校验落地页 200 且含 v1.15.1 与新 SHA、`HEAD /MaiMate-latest.apk` 返回 200 / content-length `62,552,316` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（信息查询 tab 聚合、拟合 50 segment 入口、分享卡一行 5 格与滚动预览与曲绘 ID、等效容错数值、writeOnly 权限弹窗、缺口排序删除后布局恢复）。
