@@ -122,6 +122,7 @@ export function RatingGridCell({ entry, music, allSongs, selectionMode, selected
     <Pressable style={styles.gridCell} onPress={onPress} onLongPress={onLongPress} delayLongPress={350}>
       <View style={[styles.gridCoverWrap, { borderColor }, selectionMode && selected && styles.gridCoverSelected]}>
         <CoverImage music={music ?? fallbackMusicFor(entry)} allSongs={allSongs} style={styles.gridCover} />
+        <View style={styles.gridId}><Text style={styles.gridIdText}>{entry.songId}</Text></View>
         <View style={styles.gridCornerLeft}><Text style={styles.gridCornerText}>{entry.cornerLeft}</Text></View>
         <View style={styles.gridCornerRight}><Text style={styles.gridCornerText}>{entry.rating}</Text></View>
         {selectionMode && (
@@ -198,6 +199,8 @@ const styles = StyleSheet.create({
   gridCornerLeft: { position: 'absolute', left: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.62)', paddingHorizontal: 3, borderTopRightRadius: 5 },
   gridCornerRight: { position: 'absolute', right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.62)', paddingHorizontal: 3, borderTopLeftRadius: 5 },
   gridCornerText: { fontSize: 8.5, fontWeight: '800', color: '#fff' },
+  gridId: { position: 'absolute', left: 0, top: 0, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 3, borderBottomRightRadius: 4 },
+  gridIdText: { fontSize: 8, fontWeight: '800', color: '#fff' },
   gridUnderline: {
     width: CELL_SIZE,
     height: 3,

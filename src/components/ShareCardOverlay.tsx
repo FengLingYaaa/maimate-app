@@ -5,7 +5,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { ReactElement, RefObject } from 'react';
 import type { View as RNView } from 'react-native';
 import { Colors } from '../constants';
@@ -97,9 +97,17 @@ export function ShareCardOverlay({ visible, card, fileName, onClose, readinessDe
   return (
     <View style={styles.backdrop}>
       <Pressable style={StyleSheet.absoluteFill} onPress={busy ? undefined : onClose} accessibilityLabel="关闭卡片预览" />
-      <View collapsable={false} ref={holderRef} style={styles.cardHolder}>
-        {card}
-      </View>
+      {/* 卡片在 ScrollView 内完整渲染；captureRef 拍 holder 全量内容，不受滚动/屏幕裁剪影响。 */}
+      <ScrollView
+        style={styles.cardScroller}
+        contentContainerStyle={styles.cardHolder}
+        showsVerticalScrollIndicator
+        nestedScrollEnabled
+      >
+        <View collapsable={false} ref={holderRef} style={styles.cardInner}>
+          {card}
+        </View>
+      </ScrollView>
       {!ready && (
         <View style={styles.preparingRow}>
           <ActivityIndicator size="small" color={Colors.accent.secondary} />
@@ -143,7 +151,9 @@ const styles = StyleSheet.create({
     elevation: 24,
     zIndex: 24,
   },
-  cardHolder: { alignItems: 'center', justifyContent: 'center', maxHeight: '72%' },
+  cardScroller: { width: '100%', maxHeight: '72%', flexGrow: 0 },
+  cardHolder: { alignItems: 'center', justifyContent: 'center' },
+  cardInner: { alignItems: 'center' },
   preparingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14 },
   preparingText: { fontSize: 12, color: Colors.text.secondary },
   actions: { alignItems: 'center', marginTop: 16, gap: 8 },

@@ -10,10 +10,12 @@ import { Colors } from '../constants';
 import { computeAchievementLoss, type LossCell } from '../data/achievement-loss';
 
 interface Props {
-  /** DF 谱面 notes 数组：DX=[TAP,HOLD,SLIDE,TOUCH,BREAK]，SD=[TAP,HOLD,SLIDE,BREAK]。 */
+  /** DF 谙面 notes 数组：DX=[TAP,HOLD,SLIDE,TOUCH,BREAK]，SD=[TAP,HOLD,SLIDE,BREAK]。 */
   notes: number[];
   /** 打开详情页时的初始折叠状态（设置页可配置）。 */
   defaultCollapsed?: boolean;
+  /** 当前已导入的达成率（未导入为 undefined，此时不显示等效容错行）。 */
+  currentAchievement?: number;
 }
 
 type Mode = 'percent' | 'eqTap';
@@ -29,7 +31,7 @@ const VISIBLE_JUDGMENTS: Array<{ key: string; label: string; color: string }> = 
   { key: 'miss', label: 'Miss', color: Colors.text.muted },
 ];
 
-export function AchievementLossCard({ notes, defaultCollapsed = false }: Props) {
+export function AchievementLossCard({ notes, defaultCollapsed = false, currentAchievement }: Props) {
   const [expanded, setExpanded] = useState(!defaultCollapsed);
   const [mode, setMode] = useState<Mode>('percent');
 
@@ -97,6 +99,15 @@ export function AchievementLossCard({ notes, defaultCollapsed = false }: Props) 
               ))}
             </View>
           </ScrollView>
+
+          {/* v1.15.1：等效容错 —— 至多多少个 Tap 打 Great 仍能保持 ≥100.5%。 */}
+          {currentAchievement !== undefined && result.tapGreatUnit > 0 && (
+            <Text style={styles.toleranceLine}>
+              {currentAchievement >= 100.5
+                ? `等效容错 ≈ ${Math.floor((currentAchievement - 100.5) / result.tapGreatUnit * 10) / 10} 个 Tap(Great)`
+                : '当前达成率不足 100.5%'}
+            </Text>
+          )}
         </>
       )}
     </View>
@@ -149,4 +160,5 @@ const styles = StyleSheet.create({
   typeText: { fontSize: 11, color: Colors.text.primary, fontWeight: '700' },
   valueText: { fontSize: 10.5, color: Colors.text.secondary },
   hint: { fontSize: 10, lineHeight: 15, color: Colors.text.muted, paddingHorizontal: 16 },
+  toleranceLine: { fontSize: 11, fontWeight: '800', color: Colors.accent.primary, paddingHorizontal: 16 },
 });

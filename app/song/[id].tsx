@@ -332,7 +332,7 @@ export default function SongDetail() {
                     case 'rating':
                       return <RatingPanel key="rating" ds={ds} fitDiff={stats?.fit_diff} loading={chartStatsLoading} defaultCollapsed={settings.detailBoards.rating.collapsed} />;
                     case 'achievement':
-                      return chart ? <AchievementLossCard key="achievement" notes={chart.notes} defaultCollapsed={settings.detailBoards.achievement.collapsed} /> : null;
+                      return chart ? <AchievementLossCard key="achievement" notes={chart.notes} currentAchievement={currentScore?.achievement} defaultCollapsed={settings.detailBoards.achievement.collapsed} /> : null;
                     case 'bilibili':
                       return <BilibiliSearchPanel
                         key="bilibili"

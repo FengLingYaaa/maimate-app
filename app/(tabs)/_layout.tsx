@@ -1,6 +1,6 @@
 /**
  * MaiMate Tabs Layout
- * Expo Router Tabs: 曲库 | 抽歌 | 牌子 | 计划 | 运势 | 设置
+ * Expo Router Tabs: 曲库 | 抽歌 | 计划 | 信息查询 | 设置（v1.15.1 起牌子/运势并入信息查询）
  * 挂在根 Stack 的 (tabs) 分组下；song 详情在根 Stack，返回即回原 Tab。
  */
 
@@ -96,13 +96,6 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
-          name="plates"
-          options={{
-            title: '牌子',
-            tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🏅</Text>,
-          }}
-        />
-        <Tabs.Screen
           name="plan"
           options={{
             title: '推分计划',
@@ -110,12 +103,15 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
-          name="fortune"
+          name="explore"
           options={{
-            title: '今日运势',
-            tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🔮</Text>,
+            title: '信息查询',
+            tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🔎</Text>,
           }}
         />
+        {/* v1.15.1：牌子/运势移入信息查询入口，路由保留但不再占用 tab 位。 */}
+        <Tabs.Screen name="plates" options={{ href: null }} />
+        <Tabs.Screen name="fortune" options={{ href: null }} />
         <Tabs.Screen
           name="settings"
           options={{

@@ -40,6 +40,7 @@ export function B50ShareCard({ rawData, scores, serverRating, userName }: Props)
             allSongs={rawData}
             style={styles.cellCover}
           />
+          <View style={styles.cellId}><Text style={styles.cellIdText}>{entry.songId}</Text></View>
           <View style={styles.cellCornerLeft}><Text style={styles.cellCornerText}>{entry.ds.toFixed(1)}</Text></View>
           <View style={styles.cellCornerRight}><Text style={styles.cellCornerText}>{entry.rating}</Text></View>
         </View>
@@ -94,7 +95,8 @@ export function B50ShareCard({ rawData, scores, serverRating, userName }: Props)
   );
 }
 
-const CELL = 56;
+// 5×CELL + 4×3(gap) = 332 ≤ 卡片内容区宽 344−2×12=320？否——CELL=61 时 5×61+12=317 ≤ 320，精确一行。
+const CELL = 61;
 
 const styles = StyleSheet.create({
   card: {
@@ -116,13 +118,15 @@ const styles = StyleSheet.create({
   poolChipValue: { fontSize: 14, fontWeight: '900', color: '#f0e6ff' },
   sectionTitle: { fontSize: 9.5, fontWeight: '800', color: '#00d4ff', marginTop: 2 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, justifyContent: 'center' },
-  cellWrap: { width: CELL + 6, alignItems: 'center' },
+  cellWrap: { width: CELL + 3, alignItems: 'center' },
   cell: {
     width: CELL, height: CELL,
     borderWidth: 1.5, borderRadius: 6, overflow: 'hidden',
     position: 'relative',
   },
   cellCover: { width: '100%', height: '100%' },
+  cellId: { position: 'absolute', left: 0, top: 0, backgroundColor: 'rgba(0,0,0,0.62)', paddingHorizontal: 2, borderBottomRightRadius: 4 },
+  cellIdText: { fontSize: 7.5, fontWeight: '900', color: '#fff' },
   cellCornerLeft: { position: 'absolute', left: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.62)', paddingHorizontal: 2, borderTopRightRadius: 4 },
   cellCornerRight: { position: 'absolute', right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.62)', paddingHorizontal: 2, borderTopLeftRadius: 4 },
   cellCornerText: { fontSize: 7.5, fontWeight: '900', color: '#fff' },

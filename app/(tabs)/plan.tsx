@@ -9,7 +9,6 @@ import { Colors, DifficultyColorMap, DifficultyLabels } from '../../src/constant
 import { getChinaVersionOptions, getVersionOptions } from '../../src/data/version-catalog';
 import { getMusicSearchScore, getOfficialChartConstant, matchesMusic } from '../../src/data/music-list';
 import { canDragPlanRows } from '../../src/data/plan-order';
-import { calculateRating } from '../../src/data/rating';
 import type { FilterOptions, MusicData, PlanEntry, PlayerScore, SortOptions } from '../../src/data/types';
 import { useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '../../src/store';
 import { planEntryKey } from '../../src/store/plan-store';
@@ -167,34 +166,17 @@ export default function PushPlan() {
   }, [plannedRows, scores, achievedEntryIds]);
 
   const [achieveFilter, setAchieveFilter] = useState<'all' | 'achieved' | 'unachieved'>('all');
-  // v1.15.0：排序切换 —— manual=手动拖拽序（默认）；gap=按缺口 Rating 降序（目标-当前 Rating 差大者优先，未设目标视为无穷缺口）。
-  const [planSort, setPlanSort] = useState<'manual' | 'gap'>('manual');
-  const gapSortedRows = useMemo(() => {
-    if (planSort === 'manual') return filteredRows;
-    const gapOf = (row: PlanRow): number => {
-      const score = scores.find(item => item.songId === row.music.id
-        && item.type === row.music.type
-        && item.difficultyIndex === row.entry.difficultyIndex);
-      const current = score?.achievement ?? 0;
-      if (row.entry.targetScore === undefined) return Number.POSITIVE_INFINITY;
-      if (row.entry.targetScore <= current) return Number.NEGATIVE_INFINITY;
-      const currentRating = calculateRating(row.music.ds[row.entry.difficultyIndex], current) ?? 0;
-      const targetRating = calculateRating(row.music.ds[row.entry.difficultyIndex], row.entry.targetScore) ?? 0;
-      return targetRating - currentRating;
-    };
-    return [...filteredRows].sort((left, right) => gapOf(right) - gapOf(left));
-  }, [filteredRows, planSort, scores]);
+  // v1.15.1：按用户要求移除「缺口优先」排序切换，恢复 v1.14 手动拖拽序布局。
 
   const displayRows = useMemo(() => {
-    const baseRows = gapSortedRows;
-    if (achieveFilter === 'all') return baseRows;
+    if (achieveFilter === 'all') return filteredRows;
     const achievedSet = new Set(achievedEntryIds);
-    return baseRows.filter(row => {
+    return filteredRows.filter(row => {
       if (row.entry.targetScore === undefined) return achieveFilter === 'unachieved';
       const achieved = achievedSet.has(row.entry.entryId);
       return achieveFilter === 'achieved' ? achieved : !achieved;
     });
-  }, [gapSortedRows, achieveFilter, achievedEntryIds]);
+  }, [filteredRows, achieveFilter, achievedEntryIds]);
 
   return (
     <View style={styles.container}>
@@ -210,7 +192,7 @@ export default function PushPlan() {
             {entries.length > 0 && <Pressable onPress={handleClear}><Text style={styles.clearBtn}>清空</Text></Pressable>}
           </View>
         </View>
-        <Text style={styles.headerSub}>{entries.length > 0 ? `${entries.length} 首待练习` : '还没有添加歌曲'} · {planSort === 'manual' ? '长按曲目拖拽排序' : '按缺口 Rating 降序（未设目标的排最前）'}</Text>
+        <Text style={styles.headerSub}>{entries.length > 0 ? `${entries.length} 首待练习` : '还没有添加歌曲'} · 长按曲目拖拽排序</Text>
         {progressSummary.withTargetCount > 0 && (
           <View style={styles.progressSummaryRow}>
             <View style={[styles.progressRing, progressSummary.allAchieved && styles.progressRingDone]}>
@@ -229,20 +211,6 @@ export default function PushPlan() {
           </View>
         )}
         <View style={styles.b50Row}>
-          <Pressable style={styles.b50Entry} onPress={() => router.push('/b50')}>
-            <Text style={styles.b50EntryText}>B50 总览 →</Text>
-          </Pressable>
-          <View style={styles.achieveFilterRow}>
-            {([['manual', '手动序'], ['gap', '缺口优先']] as const).map(([value, label]) => (
-              <Pressable
-                key={value}
-                style={[styles.achieveChip, planSort === value && styles.achieveChipActive]}
-                onPress={() => setPlanSort(value)}
-              >
-                <Text style={[styles.achieveChipText, planSort === value && styles.achieveChipTextActive]}>{label}</Text>
-              </Pressable>
-            ))}
-          </View>
           {progressSummary.withTargetCount > 0 && (
             <View style={styles.achieveFilterRow}>
               {([['all', '全部'], ['achieved', '已达标'], ['unachieved', '未达标']] as const).map(([value, label]) => (

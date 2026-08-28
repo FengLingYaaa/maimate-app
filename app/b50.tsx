@@ -164,6 +164,26 @@ export default function B50Screen() {
         </View>
       </View>
 
+      {/* v1.15.1：B50 / 拟合 50 模式 segment（顶栏标题下方）。 */}
+      {hasScores && !selectionMode && (
+        <View style={styles.modeSegmentRow}>
+          <View style={styles.modeSegment}>
+            <Pressable
+              style={[styles.modeSegmentTab, screenMode === 'b50' && styles.modeSegmentTabActive]}
+              onPress={() => setScreenMode('b50')}
+            >
+              <Text style={[styles.modeSegmentText, screenMode === 'b50' && styles.modeSegmentTextActive]}>B50 总览</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.modeSegmentTab, screenMode === 'fit50' && styles.modeSegmentTabActive]}
+              onPress={() => setScreenMode('fit50')}
+            >
+              <Text style={[styles.modeSegmentText, screenMode === 'fit50' && styles.modeSegmentTextActive]}>拟合 50</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
       {hasScores && shareVisible && (
         <ShareCardOverlay
           visible
@@ -390,6 +410,12 @@ const styles = StyleSheet.create({
     borderColor: Colors.border.light,
   },
   viewToggleText: { fontSize: 16, color: Colors.text.primary },
+  modeSegmentRow: { paddingHorizontal: 14, paddingTop: 10 },
+  modeSegment: { flexDirection: 'row', backgroundColor: Colors.bg.secondary, borderRadius: 10, padding: 3, gap: 3 },
+  modeSegmentTab: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 8 },
+  modeSegmentTabActive: { backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.light },
+  modeSegmentText: { fontSize: 12.5, fontWeight: '700', color: Colors.text.muted },
+  modeSegmentTextActive: { color: Colors.accent.primary },
   content: { padding: 14, gap: 12 },
   emptyCard: { backgroundColor: Colors.bg.secondary, borderRadius: 14, padding: 18, gap: 8 },
   emptyTitle: { fontSize: 15, fontWeight: '800', color: Colors.text.primary },

@@ -35,7 +35,7 @@ assert.equal(rootRoutes.get('(tabs)')?.type, 'layout', '(tabs) must be the root 
 assert.equal(rootRoutes.get('song')?.type, 'layout', 'song must be a root-level Stack sibling of (tabs)');
 assert.equal(rootRoutes.get('b50')?.type, 'route', 'b50 must be a root-level Stack screen sibling of (tabs)');
 const tabsChildren = new Map(rootRoutes.get('(tabs)')?.children.map(route => [route.route, route]));
-for (const name of ['index', 'random', 'plan', 'fortune']) {
+for (const name of ['index', 'random', 'plan', 'fortune', 'explore']) {
   assert.equal(tabsChildren.get(name)?.type, 'route', `${name} must live inside (tabs) as a leaf screen`);
 }
 for (const name of ['plates', 'settings']) {

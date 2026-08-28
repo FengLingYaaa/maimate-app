@@ -26,9 +26,12 @@ export async function captureCardToTempFile(
   return targetUri;
 }
 
-/** 请求保存到相册所需权限；拒绝时抛错。 */
+/**
+ * 请求保存到相册所需权限；拒绝时抛错。
+ * v1.15.1：writeOnly —— iOS 弹「仅添加照片」；Android 13+ 仍为媒体权限组（系统行为，无法只写）。
+ */
 async function ensureMediaLibraryPermission(): Promise<void> {
-  const permission = await MediaLibrary.requestPermissionsAsync();
+  const permission = await MediaLibrary.requestPermissionsAsync({ writeOnly: true } as any);
   if (permission.granted !== true) {
     throw new Error('未授予相册权限，无法保存到相册');
   }

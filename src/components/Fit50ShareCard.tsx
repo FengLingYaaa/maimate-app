@@ -63,6 +63,7 @@ export function Fit50ShareCard({ rawData, scores, chartStats, serverRating, user
                   allSongs={rawData}
                   style={styles.cellCover}
                 />
+                <View style={styles.cellId}><Text style={styles.cellIdText}>{entry.songId}</Text></View>
                 <Text style={styles.cellRank}>#{entry.rank}</Text>
                 <View style={styles.cellCornerLeft}><Text style={styles.cellCornerText}>{entry.fitDiff.toFixed(2)}</Text></View>
                 <View style={styles.cellCornerRight}><Text style={styles.cellCornerText}>{entry.rating}</Text></View>
@@ -83,7 +84,8 @@ export function Fit50ShareCard({ rawData, scores, chartStats, serverRating, user
   );
 }
 
-const CELL = 56;
+// 5×CELL + 4×3(gap) = 317 ≤ 卡片内容区宽 320，精确一行。
+const CELL = 61;
 
 const styles = StyleSheet.create({
   card: {
@@ -101,18 +103,20 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 9, color: '#9888b0' },
   serverLine: { fontSize: 9, color: '#00d4ff', fontWeight: '700' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, justifyContent: 'center' },
-  cellWrap: { width: CELL + 6, alignItems: 'center' },
+  cellWrap: { width: CELL + 3, alignItems: 'center' },
   cell: {
     width: CELL, height: CELL,
     borderWidth: 1.5, borderRadius: 6, overflow: 'hidden',
     position: 'relative',
   },
   cellCover: { width: '100%', height: '100%' },
+  cellId: { position: 'absolute', left: 0, top: 0, backgroundColor: 'rgba(0,0,0,0.62)', paddingHorizontal: 2, borderBottomRightRadius: 4 },
+  cellIdText: { fontSize: 7.5, fontWeight: '900', color: '#fff' },
   cellRank: {
-    position: 'absolute', left: 1, top: 0,
+    position: 'absolute', right: 0, top: 0,
     fontSize: 7.5, fontWeight: '900', color: '#fff',
     backgroundColor: 'rgba(0,0,0,0.62)', paddingHorizontal: 2,
-    borderBottomRightRadius: 4,
+    borderBottomLeftRadius: 4,
   },
   cellCornerLeft: { position: 'absolute', left: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.62)', paddingHorizontal: 2, borderTopRightRadius: 4 },
   cellCornerRight: { position: 'absolute', right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.62)', paddingHorizontal: 2, borderTopLeftRadius: 4 },
