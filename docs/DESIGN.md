@@ -96,10 +96,10 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | v1.15.2 功能主体（前一代 `93d936a` 为 v1.15.1 文档收尾） |
-| 当前标签 | v1.15.2 已推送（触发云构建，构建结果见发布补记） |
+| 当前提交 | v1.16.0 功能主体（前一代 `9e708e0` 为 v1.15.2 文档收尾） |
+| 当前标签 | v1.16.0 已推送（触发云构建，构建结果见发布补记） |
 | Android applicationId | `cc.flya.maimate` |
-| App 版本 | `1.15.2`（Android versionCode `25`） |
+| App 版本 | `1.16.0`（Android versionCode `26`） |
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
@@ -1012,3 +1012,10 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 下载站改造：`_worker.js` 的 `/MaiMate-latest.apk` 从流式代理 GitHub Release 改为 302 重定向到 GitHub 直链（`releases/latest/download/MaiMate-latest.apk`）——重定向响应仅数百字节，消除 Workers 大文件代理流量与 CF 服务条款 2.8 风险，下载流量直接走 GitHub CDN；落地页下载按钮文案改「GitHub 直链」、大小徽标改静态展示（302 无 content-length 可探测），移除 HEAD 探测 content-length 逻辑。
 - 回归与版本：六组本地回归全绿；`expo-doctor` 21/21；`expo export --platform android` 通过；`app.json` 升 `1.15.2`/versionCode `25`。发布补记待构建后回填。
 - 发布补记（当日）：功能提交 `860ab48`（16 文件 +422/−94）；轻量标签 `v1.15.2` git 推送一次成功。云构建 run `33189356190` 一次通过。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.15.2>；资产 `MaiMate-latest.apk` 大小 `62,560,632` bytes（59.7 MB），SHA-256 `8a1f048cbc08005430b55d289ac20a30345c18c069ab0ca533779e9b00146d79`（本地下载资产复算，构建日志仅落 step summary）。落地页更新 v1.15.2 文案、日志与 SHA 后经 wrangler 部署 Pages（deployment `8e7c69a2.maimate-landing.pages.dev`）；线上校验落地页 200 且含 v1.15.2 与新 SHA、`HEAD /MaiMate-latest.apk` 返回 302 → GitHub 直链、GitHub 直链 200 / content-length `62,560,632` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（分享卡一行 5 格、详情页分享预览全屏居中与存相册、等效容错无成绩显示、战报/牌子分享卡样式、搜索历史、下载站 302 跳转）。
+
+### v1.16.0（2026-08-28，第六轮用户反馈 + 图标换新）
+
+- 用户反馈与处置：① 牌子页分享功能按反馈整体移除（按钮/overlay/`PlatesShareCard` 组件与导出）；② 存相册报 `createAssetAsync` deprecated——expo-media-library 57 起旧函数式 API 从主入口移除，`share-card.ts` 改从 `expo-media-library/legacy` 导入（API 不变零逻辑改动）；③ 分享卡 FIT50 简写改 `nb50`；④ 战报缺 Rating 上涨值——页内战报与分享卡汇总统一加「DX Rating」chip（target−base 的 serverRating，正数带 +），「服务器 RA」标签同步改名；⑤ 切走再切回设置页误入快照管理——`settings/_layout` 加 `useFocusEffect`：聚焦时 pathname 非 `/settings` 即 `router.replace('/settings')` 归位；⑥ B50 总览默认网格——`viewMode` 初始值 `'list'→'grid'`（v1.15.2 漏改项）；⑦ 计划进度环重做为 SVG 环形进度条 `PlanProgressRing`（react-native-svg 已有依赖）：底环暗色、进度弧按平均完成率着色（<30% 红/<70% 黄/≥70% 绿，全达标金色），环心 x/y 文案，从 12 点顺时针；⑧ 曲库新增拟合定数排序 `fitDesc`/`fitAsc`——`SortMode` 扩两档，`music-list` 加 `getFitChartConstant`（读 chart_stats fit_diff，无数据排末尾），`MusicList.filter` 与 store `applyFilters` 透传 chartStats，筛选弹窗加两 chip + 活动标签映射，启用时 `SongCard` 徽章旁标注 `fit 13.9`（`fitDiffForIndex` 回调 prop）；⑨ 应用图标换新——方向 B（八色分段街机环，接缝落 12/3/6/9 点方位左右各 4 分区）用户定稿，程序化生成全套资产：`icon.png`（1024 圆角全幅）、`android-icon-foreground/background`（自适应 66% 安全区）、`android-icon-monochrome`（白色剪影主题图标）、`splash-icon.png`、`favicon.png`，生成脚本存 `design-candidates/`。
+- R2 决策：APK 分发迁 Cloudflare R2 方案已向用户说明（bucket+Worker 绑定+发版上传步骤、免费额度 10GB/千万次读、Workers 免费档 10 万请求/天硬顶天然兜底超额），用户选择后续自行配置，落地页本轮仍走 302 → GitHub 直链。
+- 回归与版本：六组本地回归全绿；`expo-doctor` 21/21；`expo export --platform android` 通过；`app.json` 升 `1.16.0`/versionCode `26`。发布补记待构建后回填。
+- 发布补记（当日）：功能提交 `2c64758`（33 文件 +474/−176）；轻量标签 `v1.16.0` git 推送一次成功。云构建 run `33198702590` 一次通过。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.16.0>；资产 `MaiMate-latest.apk` 大小 `62,223,316` bytes（59.3 MB），SHA-256 `e8507acc64adf2a33a1e3a86144388e589751be9f877c423ac8e4b21a354c868`（本地下载资产复算）。落地页更新 v1.16.0 文案、日志与 SHA 后经 wrangler 部署 Pages（deployment `6e565ccf.maimate-landing.pages.dev`）；线上校验落地页 200 且含 v1.16.0 与新 SHA、`HEAD /MaiMate-latest.apk` 返回 302 → GitHub 直链、GitHub 直链 200 / content-length `62,223,316` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（新图标各处置显示、拟合定数排序与标注、环形进度条配色、战报 DX Rating chip、设置栈归位、B50/nb50 默认网格、存相册 legacy 导入后无告警、牌子页分享已移除）。
