@@ -103,8 +103,9 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
-| 最新 Release APK SHA-256（v1.12.0，待 v1.13.0 构建后更新） | `72557b93f6bcf9301d222a551fb422778c0603bcb17b957f1c105440b9cb4e3e`（CI「Print APK checksum」步骤输出） |
-| 最新 Release APK 大小 | 62,292,306 bytes（59.4 MB，v1.12.0；待 v1.13.0 构建后更新） |
+| 最新 Release APK SHA-256（v1.13.0） | `d07a14b3d1c98e1c5f1de190cc4f72b0af766dcbe37679a065f5d579788c869f`（CI「Print APK checksum」步骤输出） |
+| 最新 Release APK 大小 | 62,336,434 bytes（59.4 MB） |
+| 下载站同步状态 | 已部署：v1.13.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | 下载站同步状态 | 已部署：v1.12.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | 下载站同步状态 | 已部署：v1.11.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | APK 构建方式 | GitHub Actions 云构建：先跑 lint/route/feature/phase/rating 回归、Expo Doctor 和 Android export 门禁，再出 arm64-v8a debug keystore 内测包 |
@@ -946,4 +947,5 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 查分分享卡片：新增 `react-native-view-shot@5.1.0`（expo-doctor 对齐版本）；`src/data/share-card.ts`（`captureAndShare`：captureRef → 缓存文件 → expo-sharing 分享 → 清理）；`src/components/B50ShareCard.tsx`（总分+两池+服务器 RA+新曲 TOP15/旧曲 TOP35 曲绘网格，曲绘难度色框，屏外渲染 collapsable 隐藏）；`src/components/SongShareCard.tsx`（曲绘+曲名/曲师+难度徽章+定数/完成率→Rating/FC/FS 徽章）；B50 页头部「分享」按钮与详情页「分享成绩卡片」按钮触发。
 - 牌子页状态记忆：版本/国区/难度筛选、筛选区收起、低难度展开状态持久化到 AsyncStorage（`maimate_plates_ui_state`），hydration 前不回写。
 - 快照管理 UI：`score-store` 新增 `deleteSnapshot(id)`（过滤+持久化）；新建设置子页 `snapshots.tsx`（按时间倒序列出快照、记录数/服务器 RA、删除需确认），设置页同步状态卡加「管理快照 →」入口；`route-check` settings children 加 `snapshots`。
-- 回归与版本：route-check 更新；`app.json` 升 `1.13.0`/versionCode `21`，`package.json` 升 `1.13.0`；本地全绿——tsc、六组回归、`expo-doctor` 21/21（view-shot 降到 SDK 映射版本 5.1.0）、`expo export --platform android`。发布补记待构建后回填。
+- 回归与版本：route-check 更新；`app.json` 升 `1.13.0`/versionCode `21`，`package.json` 升 `1.13.0`；本地全绿——tsc、六组回归、`expo-doctor` 21/21（view-shot 降到 SDK 映射版本 5.1.0）、`expo export --platform android`。
+- 发布补记（当日）：功能提交 `bb894cd`，轻量标签 `v1.13.0`（推送第 6 次重试成功，GitHub 间歇阻断）触发云构建 run `33139297657`，一次通过（lint + 6 组回归 + expo-doctor + Android export + arm64 gradle 全绿）。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.13.0>；资产 `MaiMate-latest.apk` 大小 `62,336,434` bytes（59.4 MB），SHA-256 `d07a14b3d1c98e1c5f1de190cc4f72b0af766dcbe37679a065f5d579788c869f`。落地页更新 v1.13.0 文案、日志与 SHA 后经 wrangler 部署 Pages（deployment `835f5234.maimate-landing.pages.dev`）；线上校验落地页 200 且含 v1.13.0 与新 SHA、`HEAD /MaiMate-latest.apk` 返回 200 / content-length `62,336,434` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（B50 网格/修复、分享卡片效果、进度闭环、牌子排序/记忆、快照管理）。
