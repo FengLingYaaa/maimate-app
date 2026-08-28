@@ -96,17 +96,17 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | v1.14.0 功能主体（前一代 `eeca8e5` 为 v1.13.0 文档收尾） |
-| 当前标签 | v1.14.0 待打（v1.13.0 及更早标签均已发布） |
+| 当前提交 | v1.15.0 功能主体（前一代 `b802c0d` 为 v1.14.0 文档收尾） |
+| 当前标签 | v1.15.0 已推送（触发云构建，构建结果见 §12/发布补记） |
 | Android applicationId | `cc.flya.maimate` |
-| App 版本 | `1.14.0`（Android versionCode `22`） |
+| App 版本 | `1.15.0`（Android versionCode `23`） |
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
-| 最新 Release APK SHA-256（v1.14.0） | `8efa31d9aad7b53ff9d102124152142ad4329e40020049d02821fc8b9eb82ab4`（CI「Print APK checksum」步骤输出） |
-| 最新 Release APK 大小 | 62,537,092 bytes（59.6 MB） |
-| 下载站同步状态 | 已部署：v1.13.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
-| 下载站同步状态 | 已部署：v1.12.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
+| 最新 Release APK SHA-256（v1.15.0，待构建后回填） | 待构建完成后更新 |
+| 最新 Release APK 大小 | 待构建完成后更新 |
+| 下载站同步状态 | v1.15.0 构建完成后同步（落地页文案待 SHA 回填后一并部署） |
+| 下载站同步状态 | 已部署：v1.14.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | 下载站同步状态 | 已部署：v1.11.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | APK 构建方式 | GitHub Actions 云构建：先跑 lint/route/feature/phase/rating 回归、Expo Doctor 和 Android export 门禁，再出 arm64-v8a debug keystore 内测包 |
 
@@ -551,6 +551,25 @@ floor(ds × min(achievement, 100.5) / 100 × coefficient)
 4. **推分计划拖拽串位**：每次拖拽提交后自增 dragEpoch 强制 DraggableFlatList 重建内部顺序缓存，并在应用结果前校验拖拽键与 store 条目一一对应；
 5. **详情页返回来源**：路由重构为根 Stack（`(tabs)` 分组 + `song` 兄弟路由），详情页压在 Tabs 之上，返回自然回到进入前的 Tab；
 6. **完成率损失试算（新功能）**：详情页 Rating 板块下方新增折叠卡片，按谱面 Note 分布计算单音符各判定损失的达成率百分点与等效 Great·Tap 数（两种口径按钮切换）；计分口径见 `src/data/achievement-loss.ts` 头注释（基础分单位权重 Tap1/Hold2/Slide3/Break5，Break 内部档位 G-2000/1500/1250 等效 5/10/12.5 个 Tap·Great、Good=15、Miss=25，奖励分池每 Break 平分 1 点、份额 CP100%/P-2550 75%/P-2500 50%/Great 统一 40%/Good 30%/Miss 0%，理论满分 101%）。
+
+
+### A3：用户第三轮修订 v1.15.0（代码已完成，云构建中，等待真机验收）
+
+2026-08-28 提出、当日完成实现（功能提交 `e1d5846`）：
+
+1. **B50 顶栏与状态栏重合**：根级路由自定义头部补 `paddingTop: insets.top + 10`；
+2. **新曲/旧曲切换按钮消失**：根因是上版 `{selectionToolbar ?? (池切换行)}` 中 selectionToolbar 表达式在网格模式下恒为非空 JSX，`??` 永走左分支顶掉池切换；改为显式 `showSelectionToolbar` 三元分支；
+3. **计划底部遮挡（三保险）**：`contentContainerStyle paddingBottom` + `ListFooterComponent` 高度占位（v1.14 的 padding 曾被 DraggableFlatList 内部结构吃掉）；
+4. **分享卡表格布局**：B50 卡重排为旧曲 35 上（7×5）新曲 15 下（3×5），每格难度色外框曲绘 + 左下定数 + 右下 Rating + 完成率着色底纹；新增 `Fit50ShareCard` 全 50 格（10×5）同款；
+5. **拟合 50（新功能）**：`src/data/fit50.ts` `computeFit50(rawData, scores, chartStats)`——全库谱面按拟合定数（fit_diff）计算单谱 Rating = floor(fit_diff × ach/100 × 系数)，排除无 fit_diff/无成绩谱面，取最高 50；B50 页新增 B50/拟合50 模式切换（汇总卡、列表/网格、排序切换「按 Rating/按拟合定数」、长按多选入计划、分享全共享）；
+6. **详情页曲绘大图**：点 hero 曲绘打开自绘全屏 overlay（512×512 源图，点背景关闭）；
+7. **删设置页「只读同步成绩…」提示**；**删详情页 B 站面板深链诊断折叠区**（含死代码清理）；
+8. **快照推分战报（新功能）**：`src/data/snapshot-battle.ts` `buildSnapshotBattleReport`——逐曲卡片（曲绘/曲名/难度徽章/旧→新达成率/±Rating）+ 汇总条（Rating 总变化/新增/上分/移除/服务器 RA）；
+9. **计划排序切换**：「手动序/缺口优先」chips——缺口 = 目标 Rating − 当前 Rating（按官方定数），未设目标视为无穷缺口排最前，已达标排最后；缺口序下禁用拖拽；
+10. **网格完成率底纹**：格子曲绘下 3px 着色进度条（金/绿/灰三档与文本同色）；
+11. **快照保留数量**：默认 6 → 20，设置页可改 1–1000（修改时 Alert 警告存储占用；`normalizeSnapshotLimit` 归一化，备份/恢复与 store 加载均走该口径）；syncScores 按 `settings.snapshotLimit` 裁剪。
+
+验收关注：B50 顶栏安全区、池切换按钮恢复、拟合 50 数值合理性（依赖 chart_stats 缓存）、分享卡表格视觉、计划底部余量、战报累计口径。
 
 
 ### A2：第三阶段只读审查

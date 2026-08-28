@@ -1,4 +1,4 @@
-﻿/**
+/**
  * B50 总览 / 拟合 50（根级路由 /b50，v1.15.0 起双模式）。
  *
  * - B50 模式：新曲 15 + 旧曲 35 官方口径；拟合 50 模式：按拟合定数 Rating 的全库单榜 50。
@@ -32,6 +32,7 @@ type ViewMode = 'list' | 'grid';
 export default function B50Screen() {
   const rawData = useMusicStore(state => state.rawData);
   const chartStats = useMusicStore(state => state.chartStats);
+  const chartStatsLoading = useMusicStore(state => state.chartStatsLoading);
   const scores = useScoreStore(state => state.scores);
   const profile = useScoreStore(state => state.profile);
   const bulkAddEntries = usePlanStore(state => state.bulkAddEntries);
@@ -230,6 +231,12 @@ export default function B50Screen() {
                     <Text style={styles.sideValue}>{fit50.chartsWithFitDiff}<Text style={styles.sideSub}> / 有拟合定数成绩</Text></Text>
                   </View>
                 </View>
+              </View>
+            )}
+
+            {screenMode === 'fit50' && fit50.entries.length < 50 && chartStatsLoading && (
+              <View style={styles.bulkNoticeBar}>
+                <Text style={styles.bulkNoticeText}>拟合定数加载中，榜单暂不完整…</Text>
               </View>
             )}
 
