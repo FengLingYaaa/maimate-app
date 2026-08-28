@@ -14,8 +14,6 @@ interface Props {
   notes: number[];
   /** 打开详情页时的初始折叠状态（设置页可配置）。 */
   defaultCollapsed?: boolean;
-  /** 当前已导入的达成率（未导入为 undefined，此时不显示等效容错行）。 */
-  currentAchievement?: number;
 }
 
 type Mode = 'percent' | 'eqTap';
@@ -31,7 +29,7 @@ const VISIBLE_JUDGMENTS: Array<{ key: string; label: string; color: string }> = 
   { key: 'miss', label: 'Miss', color: Colors.text.muted },
 ];
 
-export function AchievementLossCard({ notes, defaultCollapsed = false, currentAchievement }: Props) {
+export function AchievementLossCard({ notes, defaultCollapsed = false }: Props) {
   const [expanded, setExpanded] = useState(!defaultCollapsed);
   const [mode, setMode] = useState<Mode>('percent');
 
@@ -100,12 +98,10 @@ export function AchievementLossCard({ notes, defaultCollapsed = false, currentAc
             </View>
           </ScrollView>
 
-          {/* v1.15.1：等效容错 —— 至多多少个 Tap 打 Great 仍能保持 ≥100.5%。 */}
-          {currentAchievement !== undefined && result.tapGreatUnit > 0 && (
+          {/* v1.15.2：等效容错 —— 101%→100.5% 的 0.5 个百分点可折合多少个 Tap(Great)，只依赖谱面，与成绩无关。 */}
+          {result.tapGreatUnit > 0 && (
             <Text style={styles.toleranceLine}>
-              {currentAchievement >= 100.5
-                ? `等效容错 ≈ ${Math.floor((currentAchievement - 100.5) / result.tapGreatUnit * 10) / 10} 个 Tap(Great)`
-                : '当前达成率不足 100.5%'}
+              等效容错 ≈ {Math.floor(0.5 / result.tapGreatUnit * 10) / 10} 个 Tap(Great)
             </Text>
           )}
         </>

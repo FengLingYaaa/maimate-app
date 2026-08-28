@@ -7,6 +7,7 @@
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
+import { Platform } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import type { RefObject } from 'react';
 import type { View } from 'react-native';
@@ -28,10 +29,11 @@ export async function captureCardToTempFile(
 
 /**
  * 请求保存到相册所需权限；拒绝时抛错。
- * v1.15.1：writeOnly —— iOS 弹「仅添加照片」；Android 13+ 仍为媒体权限组（系统行为，无法只写）。
+ * v1.15.2：iOS 用 writeOnly（弹「仅添加照片」）；Android writeOnly 会导致 granted=false（保存失败），
+ * 必须请求完整权限（恢复 MaiMate 相簿写入）。
  */
 async function ensureMediaLibraryPermission(): Promise<void> {
-  const permission = await MediaLibrary.requestPermissionsAsync({ writeOnly: true } as any);
+  const permission = await MediaLibrary.requestPermissionsAsync(Platform.OS === 'ios');
   if (permission.granted !== true) {
     throw new Error('未授予相册权限，无法保存到相册');
   }

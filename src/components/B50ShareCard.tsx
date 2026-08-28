@@ -95,8 +95,8 @@ export function B50ShareCard({ rawData, scores, serverRating, userName }: Props)
   );
 }
 
-// 5×CELL + 4×3(gap) = 332 ≤ 卡片内容区宽 344−2×12=320？否——CELL=61 时 5×61+12=317 ≤ 320，精确一行。
-const CELL = 61;
+// cellWrap = 20% 容器宽（320/5=64），CELL 60 + 上下左右 padding 2 = 64 精确。
+const CELL = 60;
 
 const styles = StyleSheet.create({
   card: {
@@ -117,8 +117,8 @@ const styles = StyleSheet.create({
   poolChipLabel: { fontSize: 8.5, color: '#9888b0' },
   poolChipValue: { fontSize: 14, fontWeight: '900', color: '#f0e6ff' },
   sectionTitle: { fontSize: 9.5, fontWeight: '800', color: '#00d4ff', marginTop: 2 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, justifyContent: 'center' },
-  cellWrap: { width: CELL + 3, alignItems: 'center' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  cellWrap: { width: '20%' as any, alignItems: 'center', padding: 2 },
   cell: {
     width: CELL, height: CELL,
     borderWidth: 1.5, borderRadius: 6, overflow: 'hidden',

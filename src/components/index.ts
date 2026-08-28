@@ -14,5 +14,7 @@ export { AchievementLossCard } from './AchievementLossCard';
 export { MusicPlatformBoard } from './MusicPlatformBoard';
 export { B50ShareCard } from './B50ShareCard';
 export { Fit50ShareCard } from './Fit50ShareCard';
+export { BattleReportShareCard } from './BattleReportShareCard';
+export { PlatesShareCard } from './PlatesShareCard';
 export { SongShareCard } from './SongShareCard';
 export { ShareCardOverlay } from './ShareCardOverlay';

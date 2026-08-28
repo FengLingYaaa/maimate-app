@@ -311,28 +311,13 @@ export default function SongDetail() {
                 <Pressable style={styles.shareCardButton} onPress={() => setShareCardVisible(true)}>
                   <Text style={styles.shareCardButtonText}>分享成绩卡片</Text>
                 </Pressable>
-                {shareCardVisible && (
-                  <ShareCardOverlay
-                    visible
-                    fileName={shareCardFileName('MaiMate-song')}
-                    onClose={() => setShareCardVisible(false)}
-                    card={(
-                      <SongShareCard
-                        music={music}
-                        difficultyIndex={selectedDiff}
-                        score={currentScore}
-                        officialConstant={ds}
-                      />
-                    )}
-                  />
-                )}
 
                 {boardOrder.map(boardId => {
                   switch (boardId) {
                     case 'rating':
                       return <RatingPanel key="rating" ds={ds} fitDiff={stats?.fit_diff} loading={chartStatsLoading} defaultCollapsed={settings.detailBoards.rating.collapsed} />;
                     case 'achievement':
-                      return chart ? <AchievementLossCard key="achievement" notes={chart.notes} currentAchievement={currentScore?.achievement} defaultCollapsed={settings.detailBoards.achievement.collapsed} /> : null;
+                      return chart ? <AchievementLossCard key="achievement" notes={chart.notes} defaultCollapsed={settings.detailBoards.achievement.collapsed} /> : null;
                     case 'bilibili':
                       return <BilibiliSearchPanel
                         key="bilibili"
@@ -377,6 +362,23 @@ export default function SongDetail() {
           数据来源: Diving-Fish 舞萌DX查分器 (MIT)
         </Text>
       </ScrollView>
+
+      {/* v1.15.2：分享预览层移到 ScrollView 外——绝对定位全屏遮罩在滚动内容里会随内容定位（v1.15.1 错位根因）。 */}
+      {shareCardVisible && (
+        <ShareCardOverlay
+          visible
+          fileName={shareCardFileName('MaiMate-song')}
+          onClose={() => setShareCardVisible(false)}
+          card={(
+            <SongShareCard
+              music={music}
+              difficultyIndex={selectedDiff}
+              score={currentScore}
+              officialConstant={ds}
+            />
+          )}
+        />
+      )}
 
       {/* v1.15.0：曲绘大图查看器（点背景关闭，自绘 overlay）。 */}
       <Modal transparent visible={coverViewerVisible} animationType="fade" onRequestClose={() => setCoverViewerVisible(false)}>

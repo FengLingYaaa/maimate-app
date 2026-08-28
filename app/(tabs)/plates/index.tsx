@@ -5,7 +5,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, DifficultyColorMap, DifficultyLabels, DifficultyShortLabels } from '../../../src/constants';
 import { LIST_BOTTOM_INSET } from '../../../src/constants/layout';
-import { CoverImage } from '../../../src/components';
+import { CoverImage, ShareCardOverlay, PlatesShareCard } from '../../../src/components';
+import { shareCardFileName } from '../../../src/data/share-card';
 import { useMusicStore, usePlanStore, useScoreStore } from '../../../src/store';
 import {
   buildPlateEntries,
@@ -102,6 +103,9 @@ export default function PlatesPage() {
   const chinaOptions = useMemo(() => getPlateChinaVersionOptions(plateEntries), [plateEntries]);
   const byDifficulty = useMemo(() => summarizePlatesByDifficulty(filtered), [filtered]);
   const total = useMemo(() => summarizePlates(filtered), [filtered]);
+  // v1.15.2：牌子完成度分享卡。
+  const [shareVisible, setShareVisible] = useState(false);
+  const profile = useScoreStore(s => s.profile);
   const mergedRows = useMemo(() => {
     const rows = mergePlateRows(filtered);
     // v1.13.0：按 Master（难度 3）定数从大到小排布；无 Master 定数的曲排末尾。
@@ -179,6 +183,9 @@ export default function PlatesPage() {
     <>
       <View style={styles.header}>
         <Text style={styles.title}>🏅 本地牌子查询</Text>
+        <Pressable style={styles.shareButton} onPress={() => setShareVisible(true)} accessibilityLabel="分享牌子完成度">
+          <Text style={styles.shareButtonText}>分享</Text>
+        </Pressable>
       </View>
 
       <Pressable style={styles.filterToggle} onPress={() => setFiltersCollapsed(value => !value)}>
@@ -264,6 +271,21 @@ export default function PlatesPage() {
     // 首帧测量异常（配合 chips 换行容器修复初始无字问题）。
     <View key={`plates-root-${focusTick}`} style={styles.container}>
       <Stack.Screen options={{ title: '牌子查询', headerStyle: { backgroundColor: Colors.bg.primary }, headerTintColor: Colors.text.primary }} />
+      {shareVisible && (
+        <ShareCardOverlay
+          visible
+          fileName={shareCardFileName('MaiMate-plates')}
+          onClose={() => setShareVisible(false)}
+          card={(
+            <PlatesShareCard
+              summary={visibleTotal}
+              byDifficulty={visibleByDifficulty}
+              filterLabel={`筛选：${version === '全部' ? '全部版本' : version} · ${chinaVersion || '全部国区'} · ${difficultyIndex === undefined ? '全部难度' : DifficultyLabels[difficultyIndex]}`}
+              userName={profile?.nickname ?? profile?.username}
+            />
+          )}
+        />
+      )}
       <FlatList
         data={mergedRows}
         keyExtractor={item => item.key}
@@ -347,6 +369,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg.primary },
   header: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8 },
   title: { fontSize: 23, fontWeight: '800', color: Colors.text.primary },
+  shareButton: {
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9,
+    backgroundColor: `${Colors.accent.primary}22`, borderWidth: 1, borderColor: Colors.accent.primary,
+  },
+  shareButtonText: { fontSize: 12, fontWeight: '800', color: Colors.accent.primary },
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',

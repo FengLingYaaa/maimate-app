@@ -4,6 +4,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -74,6 +75,41 @@ export function FilterBar({
   const [showVersions, setShowVersions] = useState(false);
   const [localFilters, setLocalFilters] = useState<FilterOptions>({ ...filters });
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // v1.15.2：曲库搜索历史（最近 5 条，本机 AsyncStorage 持久化）。
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const HISTORY_KEY = 'maimate_search_history';
+  const HISTORY_LIMIT = 5;
+
+  useEffect(() => {
+    AsyncStorage.getItem(HISTORY_KEY)
+      .then(raw => {
+        try {
+          const parsed = raw ? JSON.parse(raw) : [];
+          if (Array.isArray(parsed)) setSearchHistory(parsed.filter(item => typeof item === 'string').slice(0, HISTORY_LIMIT));
+        } catch {
+          // 忽略坏数据。
+        }
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const recordSearch = useCallback((query: string) => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    setSearchHistory(previous => {
+      const next = [trimmed, ...previous.filter(item => item !== trimmed)].slice(0, HISTORY_LIMIT);
+      AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next)).catch(() => undefined);
+      return next;
+    });
+  }, []);
+
+  const removeSearchHistory = useCallback((query: string) => {
+    setSearchHistory(previous => {
+      const next = previous.filter(item => item !== query);
+      AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next)).catch(() => undefined);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     setLocalFilters({ ...filters });
@@ -151,7 +187,11 @@ export function FilterBar({
     const next = cleanFilters({ ...localFilters, titleSearch: text || undefined });
     setLocalFilters(next);
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => onApply(next), 180);
+    searchTimer.current = setTimeout(() => {
+      onApply(next);
+      // v1.15.2：防抖结束后记录有效搜索词（≥2 字符才记，避免单字符噪音）。
+      if (text.trim().length >= 2) recordSearch(text);
+    }, 180);
   };
 
   const clearSearch = () => {
@@ -256,7 +296,10 @@ export function FilterBar({
             placeholderTextColor={Colors.text.muted}
             value={localFilters.titleSearch || ''}
             onChangeText={handleSearchChange}
-            onSubmitEditing={() => onApply(cleanFilters(localFilters))}
+            onSubmitEditing={() => {
+              onApply(cleanFilters(localFilters));
+              if ((localFilters.titleSearch || '').trim().length >= 2) recordSearch(localFilters.titleSearch!);
+            }}
             returnKeyType="search"
           />
           {!!localFilters.titleSearch && (
@@ -274,6 +317,28 @@ export function FilterBar({
           </Text>
         </Pressable>
       </View>
+
+      {/* v1.15.2：搜索历史（最近 5 条，点击复用；输入时自动隐藏）。 */}
+      {searchHistory.length > 0 && !localFilters.titleSearch && (
+        <View style={styles.historyRow}>
+          <Text style={styles.historyLabel}>最近</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.historyContent}>
+            {searchHistory.map(item => (
+              <Pressable
+                key={item}
+                style={styles.historyChip}
+                onPress={() => {
+                  const next = cleanFilters({ ...localFilters, titleSearch: item });
+                  setLocalFilters(next);
+                  onApply(next);
+                }}
+              >
+                <Text style={styles.historyChipText} numberOfLines={1}>🔍 {item}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       {(activeChips.length > 0 || filteredCount !== totalCount) && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.activeRow} contentContainerStyle={styles.activeRowContent}>
@@ -535,6 +600,15 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     textAlign: 'center',
   },
+  historyRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 2, paddingBottom: 6, gap: 6 },
+  historyLabel: { fontSize: 11, color: Colors.text.muted, fontWeight: '700' },
+  historyContent: { gap: 6, alignItems: 'center' },
+  historyChip: {
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
+    backgroundColor: Colors.bg.secondary, borderWidth: 1, borderColor: Colors.border.light,
+    maxWidth: 160,
+  },
+  historyChipText: { fontSize: 11, color: Colors.text.secondary },
   filterBtn: {
     backgroundColor: Colors.bg.secondary,
     borderRadius: 10,

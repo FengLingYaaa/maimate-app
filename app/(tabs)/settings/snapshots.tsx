@@ -10,7 +10,10 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { Stack } from 'expo-router';
 import { Colors, DifficultyColorMap, DifficultyLabels } from '../../../src/constants';
 import { CoverImage } from '../../../src/components/CoverImage';
+import { ShareCardOverlay } from '../../../src/components/ShareCardOverlay';
+import { BattleReportShareCard } from '../../../src/components/BattleReportShareCard';
 import { buildSnapshotBattleReport } from '../../../src/data/snapshot-battle';
+import { shareCardFileName } from '../../../src/data/share-card';
 import { useMusicStore, useScoreStore, useSettingsStore } from '../../../src/store';
 import type { MusicData, ScoreSnapshot } from '../../../src/data/types';
 
@@ -18,11 +21,14 @@ export default function SnapshotsPage() {
   const snapshots = useScoreStore(state => state.snapshots);
   const deleteSnapshot = useScoreStore(state => state.deleteSnapshot);
   const rawData = useMusicStore(state => state.rawData);
+  const profile = useScoreStore(state => state.profile);
   const snapshotLimit = useSettingsStore(state => state.settings.snapshotLimit);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   // 对比模式：先点一份快照「对比」作基准，再点另一份完成选择（旧时间在前）。
   const [compareBase, setCompareBase] = useState<ScoreSnapshot | null>(null);
   const [comparison, setComparison] = useState<{ base: ScoreSnapshot; target: ScoreSnapshot } | null>(null);
+  // v1.15.2：战报分享卡预览开关。
+  const [shareVisible, setShareVisible] = useState(false);
 
   const report = useMemo(() => {
     if (!comparison) return null;
@@ -82,6 +88,7 @@ export default function SnapshotsPage() {
             report={report}
             rawData={rawData}
             onClose={() => setComparison(null)}
+            onShare={() => setShareVisible(true)}
           />
         )}
         {compareBase && (
@@ -113,17 +120,34 @@ export default function SnapshotsPage() {
           </View>
         ))}
       </ScrollView>
+      {shareVisible && comparison && report && (
+        <ShareCardOverlay
+          visible
+          fileName={shareCardFileName('MaiMate-battle')}
+          onClose={() => setShareVisible(false)}
+          card={(
+            <BattleReportShareCard
+              report={report}
+              base={comparison.base}
+              target={comparison.target}
+              rawData={rawData}
+              userName={profile?.nickname ?? profile?.username}
+            />
+          )}
+        />
+      )}
     </View>
   );
 }
 
 /** 推分战报卡片：汇总条 + 逐曲战报行（曲绘/曲名/难度/达成率变化/±Rating）。 */
-function BattleReportCard({ base, target, report, rawData, onClose }: {
+function BattleReportCard({ base, target, report, rawData, onClose, onShare }: {
   base: ScoreSnapshot;
   target: ScoreSnapshot;
   report: ReturnType<typeof buildSnapshotBattleReport>;
   rawData: MusicData[];
   onClose: () => void;
+  onShare: () => void;
 }) {
   const raDelta = base.serverRating != null && target.serverRating != null
     ? target.serverRating - base.serverRating
@@ -132,20 +156,19 @@ function BattleReportCard({ base, target, report, rawData, onClose }: {
     <View style={styles.compareCard}>
       <View style={styles.compareHeader}>
         <Text style={styles.compareTitle}>推分战报</Text>
-        <Pressable hitSlop={8} onPress={onClose}>
-          <Text style={styles.compareClose}>收起</Text>
-        </Pressable>
+        <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+          <Pressable hitSlop={8} onPress={onShare}>
+            <Text style={styles.compareShareText}>分享战报</Text>
+          </Pressable>
+          <Pressable hitSlop={8} onPress={onClose}>
+            <Text style={styles.compareClose}>收起</Text>
+          </Pressable>
+        </View>
       </View>
       <Text style={styles.compareRange}>
         {new Date(base.syncedAt).toLocaleString()} → {new Date(target.syncedAt).toLocaleString()}
       </Text>
       <View style={styles.summaryRow}>
-        <View style={styles.summaryChip}>
-          <Text style={styles.summaryChipValue}>
-            {report.totalRatingDelta >= 0 ? `+${report.totalRatingDelta}` : `${report.totalRatingDelta}`}
-          </Text>
-          <Text style={styles.summaryChipLabel}>Rating 变化</Text>
-        </View>
         <View style={styles.summaryChip}>
           <Text style={styles.summaryChipValue}>{report.addedCount}</Text>
           <Text style={styles.summaryChipLabel}>新增</Text>
@@ -153,10 +176,6 @@ function BattleReportCard({ base, target, report, rawData, onClose }: {
         <View style={styles.summaryChip}>
           <Text style={styles.summaryChipValue}>{report.changedCount}</Text>
           <Text style={styles.summaryChipLabel}>上分</Text>
-        </View>
-        <View style={styles.summaryChip}>
-          <Text style={styles.summaryChipValue}>{report.removedCount}</Text>
-          <Text style={styles.summaryChipLabel}>移除</Text>
         </View>
         {raDelta !== null && (
           <View style={styles.summaryChip}>
@@ -168,10 +187,10 @@ function BattleReportCard({ base, target, report, rawData, onClose }: {
       <Text style={styles.compareSummary}>
         记录 {base.recordCount} → {target.recordCount}
       </Text>
-      {report.rows.length === 0 ? (
+      {report.rows.filter(row => row.kind !== 'removed').length === 0 ? (
         <Text style={styles.compareEmpty}>两份快照之间成绩没有变化</Text>
       ) : (
-        report.rows.map(row => {
+        report.rows.filter(row => row.kind !== 'removed').map(row => {
           const music = rawData.find(candidate => candidate.id === row.songId && candidate.type === row.musicType);
           const difficultyColor = DifficultyColorMap[row.difficultyIndex] || Colors.accent.secondary;
           return (
@@ -232,6 +251,7 @@ const styles = StyleSheet.create({
   compareHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   compareTitle: { fontSize: 14, fontWeight: '900', color: Colors.text.primary },
   compareClose: { fontSize: 11, fontWeight: '700', color: Colors.text.muted },
+  compareShareText: { fontSize: 11, fontWeight: '700', color: Colors.accent.secondary },
   compareRange: { fontSize: 11, color: Colors.text.secondary },
   summaryRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   summaryChip: {

@@ -84,8 +84,8 @@ export function Fit50ShareCard({ rawData, scores, chartStats, serverRating, user
   );
 }
 
-// 5×CELL + 4×3(gap) = 317 ≤ 卡片内容区宽 320，精确一行。
-const CELL = 61;
+// cellWrap = 20% 容器宽（320/5=64），CELL 60 + padding 2 = 64 精确。
+const CELL = 60;
 
 const styles = StyleSheet.create({
   card: {
@@ -102,8 +102,8 @@ const styles = StyleSheet.create({
   totalValue: { fontSize: 32, fontWeight: '900', color: '#f0e6ff' },
   totalLabel: { fontSize: 9, color: '#9888b0' },
   serverLine: { fontSize: 9, color: '#00d4ff', fontWeight: '700' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, justifyContent: 'center' },
-  cellWrap: { width: CELL + 3, alignItems: 'center' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  cellWrap: { width: '20%' as any, alignItems: 'center', padding: 2 },
   cell: {
     width: CELL, height: CELL,
     borderWidth: 1.5, borderRadius: 6, overflow: 'hidden',

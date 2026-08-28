@@ -252,7 +252,7 @@
         ⏳ 检查下载地址
       </a>
       <p class="download-hint" id="downloadHint">
-        正在检查最新 APK；下载后即可直接安装
+        正在检查最新 APK；下载将跳转 GitHub 直链
         
       </p>
       <span class="size-badge" id="apkSize">Android · arm64-v8a · 59.6 MB · debug 签名</span>
@@ -493,25 +493,17 @@
       const apkPath = '/MaiMate-latest.apk';
       const button = document.getElementById('dlBtn');
       const hint = document.getElementById('downloadHint');
-      const size = document.getElementById('apkSize');
 
-      fetch(apkPath, { method: 'HEAD', cache: 'no-store' })
+      // v1.15.2：APK 链接改为 302 → GitHub 直链。探测仍走本地路径（302 也算可用），
+      // 大小展示用静态徽标（发布时更新），不再依赖 HEAD content-length。
+      fetch(apkPath, { method: 'HEAD', cache: 'no-store', redirect: 'follow' })
         .then((response) => {
           if (!response.ok) return;
           button.classList.remove('disabled');
           button.removeAttribute('aria-disabled');
           button.removeAttribute('onclick');
-          button.textContent = '⬇️ 下载 APK';
-          hint.innerHTML = '独立安装包，下载后直接安装<br>';
-
-          const bytes = Number(response.headers.get('content-length'));
-          if (Number.isFinite(bytes) && bytes > 0) {
-            size.textContent = `Android · arm64-v8a · ${(bytes / 1024 / 1024).toFixed(1)} MB`;
-          }
-        })
-        .catch(() => {
-          // Keep the safe "building" state when the APK is not uploaded yet.
-        });
+          button.textContent = '⬇️ 下载 APK（GitHub 直链）';
+          hint.innerHTML = '下载将跳转 GitHub Releases，速度更稳定<br>';
     })();
   </script>
 </body>

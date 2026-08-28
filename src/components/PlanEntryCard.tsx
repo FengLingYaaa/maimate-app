@@ -86,12 +86,8 @@ export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, 
         {importedScore ? (
           <Text style={styles.scoreText}>当前成绩：{formatAchievement(importedScore.achievement)} · DX {importedScore.dxScore}{importedScore.fc ? ` · ${importedScore.fc}` : ''}{importedScore.fs ? ` · ${importedScore.fs}` : ''}{importedScore.serverRating === undefined ? '' : ` · RA ${importedScore.serverRating}`}</Text>
         ) : <Text style={styles.scoreMuted}>当前成绩：尚未导入或没有匹配的成绩</Text>}
-        {entry.targetScore !== undefined && (
-          <Text style={[styles.progressText, achieved && styles.progressTextDone]}>
-            {achieved
-              ? '已达标 ✓'
-              : `${current.toFixed(2)}% → ${entry.targetScore!.toFixed(2)}%（还差 ${(entry.targetScore! - current).toFixed(2)}%）`}
-          </Text>
+        {entry.targetScore !== undefined && achieved && (
+          <Text style={[styles.progressText, styles.progressTextDone]}>已达标 ✓</Text>
         )}
         {entry.note && <Text style={styles.note}>💬 {entry.note}</Text>}
       </View>
