@@ -96,10 +96,10 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | v1.15.1 功能主体（前一代 `8b6cfb1` 为 v1.15.0 文档收尾） |
-| 当前标签 | v1.15.1 已推送（触发云构建，构建结果见发布补记） |
+| 当前提交 | v1.15.2 功能主体（前一代 `93d936a` 为 v1.15.1 文档收尾） |
+| 当前标签 | v1.15.2 已推送（触发云构建，构建结果见发布补记） |
 | Android applicationId | `cc.flya.maimate` |
-| App 版本 | `1.15.1`（Android versionCode `24`） |
+| App 版本 | `1.15.2`（Android versionCode `25`） |
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
@@ -1005,3 +1005,10 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 工程记录：explore.tsx 首次 write 工具产出损坏（`</Title>`、`</图标说明>`），heredoc 重写解决；Expo Router 会把 (tabs) 目录下所有文件自动注册 tab，必须显式 `href: null` 隐藏；route-check.mjs 增加 explore 叶子断言。
 - 回归与版本：六组本地回归全绿；`expo-doctor` 21/21；`expo export --platform android` 通过；`app.json` 升 `1.15.1`/versionCode `24`。发布补记待构建后回填。
 - 发布补记（当日）：功能提交 `0f4b71c`（15 文件 +195/−78）；轻量标签 `v1.15.1` git 推送一次成功。云构建 run `33178995317` 一次通过。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.15.1>；资产 `MaiMate-latest.apk` 大小 `62,552,316` bytes（59.6 MB），SHA-256 `75c1debd58af7b7401da72d9264eb2387e834527b044f680b5e06dc88a16c89c`。落地页更新 v1.15.1 文案、日志与 SHA 后经 wrangler 部署 Pages（deployment `4826c5c8.maimate-landing.pages.dev`）；线上校验落地页 200 且含 v1.15.1 与新 SHA、`HEAD /MaiMate-latest.apk` 返回 200 / content-length `62,552,316` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（信息查询 tab 聚合、拟合 50 segment 入口、分享卡一行 5 格与滚动预览与曲绘 ID、等效容错数值、writeOnly 权限弹窗、缺口排序删除后布局恢复）。
+
+### v1.15.2（2026-08-28，第五轮用户反馈）
+
+- 用户反馈与处置：① 等效容错口径错误（应为 101%→100.5% 的固定折算而非依赖当前成绩）——公式改为 x = 0.5 / tapGreatUnit 向下取整一位小数，删 `currentAchievement` prop，无成绩也显示；② 分享卡一行仍 4 个——v1.15.1 的 CELL 61 方案算术有误（外层容器宽 62/64px 未同步），改为 cellWrap `width: '20%'`（320px 内容区精确五分之一）+ CELL 60 + padding 2（60+4=64 精确），去掉 grid gap，B50/拟合50 两卡同修；③ 单曲分享图错位——详情页 ShareCardOverlay 放在 ScrollView 内部，绝对定位遮罩随内容定位，移到 ScrollView 外与曲绘 Modal 平级；④ 存相册失效——`requestPermissionsAsync({ writeOnly: true } as any)` 把对象传给了位置布尔参数，Android 上 writeOnly 导致 granted=false 抛「未授予相册权限」，改为 `Platform.OS === 'ios'` 才传 writeOnly（iOS 保留仅添加照片弹窗，Android 恢复完整权限与 MaiMate 相簿）；⑤ 推分战报汇总删「Rating 变化」「移除」两个 chip（保留新增/上分/服务器 RA），明细过滤移除类行；⑥ 推分计划卡删「还差…」行（保留「已达标 ✓」）；⑦ 试做分享卡：快照对比战报卡（BattleReportShareCard，快照管理页战报头部「分享战报」入口）与牌子完成度卡（PlatesShareCard，牌子页头部「分享」按钮，按当前筛选出卡、含各难度分行）；⑧ 曲库搜索历史：FilterBar 记录最近 5 条有效搜索（≥2 字符，防抖提交/回车提交时记录，AsyncStorage 持久化），搜索框下方横滑 chips 点击复用、输入时自动隐藏。
+- 下载站改造：`_worker.js` 的 `/MaiMate-latest.apk` 从流式代理 GitHub Release 改为 302 重定向到 GitHub 直链（`releases/latest/download/MaiMate-latest.apk`）——重定向响应仅数百字节，消除 Workers 大文件代理流量与 CF 服务条款 2.8 风险，下载流量直接走 GitHub CDN；落地页下载按钮文案改「GitHub 直链」、大小徽标改静态展示（302 无 content-length 可探测），移除 HEAD 探测 content-length 逻辑。
+- 回归与版本：六组本地回归全绿；`expo-doctor` 21/21；`expo export --platform android` 通过；`app.json` 升 `1.15.2`/versionCode `25`。发布补记待构建后回填。
+- 发布补记（当日）：功能提交 `860ab48`（16 文件 +422/−94）；轻量标签 `v1.15.2` git 推送一次成功。云构建 run `33189356190` 一次通过。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.15.2>；资产 `MaiMate-latest.apk` 大小 `62,560,632` bytes（59.7 MB），SHA-256 `8a1f048cbc08005430b55d289ac20a30345c18c069ab0ca533779e9b00146d79`（本地下载资产复算，构建日志仅落 step summary）。落地页更新 v1.15.2 文案、日志与 SHA 后经 wrangler 部署 Pages（deployment `8e7c69a2.maimate-landing.pages.dev`）；线上校验落地页 200 且含 v1.15.2 与新 SHA、`HEAD /MaiMate-latest.apk` 返回 302 → GitHub 直链、GitHub 直链 200 / content-length `62,560,632` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（分享卡一行 5 格、详情页分享预览全屏居中与存相册、等效容错无成绩显示、战报/牌子分享卡样式、搜索历史、下载站 302 跳转）。
