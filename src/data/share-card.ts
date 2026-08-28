@@ -1,36 +1,61 @@
 /**
- * 查分分享卡片（v1.13.0）：把 B50 总览或单曲详情渲染成图片并拉起系统分享。
- * 基于 react-native-view-shot 捕获，expo-sharing 分享。
+ * 查分分享卡片（v1.13.0 引入；v1.14.0 重构为按需 Modal 预览 + 存相册）：
+ * 调用方按需渲染卡片（可见、在遮罩上），把卡片根节点 ref 交给 captureCardToTempFile，
+ * 布局稳定后捕获为 PNG，预览大图 → 分享 / 保存到相册。
  */
 
 import * as Sharing from 'expo-sharing';
+import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
+import { captureRef } from 'react-native-view-shot';
+import type { RefObject } from 'react';
+import type { View } from 'react-native';
 
-export type { CaptureOptions } from 'react-native-view-shot';
-
-/** ViewShot 组件实例引用的最小接口（capture 方法）。 */
-export interface ViewShotInstance {
-  capture: (options?: { result?: string; format?: string; quality?: number }) => Promise<string>;
-}
-
-/** 捕获 ViewShot 实例为临时 PNG 并拉起分享面板。 */
-export async function captureAndShare(node: ViewShotInstance | null, fileName: string): Promise<void> {
-  if (!node || typeof node.capture !== 'function') return;
+/** 捕获指定 ref 指向的卡片视图为 PNG，写入缓存目录，返回本地文件 URI。 */
+export async function captureCardToTempFile(
+  nodeRef: RefObject<View | null>,
+  fileName: string,
+): Promise<string> {
+  const node = nodeRef.current;
+  if (!node) throw new Error('卡片尚未渲染完成');
   const cacheDirectory = FileSystem.cacheDirectory;
   if (!cacheDirectory) throw new Error('无法访问应用缓存目录');
-  const uri: string = await node.capture();
+  const uri = await captureRef(node, { format: 'png', quality: 1, result: 'tmpfile' });
   const targetUri = `${cacheDirectory}${fileName}`;
   await FileSystem.moveAsync({ from: uri, to: targetUri });
-  try {
-    if (!(await Sharing.isAvailableAsync())) throw new Error('当前设备不支持系统分享');
-    await Sharing.shareAsync(targetUri, {
-      mimeType: 'image/png',
-      dialogTitle: '分享 MaiMate 查分卡片',
-      UTI: 'public.png',
-    });
-  } finally {
-    FileSystem.deleteAsync(targetUri, { idempotent: true }).catch(() => undefined);
+  return targetUri;
+}
+
+/** 请求保存到相册所需权限；拒绝时抛错。 */
+async function ensureMediaLibraryPermission(): Promise<void> {
+  const permission = await MediaLibrary.requestPermissionsAsync();
+  if (permission.granted !== true) {
+    throw new Error('未授予相册权限，无法保存到相册');
   }
+}
+
+/** 保存 PNG 到系统相册（自动建立 MaiMate 相簿）。 */
+export async function savePngToMediaLibrary(fileUri: string): Promise<void> {
+  await ensureMediaLibraryPermission();
+  const asset = await MediaLibrary.createAssetAsync(fileUri);
+  if (asset) {
+    const album = await MediaLibrary.getAlbumAsync('MaiMate');
+    if (album == null) {
+      await MediaLibrary.createAlbumAsync('MaiMate', asset, false);
+    } else {
+      await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+    }
+  }
+}
+
+/** 拉起系统分享面板分享 PNG。 */
+export async function sharePngFile(fileUri: string): Promise<void> {
+  if (!(await Sharing.isAvailableAsync())) throw new Error('当前设备不支持系统分享');
+  await Sharing.shareAsync(fileUri, {
+    mimeType: 'image/png',
+    dialogTitle: '分享 MaiMate 查分卡片',
+    UTI: 'public.png',
+  });
 }
 
 export function shareCardFileName(prefix: string, now = new Date()): string {

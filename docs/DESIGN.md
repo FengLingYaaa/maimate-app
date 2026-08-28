@@ -96,15 +96,15 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | v1.13.0 功能主体（前一代 `0e61fa4` 为 v1.12.0 landing SHA 回填） |
-| 当前标签 | v1.13.0 待打（v1.12.0 及更早标签均已发布） |
+| 当前提交 | v1.14.0 功能主体（前一代 `eeca8e5` 为 v1.13.0 文档收尾） |
+| 当前标签 | v1.14.0 待打（v1.13.0 及更早标签均已发布） |
 | Android applicationId | `cc.flya.maimate` |
-| App 版本 | `1.13.0`（Android versionCode `21`） |
+| App 版本 | `1.14.0`（Android versionCode `22`） |
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
-| 最新 Release APK SHA-256（v1.13.0） | `d07a14b3d1c98e1c5f1de190cc4f72b0af766dcbe37679a065f5d579788c869f`（CI「Print APK checksum」步骤输出） |
-| 最新 Release APK 大小 | 62,336,434 bytes（59.4 MB） |
+| 最新 Release APK SHA-256（v1.13.0，待 v1.14.0 构建后更新） | `d07a14b3d1c98e1c5f1de190cc4f72b0af766dcbe37679a065f5d579788c869f`（CI「Print APK checksum」步骤输出） |
+| 最新 Release APK 大小 | 62,336,434 bytes（59.4 MB，v1.13.0；待 v1.14.0 构建后更新） |
 | 下载站同步状态 | 已部署：v1.13.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | 下载站同步状态 | 已部署：v1.12.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | 下载站同步状态 | 已部署：v1.11.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
@@ -949,3 +949,17 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 快照管理 UI：`score-store` 新增 `deleteSnapshot(id)`（过滤+持久化）；新建设置子页 `snapshots.tsx`（按时间倒序列出快照、记录数/服务器 RA、删除需确认），设置页同步状态卡加「管理快照 →」入口；`route-check` settings children 加 `snapshots`。
 - 回归与版本：route-check 更新；`app.json` 升 `1.13.0`/versionCode `21`，`package.json` 升 `1.13.0`；本地全绿——tsc、六组回归、`expo-doctor` 21/21（view-shot 降到 SDK 映射版本 5.1.0）、`expo export --platform android`。
 - 发布补记（当日）：功能提交 `bb894cd`，轻量标签 `v1.13.0`（推送第 6 次重试成功，GitHub 间歇阻断）触发云构建 run `33139297657`，一次通过（lint + 6 组回归 + expo-doctor + Android export + arm64 gradle 全绿）。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.13.0>；资产 `MaiMate-latest.apk` 大小 `62,336,434` bytes（59.4 MB），SHA-256 `d07a14b3d1c98e1c5f1de190cc4f72b0af766dcbe37679a065f5d579788c869f`。落地页更新 v1.13.0 文案、日志与 SHA 后经 wrangler 部署 Pages（deployment `835f5234.maimate-landing.pages.dev`）；线上校验落地页 200 且含 v1.13.0 与新 SHA、`HEAD /MaiMate-latest.apk` 返回 200 / content-length `62,336,434` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（B50 网格/修复、分享卡片效果、进度闭环、牌子排序/记忆、快照管理）。
+
+### 2026-08-28 — v1.14.0：分享卡预览/存相册重构、9 项用户验收反馈修复、快照对比、完成率着色与多选入计划
+
+- 用户真机验收 v1.13.0 后反馈：① 进详情页会直接触发分享；② B50 分享点了没反应；③ 推分计划底部仍被遮挡；④ 进度环虚报 100%（很多曲目未达标）；⑤ 要求删卡片进度条但保留达标标识与「还差**」；⑥ 牌子页难度标注改带小数定数（如 14.4）；⑦ 曲库长曲名把 B35 徽标顶出屏幕；⑧ B50 网格同分附加曲目与前榜之间无分隔；⑨ 长按入计划改多选打钩（已在计划的默认打钩）+ 自绘弹窗；另有设置页有新版不亮红点。追加功能：分享卡预览+存相册、网格完成率着色、快照对比、一键加入撤销（后核实 v1.12 已实现，无需改动）。
+- 分享重构（修①②+预览/存相册）：删除「隐藏常驻卡片 + onReady 注册捕获函数」模式（B50ShareCard 曾在 render 期调 setState 致注册失效＝②根因；常驻注册函数存在误触发路径＝①根因；opacity:0 屏外渲染 Android 捕获全透明）。新 `ShareCardOverlay`：点分享按钮按需渲染卡片（页面内绝对定位遮罩，非 RN Modal，避免 Android 捕获独立窗口），`captureRef` 捕获真实可见视图；预览大图后可选「分享」（expo-sharing）或「存相册」（新增 expo-media-library，写入「MaiMate」相簿）；`src/data/share-card.ts` 重写为 `captureCardToTempFile`/`savePngToMediaLibrary`/`sharePngFile`；失败/成功有行内提示。
+- 更新红点修复：根因是 update 页挂载时无条件 `markUpdateSeen`——升级后路过更新页会把尚未展示过的新版本静默 dismiss，红点从此不亮。改为仅当 `result.status === 'update'`（确实展示了新版本信息）时熄灭；`hasUpdateBadge` 增加已知版本≤当前版本的先决短路。
+- 底部遮挡（修③）：`DraggableFlatList` 的 `ListFooterComponent` 不生效，`PlanDragList` 改 `contentContainerStyle paddingBottom`；`LIST_BOTTOM_INSET` 160→200。
+- 进度环（修④）：主文案改「达标 x/y」（环形边框，全达标变金色），平均完成率降为副文案且 `Math.floor` 保留一位小数（不再四舍五入虚报 100%）。
+- 卡片进度条（修⑤）：删除进度条轨道，压为一行文字并入成绩行下方：未达标「当前 → 目标（还差 **）」、已达标绿色「已达标 ✓」。
+- 牌子页定数（修⑥）：`mergePlateRows` charts 增加 `ds` 字段（取 `music.ds[difficultyIndex]`），`PlateChartLine` 难度徽章渲染「MS 14.4」（无定数回退等级标签）。
+- 曲库徽标（修⑦）：`SongCard.title` 加 `flex: 1`，长曲名省略号截断，B15/B35 徽标固定右侧不再溢出。
+- B50 网格增强（修⑧+着色+多选）：正榜与同分附加曲目之间插入 `GridTieDivider` 全宽分隔条；完成率按 `achievementTier` 三档着色（≥100.5 金 / ≥100 绿 / <100 灰紫，纯函数 `achievementTier`+`ACHIEVEMENT_TIER_COLORS` 导出便于测试）；长按任一格进入多选模式（已在计划条目默认打钩），格子右上角自绘勾选圈，顶部自绘工具栏（全选/已选 N/取消/加入计划）替代原生 Alert，Android 返回键先退选择，提交后 `bulkAddEntries` 并 Toast 结果（自动跳过已存在）。
+- 快照对比：`snapshots.tsx` 新增「对比」两步选择（旧时间在前），`buildComparisonRows` 纯函数逐谱面 diff（新增/变化/移除，达成率四位小数），头部显示记录数与服务器 RA 变化。
+- 回归与版本：六组本地回归全绿；`expo-doctor` 21/21（expo-media-library 与 SDK 对齐）；`expo export --platform android` 通过；`app.json` 升 `1.14.0`/versionCode `22`，`package.json` 升 `1.14.0`。发布补记待构建后回填。

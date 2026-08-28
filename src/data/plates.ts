@@ -112,7 +112,7 @@ export function summarizePlatesByDifficulty(entries: PlateEntry[]): DifficultyPl
 export interface MergedPlateRow {
   key: string;
   music: MusicData;
-  charts: Array<{ difficultyIndex: number; mask: number; level?: string }>;
+  charts: Array<{ difficultyIndex: number; mask: number; level?: string; ds?: number }>;
 }
 
 export function mergePlateRows(entries: PlateEntry[]): MergedPlateRow[] {
@@ -128,6 +128,7 @@ export function mergePlateRows(entries: PlateEntry[]): MergedPlateRow[] {
       difficultyIndex: entry.difficultyIndex,
       mask: entry.mask,
       level: entry.music.level[entry.difficultyIndex],
+      ds: entry.music.ds[entry.difficultyIndex],
     });
   }
   for (const row of byMusic.values()) row.charts.sort((left, right) => left.difficultyIndex - right.difficultyIndex);

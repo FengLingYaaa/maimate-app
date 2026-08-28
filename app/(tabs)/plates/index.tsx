@@ -297,14 +297,14 @@ function FilterChip({ label, active, onPress, color }: { label: string; active: 
   return <Pressable style={[styles.chip, active && { borderColor: color || Colors.accent.primary, backgroundColor: `${color || Colors.accent.primary}22` }]} onPress={onPress}><Text style={[styles.chipText, active && { color: color || Colors.accent.primary, fontWeight: '800' }]}>{label}</Text></Pressable>;
 }
 
-function PlateChartLine({ chart }: { chart: { difficultyIndex: number; mask: number; level?: string } }) {
+function PlateChartLine({ chart }: { chart: { difficultyIndex: number; mask: number; level?: string; ds?: number } }) {
   const color = DifficultyColorMap[chart.difficultyIndex];
   return (
     <View style={styles.chartLine}>
       <View style={[styles.diffBadge, { borderColor: color }]}>
         <Text style={[styles.diffBadgeText, { color }]}>
           {DifficultyShortLabels[chart.difficultyIndex] || `D${chart.difficultyIndex}`}
-          {chart.level ? ` ${chart.level}` : ''}
+          {chart.ds !== undefined && Number.isFinite(chart.ds) ? ` ${chart.ds.toFixed(1)}` : chart.level ? ` ${chart.level}` : ''}
         </Text>
       </View>
       <View style={styles.badgeMarks}>

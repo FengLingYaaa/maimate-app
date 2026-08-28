@@ -11,10 +11,13 @@ export default function UpdateScreen() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<UpdateCheckResult | null>(null);
 
-  // 进入页面即视为已知晓已知更新，熄灭设置页红点。
+  // v1.14.0 修复：不再在进入页面时无条件清除红点（会导致升级后路过更新页
+  // 把尚未展示过的新版本静默标记为已读）。只在确实展示了「发现新版本」时熄灭。
   useEffect(() => {
-    markUpdateSeen(currentVersion).catch(() => undefined);
-  }, [currentVersion]);
+    if (result?.status === 'update') {
+      markUpdateSeen(currentVersion).catch(() => undefined);
+    }
+  }, [result?.status, currentVersion]);
 
   const handleCheck = async () => {
     setBusy(true);

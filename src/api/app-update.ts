@@ -60,15 +60,19 @@ async function writeUpdateState(state: UpdateState): Promise<void> {
 export async function hasUpdateBadge(currentVersion: string): Promise<boolean> {
   const state = await readUpdateState();
   if (!state.knownLatestVersion) return false;
+  if (compareSemver(state.knownLatestVersion, currentVersion) <= 0) return false;
   if (state.dismissedVersion && compareSemver(state.dismissedVersion, state.knownLatestVersion) >= 0) return false;
-  return compareSemver(state.knownLatestVersion, currentVersion) > 0;
+  return true;
 }
 
-/** 用户进入更新页即视为已知晓，红点清除。 */
+/**
+ * 红点清除：仅在用户确实看到该版本的更新信息时调用（更新页展示发现更新时）。
+ * v1.14.0 修复：不再在进入更新页时无条件 dismiss——此前用户升级后路过更新页
+ * 会把尚未展示过的新版本静默标记为已读，导致设置页红点不亮。
+ */
 export async function markUpdateSeen(currentVersion: string): Promise<void> {
   const state = await readUpdateState();
-  if (state.knownLatestVersion && compareSemver(state.knownLatestVersion, currentVersion) <= 0) {
-    await writeUpdateState(state);
+  if (!state.knownLatestVersion || compareSemver(state.knownLatestVersion, currentVersion) <= 0) {
     return;
   }
   await writeUpdateState({ ...state, dismissedVersion: state.knownLatestVersion });

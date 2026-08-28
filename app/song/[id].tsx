@@ -16,11 +16,12 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '../../src/store';
-import { BilibiliSearchPanel, CoverImage, DifficultyBadge, NoteBar, RatingPanel, AchievementLossCard, MusicPlatformBoard, SongShareCard } from '../../src/components';
+import { BilibiliSearchPanel, CoverImage, DifficultyBadge, NoteBar, RatingPanel, AchievementLossCard, MusicPlatformBoard, SongShareCard, ShareCardOverlay } from '../../src/components';
 import { Colors } from '../../src/constants';
 import { DifficultyLabels, getChinaVersionName } from '../../src/constants/game';
 import { getOfficialChartConstant, getTotalNotes } from '../../src/data/music-list';
 import { formatAchievement, normalizeAchievement } from '../../src/data/rating';
+import { shareCardFileName } from '../../src/data/share-card';
 import { openMusicPlatformSearch } from '../../src/data/external-links';
 import { getMusicPlatformSearchText, MUSIC_PLATFORM_LABELS } from '../../src/data/music-platforms';
 import type { ChartData, DetailBoardId, MusicPlatform } from '../../src/data/types';
@@ -134,8 +135,8 @@ export default function SongDetail() {
     score.songId === music.id && score.type === music.type && score.difficultyIndex === selectedDiff,
   );
   const inPlan = isInPlan(music.id, selectedDiff, music.type);
-  // v1.13.0：单曲成绩分享卡片。
-  const [songShareCapture, setSongShareCapture] = useState<(() => Promise<void>) | null>(null);
+  // v1.14.0：分享卡片预览层开关（按需渲染，无自动触发路径）。
+  const [shareCardVisible, setShareCardVisible] = useState(false);
   const commitCustomTarget = () => {
     const normalized = customTarget.trim().replace(',', '.');
     if (!normalized) {
@@ -304,16 +305,24 @@ export default function SongDetail() {
                   <Text style={styles.importedScoreEmpty}>尚未导入该难度成绩</Text>
                 )}
 
-                <Pressable style={styles.shareCardButton} onPress={() => void songShareCapture?.()}>
+                <Pressable style={styles.shareCardButton} onPress={() => setShareCardVisible(true)}>
                   <Text style={styles.shareCardButtonText}>分享成绩卡片</Text>
                 </Pressable>
-                <SongShareCard
-                  music={music}
-                  difficultyIndex={selectedDiff}
-                  score={currentScore}
-                  officialConstant={ds}
-                  onReady={setSongShareCapture}
-                />
+                {shareCardVisible && (
+                  <ShareCardOverlay
+                    visible
+                    fileName={shareCardFileName('MaiMate-song')}
+                    onClose={() => setShareCardVisible(false)}
+                    card={(
+                      <SongShareCard
+                        music={music}
+                        difficultyIndex={selectedDiff}
+                        score={currentScore}
+                        officialConstant={ds}
+                      />
+                    )}
+                  />
+                )}
 
                 {boardOrder.map(boardId => {
                   switch (boardId) {

@@ -15,6 +15,24 @@ import { calculateRating } from './rating';
 export const B35_SIZE = 35;
 export const B15_SIZE = 15;
 
+/**
+ * v1.14.0：网格完成率着色档位。
+ * gold：≥100.5（理论极限推满）；green：≥100（白金）；default：<100。
+ */
+export type AchievementTier = 'gold' | 'green' | 'default';
+
+export function achievementTier(achievement: number): AchievementTier {
+  if (achievement >= 100.5) return 'gold';
+  if (achievement >= 100) return 'green';
+  return 'default';
+}
+
+export const ACHIEVEMENT_TIER_COLORS: Record<AchievementTier, string> = {
+  gold: '#ffd166',
+  green: '#3dd68c',
+  default: '#9888b0',
+};
+
 export interface B50Entry {
   /** 排名（1 起，先新曲池后旧曲池，池内按 rating 降序）。 */
   rank: number;

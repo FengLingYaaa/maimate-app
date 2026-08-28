@@ -14,3 +14,4 @@ export { AchievementLossCard } from './AchievementLossCard';
 export { MusicPlatformBoard } from './MusicPlatformBoard';
 export { B50ShareCard } from './B50ShareCard';
 export { SongShareCard } from './SongShareCard';
+export { ShareCardOverlay } from './ShareCardOverlay';

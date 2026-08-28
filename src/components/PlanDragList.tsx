@@ -81,8 +81,7 @@ export function PlanDragList({
         if (orderedIds.every((id, index) => id === currentIds[index])) return;
         onReorder(orderedIds);
       }}
-      contentContainerStyle={styles.content}
-      ListFooterComponent={<View style={{ height: LIST_BOTTOM_INSET + insets.bottom }} />}
+      contentContainerStyle={[styles.content, { paddingBottom: LIST_BOTTOM_INSET + insets.bottom }]}
       showsVerticalScrollIndicator
       keyboardShouldPersistTaps="handled"
       removeClippedSubviews={false}

@@ -8,14 +8,16 @@
  * - 列表模式保持 v1.12 行为。
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, DifficultyColorMap, DifficultyLabels } from '../src/constants';
 import { CoverImage } from '../src/components/CoverImage';
 import { B50ShareCard } from '../src/components/B50ShareCard';
-import { computeB50, type B50Entry } from '../src/data/b50';
+import { ShareCardOverlay } from '../src/components/ShareCardOverlay';
+import { computeB50, achievementTier, ACHIEVEMENT_TIER_COLORS, type B50Entry } from '../src/data/b50';
+import { shareCardFileName } from '../src/data/share-card';
 import { formatAchievement } from '../src/data/rating';
 import { useMusicStore, usePlanStore, useScoreStore } from '../src/store';
 import type { MusicData } from '../src/data/types';
@@ -52,17 +54,21 @@ function EntryRow({ entry, music, allSongs, onPress }: {
   );
 }
 
-function GridCell({ entry, music, allSongs, onPress, onLongPress }: {
+function GridCell({ entry, music, allSongs, selectionMode, selected, onPress, onLongPress }: {
   entry: B50Entry;
   music?: MusicData;
   allSongs: MusicData[];
+  selectionMode: boolean;
+  selected: boolean;
   onPress: () => void;
   onLongPress: () => void;
 }) {
   const borderColor = DifficultyColorMap[entry.difficultyIndex] || Colors.accent.secondary;
+  const tier = achievementTier(entry.achievement);
+  const achievementColor = ACHIEVEMENT_TIER_COLORS[tier];
   return (
     <Pressable style={styles.gridCell} onPress={onPress} onLongPress={onLongPress} delayLongPress={350}>
-      <View style={[styles.gridCoverWrap, { borderColor }]}>
+      <View style={[styles.gridCoverWrap, { borderColor }, selectionMode && selected && styles.gridCoverSelected]}>
         <CoverImage
           music={music ?? fallbackMusic(entry)}
           allSongs={allSongs}
@@ -70,9 +76,23 @@ function GridCell({ entry, music, allSongs, onPress, onLongPress }: {
         />
         <View style={styles.gridCornerLeft}><Text style={styles.gridCornerText}>{entry.ds.toFixed(1)}</Text></View>
         <View style={styles.gridCornerRight}><Text style={styles.gridCornerText}>{entry.rating}</Text></View>
+        {selectionMode && (
+          <View style={[styles.gridCheckbox, selected && styles.gridCheckboxChecked]}>
+            {selected && <Text style={styles.gridCheckboxMark}>✓</Text>}
+          </View>
+        )}
       </View>
-      <Text style={styles.gridAchievement} numberOfLines={1}>{formatAchievement(entry.achievement)}</Text>
+      <Text style={[styles.gridAchievement, { color: achievementColor }]} numberOfLines={1}>{formatAchievement(entry.achievement)}</Text>
     </Pressable>
+  );
+}
+
+/** 网格模式：正榜与同分附加曲目之间的分隔条。 */
+function GridTieDivider({ count, pool }: { count: number; pool: PoolTab }) {
+  return (
+    <View style={styles.gridTieDivider}>
+      <Text style={styles.gridTieDividerText}>以下 {count} 首与第 {pool === 'new' ? 15 : 35} 名同 Rating，暂未计入总分</Text>
+    </View>
   );
 }
 
@@ -93,60 +113,136 @@ export default function B50Screen() {
   const rawData = useMusicStore(state => state.rawData);
   const scores = useScoreStore(state => state.scores);
   const profile = useScoreStore(state => state.profile);
-  const addEntry = usePlanStore(state => state.addEntry);
+  const bulkAddEntries = usePlanStore(state => state.bulkAddEntries);
   const isInPlan = usePlanStore(state => state.isInPlan);
   const insets = useSafeAreaInsets();
 
   // 池/视图模式状态：返回后保持。
   const [poolTab, setPoolTab] = useState<PoolTab>('new');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [shareCapture, setShareCapture] = useState<(() => Promise<void>) | null>(null);
+  const [shareVisible, setShareVisible] = useState(false);
+
+  // v1.14.0：网格长按多选入计划。
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [bulkNotice, setBulkNotice] = useState<string | null>(null);
+
+  const entryKeyOf = useCallback((entry: B50Entry) => `${entry.songId}:${entry.musicType}:${entry.difficultyIndex}`, []);
 
   const b50 = useMemo(() => computeB50(rawData, scores), [rawData, scores]);
 
   const poolEntries = b50.entries.filter(entry => entry.pool === poolTab);
   const ties = poolTab === 'new' ? b50.newTies : b50.oldTies;
+  const allGridEntries = useMemo(() => [...poolEntries, ...ties], [poolEntries, ties]);
 
   const openSong = useCallback((entry: B50Entry) => {
     router.push({ pathname: '/song/[id]' as const, params: { id: entry.songId, type: entry.musicType, difficultyIndex: String(entry.difficultyIndex) } });
   }, []);
 
-  const quickAdd = useCallback((entry: B50Entry) => {
-    if (isInPlan(entry.songId, entry.difficultyIndex, entry.musicType)) {
-      Alert.alert('已在计划中', `《${entry.title}》已在推分计划里。`);
-      return;
+  const enterSelection = useCallback((firstEntry: B50Entry) => {
+    const initial = new Set<string>();
+    for (const item of [...b50.entries, ...b50.newTies, ...b50.oldTies]) {
+      if (isInPlan(item.songId, item.difficultyIndex, item.musicType)) {
+        initial.add(entryKeyOf(item));
+      }
     }
-    Alert.alert(
-      '加入推分计划',
-      `把《${entry.title}》（定数 ${entry.ds.toFixed(1)}）加入推分计划？`,
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '加入',
-          onPress: () => {
-            addEntry({ songId: entry.songId, difficultyIndex: entry.difficultyIndex, musicType: entry.musicType });
-            Alert.alert('已加入', `《${entry.title}》已加入推分计划。`);
-          },
-        },
-      ],
-    );
-  }, [addEntry, isInPlan]);
+    initial.add(entryKeyOf(firstEntry));
+    setSelectedKeys(initial);
+    setSelectionMode(true);
+  }, [b50, entryKeyOf, isInPlan]);
+
+  const exitSelection = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedKeys(new Set());
+  }, []);
+
+  const toggleEntry = useCallback((entry: B50Entry) => {
+    const key = entryKeyOf(entry);
+    setSelectedKeys(previous => {
+      const next = new Set(previous);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, [entryKeyOf]);
+
+  // 提交多选：跳过已在计划中的，返回新增数量（0 表示全部已存在）。
+  const commitSelection = useCallback(() => {
+    const byKey = new Map(allGridEntries.map(entry => [entryKeyOf(entry), entry]));
+    const pending: B50Entry[] = [];
+    for (const key of selectedKeys) {
+      const entry = byKey.get(key);
+      if (!entry) continue;
+      if (isInPlan(entry.songId, entry.difficultyIndex, entry.musicType)) continue;
+      pending.push(entry);
+    }
+    const newlyAdded = bulkAddEntries(pending.map(entry => ({
+      songId: entry.songId, difficultyIndex: entry.difficultyIndex, musicType: entry.musicType,
+    })));
+    const skipped = pending.length - newlyAdded.length;
+    setBulkNotice(newlyAdded.length > 0
+      ? `已加入 ${newlyAdded.length} 首到推分计划${skipped > 0 ? `（${skipped} 首已在计划中，已跳过）` : ''}`
+      : '所选曲目都已在计划中');
+    exitSelection();
+  }, [allGridEntries, bulkAddEntries, entryKeyOf, exitSelection, isInPlan, selectedKeys]);
+
+  // 选择模式下 Android 返回键先退选择，不退出页面。
+  useEffect(() => {
+    if (!selectionMode) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      exitSelection();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [selectionMode, exitSelection]);
+
+  // 批量结果提示 2.6s 自动消失。
+  useEffect(() => {
+    if (!bulkNotice) return;
+    const timer = setTimeout(() => setBulkNotice(null), 2600);
+    return () => clearTimeout(timer);
+  }, [bulkNotice]);
 
   const hasScores = scores.length > 0;
+
+  // 选择模式下的工具栏（替换池切换行，含全选/加入/取消）。
+  const selectionToolbar = selectionMode && viewMode === 'grid' && (
+    <View style={styles.selectionToolbar}>
+      <Pressable
+        style={styles.selectionButton}
+        onPress={() => setSelectedKeys(new Set(allGridEntries.map(entryKeyOf)))}
+      >
+        <Text style={styles.selectionButtonText}>全选</Text>
+      </Pressable>
+      <Text style={styles.selectionCount}>
+        已选 {selectedKeys.size} 首
+      </Text>
+      <Pressable style={styles.selectionButtonGhost} onPress={exitSelection}>
+        <Text style={styles.selectionButtonGhostText}>取消</Text>
+      </Pressable>
+      <Pressable style={styles.selectionButtonPrimary} onPress={commitSelection}>
+        <Text style={styles.selectionButtonPrimaryText}>加入计划</Text>
+      </Pressable>
+    </View>
+  );
 
   return (
     <View style={[styles.root, { paddingBottom: insets.bottom }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={8}>
-          <Text style={styles.backText}>‹ 返回</Text>
+        <Pressable
+          style={styles.backButton}
+          onPress={() => (selectionMode ? exitSelection() : router.back())}
+          hitSlop={8}
+        >
+          <Text style={styles.backText}>{selectionMode ? '取消' : '‹ 返回'}</Text>
         </Pressable>
         <Text style={styles.headerTitle}>B50 总览</Text>
         <View style={styles.headerRight}>
           {hasScores && (
             <Pressable
               style={styles.shareButton}
-              onPress={() => void shareCapture?.()}
+              onPress={() => setShareVisible(true)}
               accessibilityLabel="分享 B50 卡片"
             >
               <Text style={styles.shareButtonText}>分享</Text>
@@ -162,13 +258,19 @@ export default function B50Screen() {
         </View>
       </View>
 
-      {hasScores && (
-        <B50ShareCard
-          rawData={rawData}
-          scores={scores}
-          serverRating={profile?.rating ?? null}
-          userName={profile?.nickname ?? profile?.username}
-          onReady={setShareCapture}
+      {hasScores && shareVisible && (
+        <ShareCardOverlay
+          visible
+          fileName={shareCardFileName('MaiMate-b50')}
+          onClose={() => setShareVisible(false)}
+          card={(
+            <B50ShareCard
+              rawData={rawData}
+              scores={scores}
+              serverRating={profile?.rating ?? null}
+              userName={profile?.nickname ?? profile?.username}
+            />
+          )}
         />
       )}
 
@@ -200,17 +302,25 @@ export default function B50Screen() {
               </View>
             </View>
 
-            <View style={styles.toolbarRow}>
-              <View style={styles.poolSwitch}>
-                <Pressable style={[styles.poolTab, poolTab === 'new' && styles.poolTabActive]} onPress={() => setPoolTab('new')}>
-                  <Text style={[styles.poolTabText, poolTab === 'new' && styles.poolTabTextActive]}>新曲 TOP15</Text>
-                </Pressable>
-                <Pressable style={[styles.poolTab, poolTab === 'old' && styles.poolTabActive]} onPress={() => setPoolTab('old')}>
-                  <Text style={[styles.poolTabText, poolTab === 'old' && styles.poolTabTextActive]}>旧曲 TOP35</Text>
-                </Pressable>
+            {selectionToolbar ?? (
+              <View style={styles.toolbarRow}>
+                <View style={styles.poolSwitch}>
+                  <Pressable style={[styles.poolTab, poolTab === 'new' && styles.poolTabActive]} onPress={() => setPoolTab('new')}>
+                    <Text style={[styles.poolTabText, poolTab === 'new' && styles.poolTabTextActive]}>新曲 TOP15</Text>
+                  </Pressable>
+                  <Pressable style={[styles.poolTab, poolTab === 'old' && styles.poolTabActive]} onPress={() => setPoolTab('old')}>
+                    <Text style={[styles.poolTabText, poolTab === 'old' && styles.poolTabTextActive]}>旧曲 TOP35</Text>
+                  </Pressable>
+                </View>
+                {viewMode === 'grid' && <Text style={styles.gridHint}>长按多选</Text>}
               </View>
-              {viewMode === 'grid' && <Text style={styles.gridHint}>长按加入计划</Text>}
-            </View>
+            )}
+
+            {bulkNotice && (
+              <View style={styles.bulkNoticeBar}>
+                <Text style={styles.bulkNoticeText}>{bulkNotice}</Text>
+              </View>
+            )}
 
             {viewMode === 'list' ? (
               <>
@@ -242,14 +352,29 @@ export default function B50Screen() {
               </>
             ) : (
               <View key={`grid-${poolTab}`} style={styles.gridWrap}>
-                {[...poolEntries, ...ties].map(entry => (
+                {poolEntries.map(entry => (
                   <GridCell
                     key={`${entry.songId}:${entry.musicType}:${entry.difficultyIndex}`}
                     entry={entry}
                     music={rawData.find(music => music.id === entry.songId && music.type === entry.musicType)}
                     allSongs={rawData}
-                    onPress={() => openSong(entry)}
-                    onLongPress={() => quickAdd(entry)}
+                    selectionMode={selectionMode}
+                    selected={selectedKeys.has(entryKeyOf(entry))}
+                    onPress={() => (selectionMode ? toggleEntry(entry) : openSong(entry))}
+                    onLongPress={() => (selectionMode ? toggleEntry(entry) : enterSelection(entry))}
+                  />
+                ))}
+                {ties.length > 0 && <GridTieDivider count={ties.length} pool={poolTab} />}
+                {ties.map(entry => (
+                  <GridCell
+                    key={`tie-${entry.songId}:${entry.musicType}:${entry.difficultyIndex}`}
+                    entry={entry}
+                    music={rawData.find(music => music.id === entry.songId && music.type === entry.musicType)}
+                    allSongs={rawData}
+                    selectionMode={selectionMode}
+                    selected={selectedKeys.has(entryKeyOf(entry))}
+                    onPress={() => (selectionMode ? toggleEntry(entry) : openSong(entry))}
+                    onLongPress={() => (selectionMode ? toggleEntry(entry) : enterSelection(entry))}
                   />
                 ))}
               </View>
@@ -366,4 +491,49 @@ const styles = StyleSheet.create({
   gridCornerRight: { position: 'absolute', right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.62)', paddingHorizontal: 3, borderTopLeftRadius: 5 },
   gridCornerText: { fontSize: 8.5, fontWeight: '800', color: '#fff' },
   gridAchievement: { fontSize: 8.5, color: Colors.text.secondary, marginTop: 2 },
+  gridCoverSelected: { borderColor: Colors.accent.primary, borderWidth: 3 },
+  gridCheckbox: {
+    position: 'absolute', right: 3, top: 3,
+    width: 16, height: 16, borderRadius: 8,
+    borderWidth: 1.5, borderColor: '#fff',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  gridCheckboxChecked: { backgroundColor: Colors.accent.primary, borderColor: Colors.accent.primary },
+  gridCheckboxMark: { fontSize: 10, fontWeight: '900', color: '#1a0a14' },
+  gridTieDivider: {
+    width: '100%' as any,
+    alignItems: 'center',
+    paddingVertical: 6,
+    marginVertical: 4,
+    borderRadius: 8,
+    backgroundColor: Colors.bg.tertiary,
+    borderWidth: 1,
+    borderColor: Colors.border.light,
+  },
+  gridTieDividerText: { fontSize: 10, color: Colors.text.muted, fontWeight: '700', textAlign: 'center', paddingHorizontal: 8 },
+  selectionToolbar: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.bg.secondary, borderRadius: 10, padding: 8,
+    borderWidth: 1, borderColor: Colors.accent.primary,
+  },
+  selectionButton: {
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
+    backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.light,
+  },
+  selectionButtonText: { fontSize: 11, fontWeight: '800', color: Colors.text.secondary },
+  selectionCount: { flex: 1, fontSize: 12, fontWeight: '800', color: Colors.text.primary, textAlign: 'center' },
+  selectionButtonGhost: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  selectionButtonGhostText: { fontSize: 11, fontWeight: '800', color: Colors.text.muted },
+  selectionButtonPrimary: {
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8,
+    backgroundColor: Colors.accent.primary,
+  },
+  selectionButtonPrimaryText: { fontSize: 11, fontWeight: '900', color: '#1a0a14' },
+  bulkNoticeBar: {
+    alignItems: 'center', paddingVertical: 7, paddingHorizontal: 10,
+    borderRadius: 9, backgroundColor: `${Colors.functional.success}22`,
+    borderWidth: 1, borderColor: `${Colors.functional.success}66`,
+  },
+  bulkNoticeText: { fontSize: 11, fontWeight: '700', color: Colors.functional.success },
 });

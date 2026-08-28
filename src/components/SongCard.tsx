@@ -132,6 +132,8 @@ const styles = StyleSheet.create({
   b50BadgeOld: { backgroundColor: `${Colors.text.secondary}22`, borderWidth: 1, borderColor: `${Colors.text.secondary}66` },
   b50BadgeText: { fontSize: 9, fontWeight: '800', color: Colors.text.primary },
   title: {
+    // v1.14.0：占满剩余宽度并允许收缩，长曲名截断省略，B15/B35 徽标不再被顶出屏幕。
+    flex: 1,
     fontSize: 15,
     fontWeight: '700',
     color: Colors.text.primary,

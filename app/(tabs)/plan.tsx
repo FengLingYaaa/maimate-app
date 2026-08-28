@@ -140,7 +140,7 @@ export default function PushPlan() {
     });
   }, [achievedEntryIds, clearAchievedTargets]);
 
-  // v1.13.0：进度闭环——达标统计、进度百分比与「已达标/未达标」过滤。
+  // v1.14.0：进度环改为「达标 x/y」主文案；平均完成率向下取整（不再四舍五入虚报 100%）。
   const progressSummary = useMemo(() => {
     const withTarget = plannedRows.filter(row => row.entry.targetScore !== undefined);
     const achievedSet = new Set(achievedEntryIds);
@@ -153,11 +153,15 @@ export default function PushPlan() {
       const target = row.entry.targetScore!;
       percentSum += target <= current ? 100 : Math.min(100, (current / target) * 100);
     }
+    const achieved = withTarget.filter(row => achievedSet.has(row.entry.entryId)).length;
+    const rawAverage = withTarget.length > 0 ? percentSum / withTarget.length : 0;
     return {
-      achieved: withTarget.filter(row => achievedSet.has(row.entry.entryId)).length,
+      achieved,
       withTargetCount: withTarget.length,
       noTargetCount: plannedRows.length - withTarget.length,
-      averagePercent: withTarget.length > 0 ? Math.round(percentSum / withTarget.length) : 0,
+      /** 平均完成率，向下取整保留一位小数（99.67 → 99.6，永不显示 100 除非真达标）。 */
+      averagePercent: Math.floor(rawAverage * 10) / 10,
+      allAchieved: withTarget.length > 0 && achieved === withTarget.length,
     };
   }, [plannedRows, scores, achievedEntryIds]);
 
@@ -189,12 +193,19 @@ export default function PushPlan() {
         <Text style={styles.headerSub}>{entries.length > 0 ? `${entries.length} 首待练习` : '还没有添加歌曲'} · 长按曲目拖拽排序</Text>
         {progressSummary.withTargetCount > 0 && (
           <View style={styles.progressSummaryRow}>
-            <View style={styles.progressRing}>
-              <Text style={styles.progressRingText}>{progressSummary.averagePercent}%</Text>
+            <View style={[styles.progressRing, progressSummary.allAchieved && styles.progressRingDone]}>
+              <Text style={[styles.progressRingText, progressSummary.allAchieved && styles.progressRingTextDone]}>
+                {progressSummary.achieved}/{progressSummary.withTargetCount}
+              </Text>
             </View>
-            <Text style={styles.progressSummaryText}>
-              有目标 {progressSummary.withTargetCount} 首 · 已达标 {progressSummary.achieved} · 未设目标 {progressSummary.noTargetCount}
-            </Text>
+            <View style={styles.progressSummaryInfo}>
+              <Text style={styles.progressSummaryTitle}>
+                已达标 {progressSummary.achieved} / {progressSummary.withTargetCount}
+              </Text>
+              <Text style={styles.progressSummaryText}>
+                平均完成 {progressSummary.averagePercent}% · 未设目标 {progressSummary.noTargetCount}
+              </Text>
+            </View>
           </View>
         )}
         <View style={styles.b50Row}>
@@ -345,13 +356,17 @@ const styles = StyleSheet.create({
   headerSub: { fontSize: 12, lineHeight: 18, color: Colors.text.muted, marginTop: 2 },
   b50Row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, flexWrap: 'wrap', gap: 6 },
   b50Entry: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 9, backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.light },
-  progressSummaryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+  progressSummaryRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 },
   progressRing: {
-    width: 34, height: 34, borderRadius: 17, borderWidth: 3, borderColor: Colors.functional.success,
+    width: 40, height: 40, borderRadius: 20, borderWidth: 3, borderColor: Colors.accent.secondary,
     alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bg.tertiary,
   },
-  progressRingText: { fontSize: 9, fontWeight: '900', color: Colors.functional.success },
-  progressSummaryText: { fontSize: 11, color: Colors.text.muted, flex: 1 },
+  progressRingDone: { borderColor: '#ffd166' },
+  progressRingText: { fontSize: 11, fontWeight: '900', color: Colors.accent.secondary },
+  progressRingTextDone: { color: '#ffd166' },
+  progressSummaryInfo: { flex: 1, gap: 1 },
+  progressSummaryTitle: { fontSize: 12, fontWeight: '800', color: Colors.text.primary },
+  progressSummaryText: { fontSize: 10, color: Colors.text.muted },
   achieveFilterRow: { flexDirection: 'row', gap: 5 },
   achieveChip: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8, backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.light },
   achieveChipActive: { borderColor: Colors.accent.primary, backgroundColor: `${Colors.accent.primary}22` },
