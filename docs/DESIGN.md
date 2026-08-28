@@ -103,9 +103,9 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
-| 最新 Release APK SHA-256（v1.15.0，待构建后回填） | 待构建完成后更新 |
-| 最新 Release APK 大小 | 待构建完成后更新 |
-| 下载站同步状态 | v1.15.0 构建完成后同步（落地页文案待 SHA 回填后一并部署） |
+| 最新 Release APK SHA-256（v1.15.0） | `9979d845350d4cfc063d095600c499202060f713f2292deecdfc5a716b184a98`（CI「Print APK checksum」步骤输出） |
+| 最新 Release APK 大小 | 62,550,008 bytes（59.6 MB） |
+| 下载站同步状态 | 已部署：v1.15.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | 下载站同步状态 | 已部署：v1.14.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | 下载站同步状态 | 已部署：v1.11.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | APK 构建方式 | GitHub Actions 云构建：先跑 lint/route/feature/phase/rating 回归、Expo Doctor 和 Android export 门禁，再出 arm64-v8a debug keystore 内测包 |
@@ -983,3 +983,18 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 快照对比：`snapshots.tsx` 新增「对比」两步选择（旧时间在前），`buildComparisonRows` 纯函数逐谱面 diff（新增/变化/移除，达成率四位小数），头部显示记录数与服务器 RA 变化。
 - 回归与版本：六组本地回归全绿；`expo-doctor` 21/21（expo-media-library 与 SDK 对齐）；`expo export --platform android` 通过；`app.json` 升 `1.14.0`/versionCode `22`，`package.json` 升 `1.14.0`。发布补记待构建后回填。
 - 发布补记（当日）：功能提交 `d28a509`；轻量标签 `v1.14.0` 的 git 推送受 GitHub 间歇阻断影响失败约 1 小时（根因排查中发现首轮推送超时导致本地 tag 实际未创建，后续「推送失败」实为 unknown revision；创建本地 tag 后 git 协议仍被连接重置），最终改用 GitHub REST API `POST /git/refs` 直接创建 `refs/tags/v1.14.0`（api.github.com 不受阻断）成功，同样触发 `v*` push 构建事件。云构建 run `33150585789` 一次通过（lint + 6 组回归 + expo-doctor + Android export + arm64 gradle 全绿）。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.14.0>；资产 `MaiMate-latest.apk` 大小 `62,537,092` bytes（59.6 MB），SHA-256 `8efa31d9aad7b53ff9d102124152142ad4329e40020049d02821fc8b9eb82ab4`。落地页更新 v1.14.0 文案、日志、大小与 SHA 后经 wrangler 部署 Pages（deployment `23ccb281.maimate-landing.pages.dev`）；线上校验落地页 200 且含 v1.14.0 与新 SHA、`HEAD /MaiMate-latest.apk` 返回 200 / content-length `62,537,092` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（分享卡预览/存相册、红点、底部遮挡、进度环、B50 网格着色/分隔/多选、牌子定数标注、徽标防溢出、快照对比）。
+
+### v1.15.0（2026-08-28）
+
+- 背景与修复（用户反馈三连）：① B50 顶栏与手机状态栏重合——根级路由自定义头部只写了 `paddingTop: 10`，补 `insets.top`；② 新曲/旧曲切换按钮消失——根因是 v1.14 的 `{selectionToolbar ?? (池切换行)}` 写法中 selectionToolbar 表达式在网格模式恒为非空 JSX（`&&` 短路 false 时才是 null），`??` 永走左分支顶掉池切换行，改为 `showSelectionToolbar` 显式三元；③ 计划底部仍遮挡——`contentContainerStyle` paddingBottom 也被 DraggableFlatList 内部结构吃掉，`PlanDragList` 补 `ListFooterComponent` 高度占位（与 paddingBottom 双保险）。
+- 分享卡表格布局（用户点名）：`B50ShareCard` 重写为旧曲 35 上（7×5）+ 新曲 15 下（3×5）表格，每格 = 难度色外框曲绘 + 左下定数 + 右下 Rating + 正下方完成率（着色底纹）；新增 `Fit50ShareCard` 全 50 格（10×5）同款；池汇总 chips 行 + 服务器 RA。
+- 拟合 50（新功能）：`src/data/fit50.ts` `computeFit50(rawData, scores, chartStats)` 纯函数——全库有成绩谱面按拟合定数（chart_stats fit_diff）计算单谱 Rating = floor(fit_diff × ach/100 × 系数)，排除无 fit_diff 谱面，取最高 50；B50 页升级为 B50/拟合50 双模式（segment 切换、汇总卡、排序切换「按 Rating/按拟合定数」`sortFit50Entries`、列表/网格/多选/分享全共享，网格同分分隔仅 B50 模式）；chartStats 未加载时显示「拟合定数加载中，榜单暂不完整」提示条（补充提交 `884b35f`）；数据获取路径与详情页一致（浏览任意详情页自动缓存全库 fit_diff）。
+- 展示组件抽公共模块：`src/components/RatingGrid.tsx`（UnifiedEntry 统一视图模型 + `b50ToUnified`/`fitToUnified` 映射 + `RatingEntryRow`/`RatingGridCell`/`RatingTieDivider`），B50 与拟合 50 共用；网格完成率底纹 = 曲绘下 3px 着色进度条（金/绿/灰三档与文本同色）。
+- 快照推分战报：`src/data/snapshot-battle.ts` `buildSnapshotBattleReport` 纯函数——逐曲（曲绘/曲名/难度徽章/旧→新达成率/单谱 ±Rating）+ 汇总条（Rating 总变化/新增/上分/移除计数/服务器 RA 变化）；`snapshots.tsx` 重写为战报卡片；联表曲名曲绘经 `rawData`（songId+type）。
+- 计划排序切换：plan.tsx「手动序/缺口优先」chips——缺口 = 目标 Rating − 当前 Rating（官方定数计算），未设目标 = +∞ 排最前、已达标 = −∞ 排最后；缺口序下副标题提示且 `canDrag` 关闭（沿用手动序判断）。
+- 快照保留数量：`AppSettings.snapshotLimit`（默认 20，1–1000），`normalizeSnapshotLimit` 归一化（非法/越界回退），settings-store 加载/更新与 backup normalizeSettings 均走该口径；`syncScores` 按 `settings.snapshotLimit` 裁剪；设置页新增数字输入（onBlur/onSubmitEditing 提交，调高 Alert 警告「数量越多占用存储越多」，调低提示旧快照将在下次同步时自动裁剪）；同步状态卡文案随设置联动（不再硬编码 6）。
+- 详情页曲绘大图：hero 曲绘 Pressable → 自绘全屏 overlay Modal（512×512 源图、点背景关闭）；说明 Diving-Fish covers CDN 实际返回 512×512 PNG（本地缓存同源）。
+- 界面精简：删设置页「只读同步成绩…」隐私提示（v1.10 时代文案）；删 B 站面板「深链诊断」折叠区（diagVisible state、describeDeepLink、getDirectVideoAppUrls/isBilibiliShortLink import 与 diag* 样式一并清理）。
+- 回归与版本：feature-check 新增拟合 50（Rating 数值/缺 fit_diff 排除/排序切换）、快照战报（上分 +12/新增/总变化）、快照上限归一化断言；六组本地回归全绿；`expo-doctor` 21/21（expo、expo-constants 对齐 ~57.0.18/~57.0.16）；`expo export --platform android` 通过；`app.json` 升 `1.15.0`/versionCode `23`，`package.json` 升 `1.15.0`。
+- 工程事故记录：版本号用 `Set-Content -Encoding UTF8` 批量替换时给 package.json/app.json 写入 BOM（PS 5.1 UTF8 = UTF-8 BOM），tsx 因 BOM 解析 package.json 失败导致三组回归报错；app.json 中文内容被 GBK 写坏后 `git restore` 恢复。教训：PowerShell 5.1 批量改文件必须用 `[System.IO.File]::WriteAllText`（无 BOM 重载）或 edit 工具。
+- 发布补记（当日）：功能提交 `e1d5846`（22 文件 +1168/−486）、补充 `884b35f`（拟合 50 加载提示）；轻量标签 `v1.15.0` git 推送一次成功（本季度首次未被阻断）。云构建 run `33171695275` 一次通过。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.15.0>；资产 `MaiMate-latest.apk` 大小 `62,550,008` bytes（59.6 MB），SHA-256 `9979d845350d4cfc063d095600c499202060f713f2292deecdfc5a716b184a98`。落地页更新 v1.15.0 文案、日志与 SHA 后经 wrangler 部署 Pages（deployment `c4012395.maimate-landing.pages.dev`）；线上校验落地页 200 且含 v1.15.0 与新 SHA（CDN 缓存约 40s 内刷新）、`HEAD /MaiMate-latest.apk` 返回 200 / content-length `62,550,008` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（A3 全部 11 项：顶栏安全区、池切换、计划底部、B50/拟合50 分享卡表格、拟合 50 榜单与排序、曲绘大图、两处删减、快照战报、计划缺口排序、网格底纹、快照数量设置）。
