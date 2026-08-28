@@ -103,8 +103,8 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
-| 最新 Release APK SHA-256（v1.13.0，待 v1.14.0 构建后更新） | `d07a14b3d1c98e1c5f1de190cc4f72b0af766dcbe37679a065f5d579788c869f`（CI「Print APK checksum」步骤输出） |
-| 最新 Release APK 大小 | 62,336,434 bytes（59.4 MB，v1.13.0；待 v1.14.0 构建后更新） |
+| 最新 Release APK SHA-256（v1.14.0） | `8efa31d9aad7b53ff9d102124152142ad4329e40020049d02821fc8b9eb82ab4`（CI「Print APK checksum」步骤输出） |
+| 最新 Release APK 大小 | 62,537,092 bytes（59.6 MB） |
 | 下载站同步状态 | 已部署：v1.13.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | 下载站同步状态 | 已部署：v1.12.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | 下载站同步状态 | 已部署：v1.11.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
@@ -963,3 +963,4 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - B50 网格增强（修⑧+着色+多选）：正榜与同分附加曲目之间插入 `GridTieDivider` 全宽分隔条；完成率按 `achievementTier` 三档着色（≥100.5 金 / ≥100 绿 / <100 灰紫，纯函数 `achievementTier`+`ACHIEVEMENT_TIER_COLORS` 导出便于测试）；长按任一格进入多选模式（已在计划条目默认打钩），格子右上角自绘勾选圈，顶部自绘工具栏（全选/已选 N/取消/加入计划）替代原生 Alert，Android 返回键先退选择，提交后 `bulkAddEntries` 并 Toast 结果（自动跳过已存在）。
 - 快照对比：`snapshots.tsx` 新增「对比」两步选择（旧时间在前），`buildComparisonRows` 纯函数逐谱面 diff（新增/变化/移除，达成率四位小数），头部显示记录数与服务器 RA 变化。
 - 回归与版本：六组本地回归全绿；`expo-doctor` 21/21（expo-media-library 与 SDK 对齐）；`expo export --platform android` 通过；`app.json` 升 `1.14.0`/versionCode `22`，`package.json` 升 `1.14.0`。发布补记待构建后回填。
+- 发布补记（当日）：功能提交 `d28a509`；轻量标签 `v1.14.0` 的 git 推送受 GitHub 间歇阻断影响失败约 1 小时（根因排查中发现首轮推送超时导致本地 tag 实际未创建，后续「推送失败」实为 unknown revision；创建本地 tag 后 git 协议仍被连接重置），最终改用 GitHub REST API `POST /git/refs` 直接创建 `refs/tags/v1.14.0`（api.github.com 不受阻断）成功，同样触发 `v*` push 构建事件。云构建 run `33150585789` 一次通过（lint + 6 组回归 + expo-doctor + Android export + arm64 gradle 全绿）。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.14.0>；资产 `MaiMate-latest.apk` 大小 `62,537,092` bytes（59.6 MB），SHA-256 `8efa31d9aad7b53ff9d102124152142ad4329e40020049d02821fc8b9eb82ab4`。落地页更新 v1.14.0 文案、日志、大小与 SHA 后经 wrangler 部署 Pages（deployment `23ccb281.maimate-landing.pages.dev`）；线上校验落地页 200 且含 v1.14.0 与新 SHA、`HEAD /MaiMate-latest.apk` 返回 200 / content-length `62,537,092` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（分享卡预览/存相册、红点、底部遮挡、进度环、B50 网格着色/分隔/多选、牌子定数标注、徽标防溢出、快照对比）。
