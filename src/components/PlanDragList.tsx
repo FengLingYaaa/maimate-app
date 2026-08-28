@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import DraggableFlatList, { ScaleDecorator, type RenderItemParams } from 'react-native-draggable-flatlist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../constants';
+import { LIST_BOTTOM_INSET } from '../constants/layout';
 import type { MusicData, PlanEntry, PlayerScore } from '../data/types';
 import { PlanEntryCard } from './PlanEntryCard';
 
@@ -81,7 +82,7 @@ export function PlanDragList({
         onReorder(orderedIds);
       }}
       contentContainerStyle={styles.content}
-      ListFooterComponent={<View style={{ height: 96 + insets.bottom }} />}
+      ListFooterComponent={<View style={{ height: LIST_BOTTOM_INSET + insets.bottom }} />}
       showsVerticalScrollIndicator
       keyboardShouldPersistTaps="handled"
       removeClippedSubviews={false}

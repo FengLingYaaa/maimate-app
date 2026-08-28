@@ -96,15 +96,15 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | v1.12.0 功能主体（前一代 `213e7c6` 为 v1.11.0 landing SHA 回填） |
-| 当前标签 | v1.12.0 待打（v1.11.0 及更早标签均已发布） |
+| 当前提交 | v1.13.0 功能主体（前一代 `0e61fa4` 为 v1.12.0 landing SHA 回填） |
+| 当前标签 | v1.13.0 待打（v1.12.0 及更早标签均已发布） |
 | Android applicationId | `cc.flya.maimate` |
-| App 版本 | `1.12.0`（Android versionCode `20`） |
+| App 版本 | `1.13.0`（Android versionCode `21`） |
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
-| 最新 Release APK SHA-256（v1.12.0） | `72557b93f6bcf9301d222a551fb422778c0603bcb17b957f1c105440b9cb4e3e`（CI「Print APK checksum」步骤输出） |
-| 最新 Release APK 大小 | 62,292,306 bytes（59.4 MB） |
+| 最新 Release APK SHA-256（v1.12.0，待 v1.13.0 构建后更新） | `72557b93f6bcf9301d222a551fb422778c0603bcb17b957f1c105440b9cb4e3e`（CI「Print APK checksum」步骤输出） |
+| 最新 Release APK 大小 | 62,292,306 bytes（59.4 MB，v1.12.0；待 v1.13.0 构建后更新） |
 | 下载站同步状态 | 已部署：v1.12.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | 下载站同步状态 | 已部署：v1.11.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | APK 构建方式 | GitHub Actions 云构建：先跑 lint/route/feature/phase/rating 回归、Expo Doctor 和 Android export 门禁，再出 arm64-v8a debug keystore 内测包 |
@@ -932,3 +932,18 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 回归测试：feature-check 删除 v1.11 跨组拖拽断言；新增 ties 断言（40 首同分旧曲 → 35 入榜 + 5 未入榜 ties 且 ID 稳定 985–989）、`computeB50Gain` 断言（非法目标/不在库→null、Song 1 成绩 90→100.5 增量=新旧单谱 Rating 差、低定数谱面即使 100.5% 也进不了池→+0）、CSV 断言（表头逐列、含逗号引号值转义、CRLF 结尾）。
 - 版本与验证：`app.json` 升 `1.12.0`/versionCode `20`，`package.json` 升 `1.12.0`；本地全绿——tsc、route/feature/phase-af/rating/backup/update 六组回归、`expo-doctor` 21/21、`expo export --platform android`（4.4MB hbc）。
 - 发布补记（当日）：功能提交 `8f03358`，打轻量标签 `v1.12.0` 推送（GitHub 间歇阻断约 5 分钟，第 3 次重试成功）触发云构建 run `33097427159`，一次通过（lint + 6 组回归 + expo-doctor + Android export + arm64 gradle 全绿）。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.12.0>；资产 `MaiMate-latest.apk` 大小 `62,292,306` bytes（59.4 MB），SHA-256 `72557b93f6bcf9301d222a551fb422778c0603bcb17b957f1c105440b9cb4e3e`（取自 CI「Print APK checksum」步骤输出）。落地页更新 v1.12.0 文案、日志与 SHA 后经 wrangler 部署 Pages（deployment `647c6a8e.maimate-landing.pages.dev`）；线上校验落地页 200 且含 v1.12.0 与新 SHA、`HEAD /MaiMate-latest.apk` 返回 200 / content-length `62,292,306` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（无分组拖拽、B50 分池/染色/同分附加、目标增量、曲库徽标、CSV 导出、清已达）。
+
+### 2026-08-28 — v1.13.0：牌子页排序/文案/状态记忆、计划进度闭环、B50 网格模式与修复、查分分享卡片、快照管理
+
+- 用户目标：① 牌子查询页歌曲按 Master 定数从大到小排布；② 推分计划最下侧一首仍被下边栏遮挡，留空一些；③「一键加入 14+」改为「一键加入 14 以上谱面」避免歧义；④ 曲库 B50 徽标区分 B15（新曲15）/B35（旧曲35）；⑤ 曲库筛选后进 B50 只显示筛选曲目——B50 不应被筛选影响（bug）；⑥ B50 加图标模式（每行 5 首，难度色框住曲绘，左下定数、右下 Rating、正下方完成率）。追加：推分进度闭环、查分分享卡片（B50 + 单曲）、牌子页状态记忆、快照管理 UI、B50 网格长按快捷入计划。曲绘识别经方案讨论后本版不做。
+- 牌子页（修①③）：`mergedRows` 按 `music.ds[3]` 降序排列（无 Master 定数排末尾）；按钮与 Toast 文案 14+ → 14 以上。
+- 底部遮挡（修②）：新建 `src/constants/layout.ts` 统一 `LIST_BOTTOM_INSET = 160`（原 96），`PlanDragList` footer 与牌子页 `paddingBottom` 共用。
+- B50 徽标（修④）：`SongCard` 徽标文案按 pool 显示 `B15 #N` / `B35 #N`。
+- B50 数据源修复（修⑤根因）：`app/b50.tsx` 从 `musicList`（应用筛选后的列表）改为 `rawData`（全量曲库），与曲库徽标数据源一致。
+- B50 网格模式（修⑥）：页头右上 ⊞/☰ 切换（useState 保持）；每行 5 格，曲绘 2px 难度色边框，左下定数、右下 Rating 半透明胶囊，正下方完成率；网格模式下提示「长按加入计划」。
+- B50 网格长按入计划：`quickAdd` 确认弹窗（已在计划中则提示），调用 `plan-store.addEntry`。
+- 推分进度闭环：`PlanEntryCard` 加进度条（当前→目标百分比，达标变绿显示「已达标 ✓」）；`plan.tsx` 头部加进度摘要环（平均进度%）+ 统计（有目标/已达标/未设目标）+「全部/已达标/未达标」过滤 chips；过滤状态下禁用拖拽（`canDrag` 需 `achieveFilter === 'all'`）。
+- 查分分享卡片：新增 `react-native-view-shot@5.1.0`（expo-doctor 对齐版本）；`src/data/share-card.ts`（`captureAndShare`：captureRef → 缓存文件 → expo-sharing 分享 → 清理）；`src/components/B50ShareCard.tsx`（总分+两池+服务器 RA+新曲 TOP15/旧曲 TOP35 曲绘网格，曲绘难度色框，屏外渲染 collapsable 隐藏）；`src/components/SongShareCard.tsx`（曲绘+曲名/曲师+难度徽章+定数/完成率→Rating/FC/FS 徽章）；B50 页头部「分享」按钮与详情页「分享成绩卡片」按钮触发。
+- 牌子页状态记忆：版本/国区/难度筛选、筛选区收起、低难度展开状态持久化到 AsyncStorage（`maimate_plates_ui_state`），hydration 前不回写。
+- 快照管理 UI：`score-store` 新增 `deleteSnapshot(id)`（过滤+持久化）；新建设置子页 `snapshots.tsx`（按时间倒序列出快照、记录数/服务器 RA、删除需确认），设置页同步状态卡加「管理快照 →」入口；`route-check` settings children 加 `snapshots`。
+- 回归与版本：route-check 更新；`app.json` 升 `1.13.0`/versionCode `21`，`package.json` 升 `1.13.0`；本地全绿——tsc、六组回归、`expo-doctor` 21/21（view-shot 降到 SDK 映射版本 5.1.0）、`expo export --platform android`。发布补记待构建后回填。

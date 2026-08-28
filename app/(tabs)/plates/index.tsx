@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, DifficultyColorMap, DifficultyLabels, DifficultyShortLabels } from '../../../src/constants';
+import { LIST_BOTTOM_INSET } from '../../../src/constants/layout';
 import { CoverImage } from '../../../src/components';
 import { useMusicStore, usePlanStore, useScoreStore } from '../../../src/store';
 import {
@@ -35,15 +37,48 @@ export default function PlatesPage() {
   const bulkAddEntries = usePlanStore(s => s.bulkAddEntries);
   const bulkRemoveEntries = usePlanStore(s => s.bulkRemoveEntries);
 
+  // v1.13.0：牌子页状态记忆——筛选与展开状态持久化，下次进入保持。
+  const PLATES_STATE_KEY = 'maimate_plates_ui_state';
   const [version, setVersion] = useState('全部');
   const [chinaVersion, setChinaVersion] = useState<string | undefined>();
   const [difficultyIndex, setDifficultyIndex] = useState<number | undefined>();
+  const [filtersCollapsed, setFiltersCollapsed] = useState(true);
+  const [showLowDifficulties, setShowLowDifficulties] = useState(false);
+  const [stateHydrated, setStateHydrated] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(PLATES_STATE_KEY);
+        if (raw && !cancelled) {
+          const saved = JSON.parse(raw) as { version?: string; chinaVersion?: string; difficultyIndex?: number; filtersCollapsed?: boolean; showLowDifficulties?: boolean };
+          if (typeof saved.version === 'string') setVersion(saved.version);
+          if (typeof saved.chinaVersion === 'string') setChinaVersion(saved.chinaVersion);
+          if (typeof saved.difficultyIndex === 'number') setDifficultyIndex(saved.difficultyIndex);
+          if (typeof saved.filtersCollapsed === 'boolean') setFiltersCollapsed(saved.filtersCollapsed);
+          if (typeof saved.showLowDifficulties === 'boolean') setShowLowDifficulties(saved.showLowDifficulties);
+        }
+      } catch {
+        // 读取失败用默认值。
+      } finally {
+        if (!cancelled) setStateHydrated(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!stateHydrated) return;
+    AsyncStorage.setItem(PLATES_STATE_KEY, JSON.stringify({ version, chinaVersion, difficultyIndex, filtersCollapsed, showLowDifficulties }))
+      .catch(() => undefined);
+  }, [stateHydrated, version, chinaVersion, difficultyIndex, filtersCollapsed, showLowDifficulties]);
+
   const [lastBulkKeys, setLastBulkKeys] = useState<string[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
-  // 版本筛选默认收起：避免筛选区过高挤占曲目列表。
-  const [filtersCollapsed, setFiltersCollapsed] = useState(true);
-  // v1.11.0：默认聚焦 Master/ReMaster，低难度（Basic/Advanced/Expert）收起。
-  const [showLowDifficulties, setShowLowDifficulties] = useState(false);
   // 进入页面时强制刷新一次：修复嵌套 Stack 初次渲染偶发空白、
   // 点击筛选后才显示的问题。
   const [focusTick, setFocusTick] = useState(0);
@@ -67,7 +102,18 @@ export default function PlatesPage() {
   const chinaOptions = useMemo(() => getPlateChinaVersionOptions(plateEntries), [plateEntries]);
   const byDifficulty = useMemo(() => summarizePlatesByDifficulty(filtered), [filtered]);
   const total = useMemo(() => summarizePlates(filtered), [filtered]);
-  const mergedRows = useMemo(() => mergePlateRows(filtered), [filtered]);
+  const mergedRows = useMemo(() => {
+    const rows = mergePlateRows(filtered);
+    // v1.13.0：按 Master（难度 3）定数从大到小排布；无 Master 定数的曲排末尾。
+    return [...rows].sort((left, right) => {
+      const leftDs = left.music.ds[3];
+      const rightDs = right.music.ds[3];
+      if (Number.isFinite(leftDs) && Number.isFinite(rightDs)) return rightDs - leftDs;
+      if (Number.isFinite(leftDs)) return -1;
+      if (Number.isFinite(rightDs)) return 1;
+      return left.music.id.localeCompare(right.music.id);
+    });
+  }, [filtered]);
   // 总计卡与曲目行按同一开关过滤低难度；空数组表示全难度。
   const visibleDifficulties = useMemo(
     () => (showLowDifficulties ? undefined : [3, 4]),
@@ -115,11 +161,11 @@ export default function PlatesPage() {
       musicType: entry.music.type,
     })));
     if (added.length === 0) {
-      setNotice('选中的 14+ 谱面都已在推分计划中');
+      setNotice('选中的 14 以上谱面都已在推分计划中');
       return;
     }
     setLastBulkKeys(added);
-    setNotice(`已把 ${added.length} 张 14+ 谱面加入推分计划`);
+    setNotice(`已把 ${added.length} 张 14 以上谱面加入推分计划`);
   };
 
   const handleBulkUndo = () => {
@@ -194,7 +240,7 @@ export default function PlatesPage() {
             onPress={handleBulkAdd}
             disabled={pendingCount === 0}
           >
-            <Text style={styles.bulkButtonText}>⚡ 一键加入 14+（{pendingCount}）</Text>
+            <Text style={styles.bulkButtonText}>⚡ 一键加入 14 以上谱面（{pendingCount}）</Text>
           </Pressable>
           {lastBulkKeys.length > 0 && (
             <Pressable style={({ pressed }) => [styles.undoButton, pressed && styles.pressed]} onPress={handleBulkUndo}>
@@ -222,7 +268,7 @@ export default function PlatesPage() {
         data={mergedRows}
         keyExtractor={item => item.key}
         removeClippedSubviews={false}
-        contentContainerStyle={[styles.list, { paddingBottom: 96 + insets.bottom }]}
+        contentContainerStyle={[styles.list, { paddingBottom: LIST_BOTTOM_INSET + insets.bottom }]}
         ListHeaderComponent={listHeader}
         ListEmptyComponent={listEmpty}
         renderItem={({ item }) => (

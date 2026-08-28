@@ -15,6 +15,7 @@ export default function SettingsStackLayout() {
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="data-backup" options={{ title: '数据备份' }} />
+      <Stack.Screen name="snapshots" options={{ title: '快照管理' }} />
       <Stack.Screen name="update" options={{ title: '检查更新' }} />
     </Stack>
   );

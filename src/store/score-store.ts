@@ -27,6 +27,8 @@ interface ScoreStore {
   loaded: boolean;
   tokenConfigured: boolean;
   loadScores: () => Promise<void>;
+  /** v1.13.0：删除指定快照（快照管理 UI 使用），持久化同步更新。 */
+  deleteSnapshot: (snapshotId: string) => Promise<void>;
   verifyAndSaveToken: (value: string) => Promise<void>;
   clearToken: () => Promise<void>;
   syncScores: () => Promise<void>;
@@ -183,5 +185,11 @@ export const useScoreStore = create<ScoreStore>((set, get) => ({
   clearScores: async () => {
     await AsyncStorage.multiRemove([CACHE_KEYS.scoreData, CACHE_KEYS.scoreSnapshots, CACHE_KEYS.scoreChanges]);
     set({ scores: [], profile: null, sync: initialSync, snapshots: [], changes: [] });
+  },
+
+  deleteSnapshot: async snapshotId => {
+    const snapshots = get().snapshots.filter(snapshot => snapshot.id !== snapshotId);
+    await AsyncStorage.setItem(CACHE_KEYS.scoreSnapshots, JSON.stringify(snapshots));
+    set({ snapshots });
   },
 }));

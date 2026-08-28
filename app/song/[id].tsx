@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '../../src/store';
-import { BilibiliSearchPanel, CoverImage, DifficultyBadge, NoteBar, RatingPanel, AchievementLossCard, MusicPlatformBoard } from '../../src/components';
+import { BilibiliSearchPanel, CoverImage, DifficultyBadge, NoteBar, RatingPanel, AchievementLossCard, MusicPlatformBoard, SongShareCard } from '../../src/components';
 import { Colors } from '../../src/constants';
 import { DifficultyLabels, getChinaVersionName } from '../../src/constants/game';
 import { getOfficialChartConstant, getTotalNotes } from '../../src/data/music-list';
@@ -134,6 +134,8 @@ export default function SongDetail() {
     score.songId === music.id && score.type === music.type && score.difficultyIndex === selectedDiff,
   );
   const inPlan = isInPlan(music.id, selectedDiff, music.type);
+  // v1.13.0：单曲成绩分享卡片。
+  const [songShareCapture, setSongShareCapture] = useState<(() => Promise<void>) | null>(null);
   const commitCustomTarget = () => {
     const normalized = customTarget.trim().replace(',', '.');
     if (!normalized) {
@@ -301,6 +303,17 @@ export default function SongDetail() {
                 ) : (
                   <Text style={styles.importedScoreEmpty}>尚未导入该难度成绩</Text>
                 )}
+
+                <Pressable style={styles.shareCardButton} onPress={() => void songShareCapture?.()}>
+                  <Text style={styles.shareCardButtonText}>分享成绩卡片</Text>
+                </Pressable>
+                <SongShareCard
+                  music={music}
+                  difficultyIndex={selectedDiff}
+                  score={currentScore}
+                  officialConstant={ds}
+                  onReady={setSongShareCapture}
+                />
 
                 {boardOrder.map(boardId => {
                   switch (boardId) {
@@ -553,6 +566,19 @@ const styles = StyleSheet.create({
   importedScoreEmpty: {
     fontSize: 11,
     color: Colors.text.muted,
+  },
+  shareCardButton: {
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: `${Colors.accent.primary}1a`,
+    borderWidth: 1,
+    borderColor: Colors.accent.primary,
+  },
+  shareCardButtonText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.accent.primary,
   },
   totalNotes: {
     alignItems: 'center',

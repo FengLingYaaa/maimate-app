@@ -55,7 +55,7 @@ export const SongCard = memo(function SongCard({
           </Text>
           {b50Badge && (
             <View style={[styles.b50Badge, b50Badge.pool === 'new' ? styles.b50BadgeNew : styles.b50BadgeOld]}>
-              <Text style={styles.b50BadgeText}>B50 #{b50Badge.rank}</Text>
+              <Text style={styles.b50BadgeText}>{b50Badge.pool === 'new' ? 'B15' : 'B35'} #{b50Badge.rank}</Text>
             </View>
           )}
         </View>

@@ -35,6 +35,12 @@ export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, 
   const difficultyColor = DifficultyColorMap[entry.difficultyIndex] || Colors.accent.secondary;
   const [editingTarget, setEditingTarget] = useState(false);
   const showTargetPicker = entry.targetScore === undefined || editingTarget;
+  // v1.13.0：进度闭环——当前达成率向目标的进度（无成绩按 0 起步）。
+  const current = importedScore?.achievement ?? 0;
+  const achieved = entry.targetScore !== undefined && current >= entry.targetScore;
+  const progressPercent = entry.targetScore === undefined || entry.targetScore <= current
+    ? (entry.targetScore !== undefined ? 100 : 0)
+    : (current / entry.targetScore) * 100;
   const chooseTarget = (score: number | null) => {
     onTarget(score);
     setEditingTarget(false);
@@ -80,6 +86,16 @@ export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, 
           </Pressable>
         )}
         {officialConstant === null && <Text style={styles.warning}>宴会场或数据缺失：不计算官方目标 Rating。</Text>}
+        {entry.targetScore !== undefined && (
+          <View style={styles.progressWrap}>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${Math.min(100, Math.max(0, progressPercent))}%` as any, backgroundColor: achieved ? Colors.functional.success : Colors.accent.primary }]} />
+            </View>
+            <Text style={[styles.progressText, achieved && styles.progressTextDone]}>
+              {achieved ? '已达标 ✓' : `${current.toFixed(2)}% → ${entry.targetScore!.toFixed(2)}%（还差 ${(entry.targetScore! - current).toFixed(2)}%）`}
+            </Text>
+          </View>
+        )}
         {importedScore ? (
           <Text style={styles.scoreText}>当前成绩：{formatAchievement(importedScore.achievement)} · DX {importedScore.dxScore}{importedScore.fc ? ` · ${importedScore.fc}` : ''}{importedScore.fs ? ` · ${importedScore.fs}` : ''}{importedScore.serverRating === undefined ? '' : ` · RA ${importedScore.serverRating}`}</Text>
         ) : <Text style={styles.scoreMuted}>当前成绩：尚未导入或没有匹配的成绩</Text>}
@@ -120,6 +136,11 @@ const styles = StyleSheet.create({
   targetSummaryText: { fontSize: 12, color: Colors.text.primary, fontWeight: '800' },
   targetRating: { fontSize: 12, color: Colors.accent.primary, fontWeight: '800' },
   editHint: { fontSize: 9, color: Colors.text.muted },
+  progressWrap: { gap: 3 },
+  progressTrack: { height: 5, borderRadius: 3, backgroundColor: Colors.bg.tertiary, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 3 },
+  progressText: { fontSize: 9.5, color: Colors.text.muted },
+  progressTextDone: { color: Colors.functional.success, fontWeight: '800' },
   warning: { fontSize: 10, lineHeight: 14, color: Colors.functional.warning },
   scoreText: { fontSize: 11, lineHeight: 16, color: Colors.functional.success },
   scoreMuted: { fontSize: 11, color: Colors.text.muted },

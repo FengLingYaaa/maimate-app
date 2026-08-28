@@ -156,6 +156,11 @@ export default function SettingsPage() {
            <Text style={styles.syncText}>本地快照：{snapshots.length} 次（最多保留最近 6 次）</Text>
           <Text style={styles.syncText}>上次同步：{sync.lastSyncedAt ? new Date(sync.lastSyncedAt).toLocaleString() : '尚未同步'}</Text>
           {!!sync.message && <Text style={styles.messageText}>{sync.message}</Text>}
+          {snapshots.length > 0 && (
+            <Pressable style={styles.snapshotLink} onPress={() => router.push('/settings/snapshots' as any)}>
+              <Text style={styles.snapshotLinkText}>管理快照 →</Text>
+            </Pressable>
+          )}
         </View>
         {changes.length > 0 && (
            <View style={styles.syncCard}>
@@ -241,6 +246,8 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.5 },
   configuredText: { fontSize: 11, color: Colors.functional.success },
   messageText: { fontSize: 11, lineHeight: 16, color: Colors.functional.warning },
+  snapshotLink: { marginTop: 4, alignSelf: 'flex-start' },
+  snapshotLinkText: { fontSize: 11, fontWeight: '800', color: Colors.accent.secondary },
   buttonRow: { flexDirection: 'row', gap: 8 },
   secondaryButton: { flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: 10, backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.medium },
   secondaryButtonText: { fontSize: 12, fontWeight: '700', color: Colors.accent.secondary },

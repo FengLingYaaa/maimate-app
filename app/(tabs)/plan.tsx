@@ -140,6 +140,38 @@ export default function PushPlan() {
     });
   }, [achievedEntryIds, clearAchievedTargets]);
 
+  // v1.13.0：进度闭环——达标统计、进度百分比与「已达标/未达标」过滤。
+  const progressSummary = useMemo(() => {
+    const withTarget = plannedRows.filter(row => row.entry.targetScore !== undefined);
+    const achievedSet = new Set(achievedEntryIds);
+    let percentSum = 0;
+    for (const row of withTarget) {
+      const score = scores.find(item => item.songId === row.music.id
+        && item.type === row.music.type
+        && item.difficultyIndex === row.entry.difficultyIndex);
+      const current = score?.achievement ?? 0;
+      const target = row.entry.targetScore!;
+      percentSum += target <= current ? 100 : Math.min(100, (current / target) * 100);
+    }
+    return {
+      achieved: withTarget.filter(row => achievedSet.has(row.entry.entryId)).length,
+      withTargetCount: withTarget.length,
+      noTargetCount: plannedRows.length - withTarget.length,
+      averagePercent: withTarget.length > 0 ? Math.round(percentSum / withTarget.length) : 0,
+    };
+  }, [plannedRows, scores, achievedEntryIds]);
+
+  const [achieveFilter, setAchieveFilter] = useState<'all' | 'achieved' | 'unachieved'>('all');
+  const displayRows = useMemo(() => {
+    if (achieveFilter === 'all') return filteredRows;
+    const achievedSet = new Set(achievedEntryIds);
+    return filteredRows.filter(row => {
+      if (row.entry.targetScore === undefined) return achieveFilter === 'unachieved';
+      const achieved = achievedSet.has(row.entry.entryId);
+      return achieveFilter === 'achieved' ? achieved : !achieved;
+    });
+  }, [filteredRows, achieveFilter, achievedEntryIds]);
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -155,16 +187,41 @@ export default function PushPlan() {
           </View>
         </View>
         <Text style={styles.headerSub}>{entries.length > 0 ? `${entries.length} 首待练习` : '还没有添加歌曲'} · 长按曲目拖拽排序</Text>
-        <Pressable style={styles.b50Entry} onPress={() => router.push('/b50')}>
-          <Text style={styles.b50EntryText}>B50 总览 →</Text>
-        </Pressable>
+        {progressSummary.withTargetCount > 0 && (
+          <View style={styles.progressSummaryRow}>
+            <View style={styles.progressRing}>
+              <Text style={styles.progressRingText}>{progressSummary.averagePercent}%</Text>
+            </View>
+            <Text style={styles.progressSummaryText}>
+              有目标 {progressSummary.withTargetCount} 首 · 已达标 {progressSummary.achieved} · 未设目标 {progressSummary.noTargetCount}
+            </Text>
+          </View>
+        )}
+        <View style={styles.b50Row}>
+          <Pressable style={styles.b50Entry} onPress={() => router.push('/b50')}>
+            <Text style={styles.b50EntryText}>B50 总览 →</Text>
+          </Pressable>
+          {progressSummary.withTargetCount > 0 && (
+            <View style={styles.achieveFilterRow}>
+              {([['all', '全部'], ['achieved', '已达标'], ['unachieved', '未达标']] as const).map(([value, label]) => (
+                <Pressable
+                  key={value}
+                  style={[styles.achieveChip, achieveFilter === value && styles.achieveChipActive]}
+                  onPress={() => setAchieveFilter(value)}
+                >
+                  <Text style={[styles.achieveChipText, achieveFilter === value && styles.achieveChipTextActive]}>{label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
       </View>
       <FilterBar
         filters={filters}
         onApply={setFilters}
         onClear={() => setFilters({})}
         totalCount={plannedRows.length}
-        filteredCount={filteredRows.length}
+        filteredCount={displayRows.length}
         getPreviewCount={getPreviewCount}
         genres={genres}
         versionOptions={versionOptions}
@@ -174,12 +231,15 @@ export default function PushPlan() {
       />
       {plannedRows.length === 0 ? (
         <EmptyPlan />
-      ) : filteredRows.length === 0 ? (
-        <View style={styles.empty}><Text style={styles.emptyText}>没有匹配的计划条目</Text><Pressable onPress={() => setFilters({})}><Text style={styles.clearLink}>清除筛选</Text></Pressable></View>
+      ) : displayRows.length === 0 ? (
+        <View style={styles.empty}>
+          <Text style={styles.emptyText}>{achieveFilter === 'all' ? '没有匹配的计划条目' : (achieveFilter === 'achieved' ? '还没有已达标条目' : '全部条目都已达标')}</Text>
+          <Pressable onPress={() => { setFilters({}); setAchieveFilter('all'); }}><Text style={styles.clearLink}>清除全部筛选</Text></Pressable>
+        </View>
       ) : (
         <PlanDragList
-          rows={filteredRows}
-          canDrag={manualOrderView}
+          rows={displayRows}
+          canDrag={manualOrderView && achieveFilter === 'all'}
           showChinaVersion={settings.showChinaVersion}
           showProjectedRating={settings.showProjectedRating}
           allSongs={rawData}
@@ -187,7 +247,7 @@ export default function PushPlan() {
           getScore={getScore}
           onOpen={row => router.push({ pathname: '/song/[id]' as any, params: { id: row.music.id, type: row.music.type, difficultyIndex: String(row.entry.difficultyIndex), source: 'plan' } })}
           onRemove={entryId => {
-            const row = filteredRows.find(item => item.entry.entryId === entryId);
+            const row = displayRows.find(item => item.entry.entryId === entryId);
             if (row) handleRemove(row);
           }}
           onTarget={updateTargetScoreById}
@@ -283,7 +343,20 @@ const styles = StyleSheet.create({
   graveyardBadgeText: { fontSize: 9, color: '#fff', fontWeight: '800' },
   headerTitle: { fontSize: 26, fontWeight: '800', color: Colors.text.primary },
   headerSub: { fontSize: 12, lineHeight: 18, color: Colors.text.muted, marginTop: 2 },
-  b50Entry: { alignSelf: 'flex-start', marginTop: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 9, backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.light },
+  b50Row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, flexWrap: 'wrap', gap: 6 },
+  b50Entry: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 9, backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.light },
+  progressSummaryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+  progressRing: {
+    width: 34, height: 34, borderRadius: 17, borderWidth: 3, borderColor: Colors.functional.success,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bg.tertiary,
+  },
+  progressRingText: { fontSize: 9, fontWeight: '900', color: Colors.functional.success },
+  progressSummaryText: { fontSize: 11, color: Colors.text.muted, flex: 1 },
+  achieveFilterRow: { flexDirection: 'row', gap: 5 },
+  achieveChip: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8, backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.light },
+  achieveChipActive: { borderColor: Colors.accent.primary, backgroundColor: `${Colors.accent.primary}22` },
+  achieveChipText: { fontSize: 10, fontWeight: '700', color: Colors.text.muted },
+  achieveChipTextActive: { color: Colors.accent.primary },
   b50EntryText: { fontSize: 11, fontWeight: '800', color: Colors.accent.secondary },
   clearBtn: { fontSize: 14, color: Colors.functional.danger, fontWeight: '600' },
   sheetOverlay: { flex: 1, backgroundColor: Colors.bg.overlay, justifyContent: 'flex-end' },
