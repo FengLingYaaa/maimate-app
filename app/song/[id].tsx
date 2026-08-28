@@ -46,6 +46,7 @@ export default function SongDetail() {
 
   const [selectedDiff, setSelectedDiff] = useState(0);
   const [planModalVisible, setPlanModalVisible] = useState(false);
+  const [coverViewerVisible, setCoverViewerVisible] = useState(false);
   const [customTarget, setCustomTarget] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -183,7 +184,9 @@ export default function SongDetail() {
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         {/* 歌曲基本信息 */}
         <View style={styles.heroCard}>
-          <CoverImage music={music} allSongs={rawData} style={styles.heroCover} accessibilityLabel={`${music.title} 曲绘`} />
+          <Pressable onPress={() => setCoverViewerVisible(true)} accessibilityLabel={`查看 ${music.title} 曲绘大图`}>
+            <CoverImage music={music} allSongs={rawData} style={styles.heroCover} accessibilityLabel={`${music.title} 曲绘`} />
+          </Pressable>
           <View style={styles.heroInfo}>
             <Text style={styles.heroTitle}>{music.title}</Text>
             <Text style={styles.heroArtist}>{music.basic_info.artist}</Text>
@@ -375,6 +378,14 @@ export default function SongDetail() {
         </Text>
       </ScrollView>
 
+      {/* v1.15.0：曲绘大图查看器（点背景关闭，自绘 overlay）。 */}
+      <Modal transparent visible={coverViewerVisible} animationType="fade" onRequestClose={() => setCoverViewerVisible(false)}>
+        <Pressable style={styles.coverViewerBackdrop} onPress={() => setCoverViewerVisible(false)}>
+          <CoverImage music={music} allSongs={rawData} style={styles.coverViewerImage} />
+          <Text style={styles.coverViewerHint}>已加载源图为 512×512 · 点任意处关闭</Text>
+        </Pressable>
+      </Modal>
+
       <Modal
         transparent
         visible={planModalVisible}
@@ -454,6 +465,19 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: Colors.bg.tertiary,
   },
+  coverViewerBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  coverViewerImage: {
+    width: '92%' as any,
+    aspectRatio: 1,
+    borderRadius: 8,
+  },
+  coverViewerHint: { fontSize: 11, color: Colors.text.muted },
   heroInfo: {
     flex: 1,
     justifyContent: 'center',

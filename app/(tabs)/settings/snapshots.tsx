@@ -1,28 +1,33 @@
 /**
- * 快照管理（v1.13.0）：查看本地保存的最多 6 次成绩快照并支持删除。
- * v1.14.0：新增两份快照对比（记录数/服务器 RA/成绩逐谱面 diff）。
+ * 快照管理（v1.13.0）：查看本地保存的成绩快照并支持删除。
+ * v1.14.0：两份快照对比。v1.15.0：推分战报——逐曲卡片（曲绘/曲名/难度徽章/
+ * 旧→新达成率/±Rating）+ 汇总条（新增/上分/移除计数与总 Rating 变化）；
+ * 保留数量由设置驱动（默认 20，可设至多 1000）。
  */
 
 import React, { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
-import { Colors } from '../../../src/constants';
-import { getChartKey } from '../../../src/data/bilibili-links';
-import { useScoreStore } from '../../../src/store';
-import type { ScoreSnapshot } from '../../../src/data/types';
+import { Colors, DifficultyColorMap, DifficultyLabels } from '../../../src/constants';
+import { CoverImage } from '../../../src/components/CoverImage';
+import { buildSnapshotBattleReport } from '../../../src/data/snapshot-battle';
+import { useMusicStore, useScoreStore, useSettingsStore } from '../../../src/store';
+import type { MusicData, ScoreSnapshot } from '../../../src/data/types';
 
 export default function SnapshotsPage() {
   const snapshots = useScoreStore(state => state.snapshots);
   const deleteSnapshot = useScoreStore(state => state.deleteSnapshot);
+  const rawData = useMusicStore(state => state.rawData);
+  const snapshotLimit = useSettingsStore(state => state.settings.snapshotLimit);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   // 对比模式：先点一份快照「对比」作基准，再点另一份完成选择（旧时间在前）。
   const [compareBase, setCompareBase] = useState<ScoreSnapshot | null>(null);
   const [comparison, setComparison] = useState<{ base: ScoreSnapshot; target: ScoreSnapshot } | null>(null);
 
-  const comparisonRows = useMemo(() => {
-    if (!comparison) return [];
-    return buildComparisonRows(comparison.base, comparison.target);
-  }, [comparison]);
+  const report = useMemo(() => {
+    if (!comparison) return null;
+    return buildSnapshotBattleReport(comparison.base, comparison.target, rawData);
+  }, [comparison, rawData]);
 
   const confirmDelete = (snapshotId: string, syncedAt: number) => {
     Alert.alert(
@@ -63,17 +68,19 @@ export default function SnapshotsPage() {
       <Stack.Screen options={{ title: '快照管理', headerStyle: { backgroundColor: Colors.bg.primary }, headerTintColor: Colors.text.primary }} />
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.note}>
-          每次成功同步成绩都会保存一份快照（最多保留最近 6 次）。点「对比」选两份快照查看成绩与 Rating 变化；删除快照不会影响本机成绩。
+          每次成功同步成绩都会保存一份快照（当前保留最近 {snapshotLimit} 份，可在设置中调整）。点「对比」选两份快照查看推分战报；删除快照不会影响本机成绩。
         </Text>
         {snapshots.length === 0 && (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>还没有快照。去「设置 → Diving-Fish 成绩导入」同步一次成绩即可生成。</Text>
           </View>
         )}
-        {comparison && (
-          <ComparisonCard
-            comparison={comparison}
-            rows={comparisonRows}
+        {report && comparison && (
+          <BattleReportCard
+            base={comparison.base}
+            target={comparison.target}
+            report={report}
+            rawData={rawData}
             onClose={() => setComparison(null)}
           />
         )}
@@ -110,56 +117,21 @@ export default function SnapshotsPage() {
   );
 }
 
-/** 单谱面对比行。 */
-interface ComparisonRow {
-  chartKey: string;
-  title: string;
-  diffLabel: string;
-  before: number | null;
-  after: number | null;
-  kind: 'added' | 'removed' | 'changed';
-}
-
-/** 纯函数：两份快照的逐谱面 diff（按曲名排序），供渲染与测试。 */
-export function buildComparisonRows(base: ScoreSnapshot, target: ScoreSnapshot): ComparisonRow[] {
-  const titleOf = (snapshot: ScoreSnapshot, chartKey: string): string => {
-    const score = snapshot.scores.find(item => getChartKey(item.songId, item.type, item.difficultyIndex) === chartKey);
-    return score ? `${score.songId}` : chartKey;
-  };
-  const baseMap = new Map(base.scores.map(score => [getChartKey(score.songId, score.type, score.difficultyIndex), score]));
-  const targetMap = new Map(target.scores.map(score => [getChartKey(score.songId, score.type, score.difficultyIndex), score]));
-  const keys = new Set([...baseMap.keys(), ...targetMap.keys()]);
-  const rows: ComparisonRow[] = [];
-  for (const key of keys) {
-    const before = baseMap.get(key) ?? null;
-    const after = targetMap.get(key) ?? null;
-    if (before && after) {
-      if (before.achievement === after.achievement) continue;
-      rows.push({ chartKey: key, title: titleOf(target, key), diffLabel: '变化', before: before.achievement, after: after.achievement, kind: 'changed' });
-    } else if (after) {
-      rows.push({ chartKey: key, title: titleOf(target, key), diffLabel: '新增', before: null, after: after.achievement, kind: 'added' });
-    } else {
-      rows.push({ chartKey: key, title: titleOf(base, key), diffLabel: '移除', before: before!.achievement, after: null, kind: 'removed' });
-    }
-  }
-  const kindOrder = { added: 0, changed: 1, removed: 2 } as const;
-  return rows.sort((left, right) => kindOrder[left.kind] - kindOrder[right.kind] || left.title.localeCompare(right.title));
-}
-
-/** 对比结果卡片：RA 变化 + 变化谱面列表。 */
-function ComparisonCard({ comparison, rows, onClose }: {
-  comparison: { base: ScoreSnapshot; target: ScoreSnapshot };
-  rows: ComparisonRow[];
+/** 推分战报卡片：汇总条 + 逐曲战报行（曲绘/曲名/难度/达成率变化/±Rating）。 */
+function BattleReportCard({ base, target, report, rawData, onClose }: {
+  base: ScoreSnapshot;
+  target: ScoreSnapshot;
+  report: ReturnType<typeof buildSnapshotBattleReport>;
+  rawData: MusicData[];
   onClose: () => void;
 }) {
-  const { base, target } = comparison;
   const raDelta = base.serverRating != null && target.serverRating != null
     ? target.serverRating - base.serverRating
     : null;
   return (
     <View style={styles.compareCard}>
       <View style={styles.compareHeader}>
-        <Text style={styles.compareTitle}>快照对比</Text>
+        <Text style={styles.compareTitle}>推分战报</Text>
         <Pressable hitSlop={8} onPress={onClose}>
           <Text style={styles.compareClose}>收起</Text>
         </Pressable>
@@ -167,30 +139,74 @@ function ComparisonCard({ comparison, rows, onClose }: {
       <Text style={styles.compareRange}>
         {new Date(base.syncedAt).toLocaleString()} → {new Date(target.syncedAt).toLocaleString()}
       </Text>
+      <View style={styles.summaryRow}>
+        <View style={styles.summaryChip}>
+          <Text style={styles.summaryChipValue}>
+            {report.totalRatingDelta >= 0 ? `+${report.totalRatingDelta}` : `${report.totalRatingDelta}`}
+          </Text>
+          <Text style={styles.summaryChipLabel}>Rating 变化</Text>
+        </View>
+        <View style={styles.summaryChip}>
+          <Text style={styles.summaryChipValue}>{report.addedCount}</Text>
+          <Text style={styles.summaryChipLabel}>新增</Text>
+        </View>
+        <View style={styles.summaryChip}>
+          <Text style={styles.summaryChipValue}>{report.changedCount}</Text>
+          <Text style={styles.summaryChipLabel}>上分</Text>
+        </View>
+        <View style={styles.summaryChip}>
+          <Text style={styles.summaryChipValue}>{report.removedCount}</Text>
+          <Text style={styles.summaryChipLabel}>移除</Text>
+        </View>
+        {raDelta !== null && (
+          <View style={styles.summaryChip}>
+            <Text style={styles.summaryChipValue}>{raDelta >= 0 ? `+${raDelta}` : `${raDelta}`}</Text>
+            <Text style={styles.summaryChipLabel}>服务器 RA</Text>
+          </View>
+        )}
+      </View>
       <Text style={styles.compareSummary}>
-        记录 {base.recordCount} → {target.recordCount} · RA {base.serverRating ?? '—'} → {target.serverRating ?? '—'}
-        {raDelta !== null && (raDelta >= 0 ? `（+${raDelta}）` : `（${raDelta}）`)}
+        记录 {base.recordCount} → {target.recordCount}
       </Text>
-      {rows.length === 0 ? (
+      {report.rows.length === 0 ? (
         <Text style={styles.compareEmpty}>两份快照之间成绩没有变化</Text>
       ) : (
-        rows.map(row => (
-          <View key={row.chartKey} style={styles.compareRow}>
-            <Text
-              style={[
-                styles.compareKind,
-                row.kind === 'added' && { color: Colors.functional.success },
-                row.kind === 'removed' && { color: Colors.functional.danger },
-              ]}
-            >
-              {row.diffLabel}
-            </Text>
-            <Text style={styles.compareTitle2} numberOfLines={1}>{row.title}</Text>
-            <Text style={styles.compareValue}>
-              {row.before === null ? '—' : `${row.before.toFixed(4)}%`} → {row.after === null ? '—' : `${row.after.toFixed(4)}%`}
-            </Text>
-          </View>
-        ))
+        report.rows.map(row => {
+          const music = rawData.find(candidate => candidate.id === row.songId && candidate.type === row.musicType);
+          const difficultyColor = DifficultyColorMap[row.difficultyIndex] || Colors.accent.secondary;
+          return (
+            <View key={row.chartKey} style={styles.battleRow}>
+              <CoverImage
+                music={music ?? {
+                  id: row.songId, title: row.title, type: row.musicType, ds: [], level: [], cids: [], charts: [],
+                  basic_info: { title: row.title, artist: '', genre: '', is_new: false, bpm: 0, from: '', release_date: '' },
+                }}
+                allSongs={rawData}
+                style={styles.battleCover}
+              />
+              <View style={styles.battleInfo}>
+                <View style={styles.battleTitleRow}>
+                  <Text style={styles.battleTitle} numberOfLines={1}>{row.title}</Text>
+                  <Text style={[styles.battleDiff, { color: difficultyColor }]}>
+                    {DifficultyLabels[row.difficultyIndex] || `难度${row.difficultyIndex}`}
+                  </Text>
+                </View>
+                <Text style={styles.battleValue}>
+                  {row.kind === 'added' && <Text style={{ color: Colors.functional.success }}>新增 </Text>}
+                  {row.kind === 'removed' && <Text style={{ color: Colors.functional.danger }}>移除 </Text>}
+                  {row.before === null ? '—' : `${row.before.toFixed(4)}%`}
+                  {' → '}
+                  {row.after === null ? '—' : `${row.after.toFixed(4)}%`}
+                  {row.ratingDelta !== null && (
+                    <Text style={styles.ratingDeltaText}>
+                      {row.ratingDelta >= 0 ? `  +${row.ratingDelta}` : `  ${row.ratingDelta}`} RA
+                    </Text>
+                  )}
+                </Text>
+              </View>
+            </View>
+          );
+        })
       )}
     </View>
   );
@@ -212,15 +228,29 @@ const styles = StyleSheet.create({
   deleteText: { fontSize: 11, fontWeight: '700', color: Colors.functional.danger },
   metaRow: { flexDirection: 'row', gap: 14 },
   meta: { fontSize: 11, color: Colors.text.muted },
-  compareCard: { backgroundColor: Colors.bg.secondary, borderRadius: 12, padding: 12, gap: 7, borderWidth: 1, borderColor: Colors.border.accent },
+  compareCard: { backgroundColor: Colors.bg.secondary, borderRadius: 12, padding: 12, gap: 8, borderWidth: 1, borderColor: Colors.border.accent },
   compareHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   compareTitle: { fontSize: 14, fontWeight: '900', color: Colors.text.primary },
   compareClose: { fontSize: 11, fontWeight: '700', color: Colors.text.muted },
   compareRange: { fontSize: 11, color: Colors.text.secondary },
+  summaryRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  summaryChip: {
+    backgroundColor: Colors.bg.tertiary, borderRadius: 9, paddingVertical: 5, paddingHorizontal: 9,
+    alignItems: 'center', borderWidth: 1, borderColor: Colors.border.light,
+  },
+  summaryChipValue: { fontSize: 13, fontWeight: '900', color: Colors.text.primary },
+  summaryChipLabel: { fontSize: 8.5, color: Colors.text.muted, marginTop: 1 },
   compareSummary: { fontSize: 11, fontWeight: '700', color: Colors.accent.secondary },
   compareEmpty: { fontSize: 11, color: Colors.text.muted },
-  compareRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  compareKind: { width: 30, fontSize: 10, fontWeight: '800', color: Colors.accent.secondary },
-  compareTitle2: { flex: 1, fontSize: 11, color: Colors.text.primary },
-  compareValue: { fontSize: 10.5, color: Colors.text.secondary },
+  battleRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 9,
+    backgroundColor: Colors.bg.tertiary, borderRadius: 10, padding: 8,
+  },
+  battleCover: { width: 38, height: 38, borderRadius: 7, backgroundColor: Colors.bg.secondary },
+  battleInfo: { flex: 1, gap: 3 },
+  battleTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  battleTitle: { flex: 1, fontSize: 12, fontWeight: '700', color: Colors.text.primary },
+  battleDiff: { fontSize: 9.5, fontWeight: '800' },
+  battleValue: { fontSize: 10.5, color: Colors.text.secondary },
+  ratingDeltaText: { fontWeight: '900', color: Colors.accent.primary },
 });

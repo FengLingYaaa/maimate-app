@@ -11,7 +11,7 @@ import type {
 } from './types';
 import { normalizeBilibiliVideoUrl } from './bilibili-links';
 import { migratePlanEntryIds, migratePlanGraveyardIds, normalizePlanEntries } from './plan-entries';
-import { DEFAULT_SETTINGS, mergeDetailBoards } from './settings-defaults';
+import { DEFAULT_SETTINGS, mergeDetailBoards, normalizeSnapshotLimit } from './settings-defaults';
 
 /** 备份文件格式标识与当前 schema 版本。 */
 export const BACKUP_FORMAT = 'cc.flya.maimate.backup';
@@ -139,6 +139,7 @@ function normalizeSettings(input: unknown): AppSettings {
     defaultMusicPlatform: platform === 'netease' || platform === 'qq' || platform === 'kugou' ? platform : DEFAULT_SETTINGS.defaultMusicPlatform,
     musicAppSearchFirst: typeof parsed.musicAppSearchFirst === 'boolean' ? parsed.musicAppSearchFirst : DEFAULT_SETTINGS.musicAppSearchFirst,
     detailBoards: mergeDetailBoards(parsed),
+    snapshotLimit: normalizeSnapshotLimit(parsed.snapshotLimit),
   };
 }
 

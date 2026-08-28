@@ -11,6 +11,8 @@ import {
   saveImportToken,
   validateImportToken,
 } from '../api/score-import';
+import { useSettingsStore } from './settings-store';
+import { normalizeSnapshotLimit } from '../data/settings-defaults';
 
 interface StoredScorePayload {
   scores: PlayerScore[];
@@ -158,7 +160,9 @@ export const useScoreStore = create<ScoreStore>((set, get) => ({
         serverRating: result.serverRating,
         scores: result.scores,
       };
-      const snapshots = [snapshot, ...get().snapshots].slice(0, 6);
+      // v1.15.0：快照保留数量由设置驱动（默认 20，可设至多 1000）。
+      const snapshotLimit = normalizeSnapshotLimit(useSettingsStore.getState().settings.snapshotLimit);
+      const snapshots = [snapshot, ...get().snapshots].slice(0, snapshotLimit);
       const changes = [...changed, ...get().changes].slice(0, 120);
       const sync: ScoreSyncState = {
         status: 'success',

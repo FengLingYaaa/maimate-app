@@ -18,6 +18,9 @@ import {
 import { applyDragWithPinGroups, canDragPlanRows, compareByPinThenOrder, pinGroupOf } from '../src/data/plan-order.ts';
 import { migratePlanEntryIds, normalizePlanEntries, reorderPlanEntriesById } from '../src/data/plan-entries.ts';
 import { computeB50, computeB50Gain, B35_SIZE, B15_SIZE } from '../src/data/b50.ts';
+import { computeFit50, sortFit50Entries } from '../src/data/fit50.ts';
+import { buildSnapshotBattleReport } from '../src/data/snapshot-battle.ts';
+import { normalizeSnapshotLimit } from '../src/data/settings-defaults.ts';
 import { getCoverCacheFilename, isCoverCacheFileForSong } from '../src/data/cover-cache-names.ts';
 import { buildScoresCsv, CSV_HEADER } from '../src/data/scores-csv-core.ts';
 import { getBilibiliVideoAppUrls } from '../src/data/bilibili-search.ts';
@@ -306,4 +309,65 @@ assert.equal(csv.split('\r\n')[0], CSV_HEADER.join(','));
 assert.ok(csv.includes('"Song, ""1"""'), 'CSV must escape comma/quote values');
 assert.ok(csv.endsWith('\r\n'));
 
-console.log('Feature checks passed (deep links, Bilibili parsing, version groups, local plates, pins, fortune)');
+// v1.15.0：拟合 50（fit_diff 驱动的 Rating 排名）。
+const fitStats = (fitDiff: number) => ({ cnt: 100, diff: 'master', fit_diff: fitDiff, avg: 90, avg_dx: 90, std_dev: 5, dist: [], fc_dist: [] });
+const fitMusic: import('../src/data/types.ts').MusicData[] = [
+  { id: '901', title: 'FitA', type: 'DX', ds: [0, 0, 0, 0, 14.0], level: ['', '', '', '', '14'], cids: [0, 0, 0, 0, 1], charts: [], basic_info: { title: 'FitA', artist: '', genre: '', bpm: 0, from: '', is_new: true, release_date: '' } },
+  { id: '902', title: 'FitB', type: 'SD', ds: [0, 0, 0, 0, 13.0], level: ['', '', '', '', '13'], cids: [0, 0, 0, 0, 2], charts: [], basic_info: { title: 'FitB', artist: '', genre: '', bpm: 0, from: '', is_new: false, release_date: '' } },
+];
+const fitScores: import('../src/data/types.ts').PlayerScore[] = [
+  { songId: '901', type: 'DX', difficultyIndex: 4, achievement: 100.5, dxScore: 0, importedAt: 1 },
+  { songId: '902', type: 'SD', difficultyIndex: 4, achievement: 60, dxScore: 0, importedAt: 2 },
+];
+const fitStatsMap = { '901': [null, null, null, null, fitStats(14.0)], '902': [null, null, null, null, fitStats(14.9)] };
+const fit50 = computeFit50(fitMusic, fitScores, fitStatsMap);
+assert.equal(fit50.entries.length, 2);
+// 拟合 Rating = floor(fit_diff × ach/100 × coef)：14.0×1.005×22.4=315.168→315；14.9×0.6×9.6=85.824→85。
+assert.equal(fit50.entries[0].rating, 315);
+assert.equal(fit50.entries[1].rating, 85);
+assert.equal(fit50.total, 400);
+assert.equal(fit50.chartsWithFitDiff, 2);
+// 缺 fit_diff 的谱面被排除。
+const fit50Missing = computeFit50(fitMusic, fitScores, { '901': [null, null, null, null, fitStats(14.0)] });
+assert.equal(fit50Missing.entries.length, 1);
+assert.equal(fit50Missing.chartsWithFitDiff, 1);
+// 排序切换：按拟合定数降序（14.9 的 FitB 反超到第一，尽管 Rating 更低）。
+const fitSorted = sortFit50Entries(fit50.entries, 'fitDiff');
+assert.equal(fitSorted[0].songId, '902');
+assert.equal(fitSorted[0].fitDiff, 14.9);
+
+// v1.15.0：快照推分战报（逐曲 + 总 Rating 变化）。
+const battleMusic: import('../src/data/types.ts').MusicData[] = [
+  { id: '801', title: 'BattleA', type: 'DX', ds: [0, 0, 0, 0, 14.0], level: ['', '', '', '', '14'], cids: [1], charts: [], basic_info: { title: 'BattleA', artist: '', genre: '', bpm: 0, from: '', is_new: true, release_date: '' } },
+  { id: '802', title: 'BattleB', type: 'SD', ds: [0, 0, 0, 0, 13.0], level: ['', '', '', '', '13'], cids: [2], charts: [], basic_info: { title: 'BattleB', artist: '', genre: '', bpm: 0, from: '', is_new: false, release_date: '' } },
+];
+const mkScore = (songId: string, type: 'SD' | 'DX', achievement: number): import('../src/data/types.ts').PlayerScore => ({
+  songId, type, difficultyIndex: 4, achievement, dxScore: 0, importedAt: 1,
+});
+const baseSnapshot = {
+  id: 'snap-base', syncedAt: 1000, recordCount: 2, serverRating: 1000,
+  scores: [mkScore('801', 'DX', 100.5), mkScore('802', 'SD', 100)],
+};
+const targetSnapshot = {
+  id: 'snap-target', syncedAt: 2000, recordCount: 3, serverRating: 1010,
+  scores: [mkScore('801', 'DX', 100.5), mkScore('802', 'SD', 100.5), mkScore('803' in battleMusic ? '801' : '803', 'DX' as const, 99)],
+};
+const report = buildSnapshotBattleReport(baseSnapshot, targetSnapshot, battleMusic);
+// 上分：802 100→100.5（13.0×21.6=280.8→280 → 13.0×1.005×22.4=292.824→292，+12）；新增 803 不在库 → Rating 记 null，不计总分。
+assert.equal(report.changedCount, 1);
+assert.equal(report.addedCount, 1);
+assert.equal(report.removedCount, 0);
+const changedRow = report.rows.find(row => row.songId === '802');
+assert.ok(changedRow);
+assert.equal(changedRow.ratingDelta, 12);
+assert.equal(report.totalRatingDelta, 12);
+
+// v1.15.0：快照保留数量归一化（默认 20，边界 1/1000）。
+assert.equal(normalizeSnapshotLimit(undefined), 20);
+assert.equal(normalizeSnapshotLimit('abc'), 20);
+assert.equal(normalizeSnapshotLimit(0), 1);
+assert.equal(normalizeSnapshotLimit(5000), 1000);
+assert.equal(normalizeSnapshotLimit(37.9), 38);
+assert.equal(normalizeSnapshotLimit('55'), 55);
+
+console.log('Feature checks passed (deep links, Bilibili parsing, version groups, local plates, pins, fortune, fit50, snapshot battle)');

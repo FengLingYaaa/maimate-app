@@ -22,6 +22,42 @@ export default function SettingsPage() {
   const [tokenInput, setTokenInput] = useState('');
   const [tokenMessage, setTokenMessage] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
+  // v1.15.0：快照保留数量设置（1–1000，默认 20），修改时警告存储占用。
+  const [snapshotLimitInput, setSnapshotLimitInput] = useState(String(settings.snapshotLimit));
+
+  useEffect(() => {
+    setSnapshotLimitInput(String(settings.snapshotLimit));
+  }, [settings.snapshotLimit]);
+
+  const commitSnapshotLimit = () => {
+    const parsed = Number.parseInt(snapshotLimitInput, 10);
+    if (!Number.isFinite(parsed)) {
+      setSnapshotLimitInput(String(settings.snapshotLimit));
+      return;
+    }
+    const next = Math.max(1, Math.min(1000, Math.round(parsed)));
+    setSnapshotLimitInput(String(next));
+    if (next === settings.snapshotLimit) return;
+    if (next > settings.snapshotLimit) {
+      Alert.alert(
+        '提高快照保留数量',
+        `将保留最近 ${next} 次快照（当前 ${settings.snapshotLimit} 次）。快照只保存在本机，数量越多占用的存储空间越大，确定继续？`,
+        [
+          { text: '取消', style: 'cancel' },
+          { text: '确定', onPress: () => void updateSettings({ snapshotLimit: next }) },
+        ],
+      );
+    } else {
+      Alert.alert(
+        '降低快照保留数量',
+        `将只保留最近 ${next} 次快照，超出的旧快照会在下次同步成绩时自动裁剪。`,
+        [
+          { text: '取消', style: 'cancel' },
+          { text: '确定', onPress: () => void updateSettings({ snapshotLimit: next }) },
+        ],
+      );
+    }
+  };
 
   const exportCsv = async () => {
     if (working) return;
@@ -121,7 +157,6 @@ export default function SettingsPage() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Diving-Fish 成绩导入</Text>
-        <Text style={styles.securityNote}>只读同步成绩。MaiMate 不会上传成绩、不保存 Shadowrocket 配置，也不会把 Token 写入日志或源码。</Text>
         <TextInput
           style={styles.tokenInput}
           value={tokenInput}
@@ -148,12 +183,27 @@ export default function SettingsPage() {
             <Text style={styles.dangerButtonText}>删除 Token</Text>
           </Pressable>
         </View>
+        <View style={styles.snapshotLimitRow}>
+          <View style={styles.preferenceText}>
+            <Text style={styles.preferenceTitle}>快照保留数量</Text>
+            <Text style={styles.preferenceDescription}>1–1000 次；数量越多占用本机存储越多</Text>
+          </View>
+          <TextInput
+            style={styles.snapshotLimitInput}
+            value={snapshotLimitInput}
+            onChangeText={setSnapshotLimitInput}
+            onBlur={commitSnapshotLimit}
+            onSubmitEditing={commitSnapshotLimit}
+            keyboardType="number-pad"
+            maxLength={4}
+          />
+        </View>
         <View style={styles.syncCard}>
           <Text style={styles.syncTitle}>同步状态：{getSyncLabel(sync.status)}</Text>
           <Text style={styles.syncText}>本地记录：{sync.recordCount} 条</Text>
           <Text style={styles.syncText}>Diving-Fish Rating：{sync.serverRating ?? '—'}</Text>
            <Text style={styles.syncText}>本次变化：{sync.changedCount} 条（不是游玩次数）</Text>
-           <Text style={styles.syncText}>本地快照：{snapshots.length} 次（最多保留最近 6 次）</Text>
+           <Text style={styles.syncText}>本地快照：{snapshots.length} 次（最多保留最近 {settings.snapshotLimit} 次）</Text>
           <Text style={styles.syncText}>上次同步：{sync.lastSyncedAt ? new Date(sync.lastSyncedAt).toLocaleString() : '尚未同步'}</Text>
           {!!sync.message && <Text style={styles.messageText}>{sync.message}</Text>}
           {snapshots.length > 0 && (
@@ -249,6 +299,12 @@ const styles = StyleSheet.create({
   snapshotLink: { marginTop: 4, alignSelf: 'flex-start' },
   snapshotLinkText: { fontSize: 11, fontWeight: '800', color: Colors.accent.secondary },
   buttonRow: { flexDirection: 'row', gap: 8 },
+  snapshotLimitRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  snapshotLimitInput: {
+    width: 72, minHeight: 40, paddingHorizontal: 10, borderRadius: 9,
+    backgroundColor: Colors.bg.tertiary, color: Colors.text.primary,
+    borderWidth: 1, borderColor: Colors.border.light, textAlign: 'center', fontSize: 13, fontWeight: '800',
+  },
   secondaryButton: { flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: 10, backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.medium },
   secondaryButtonText: { fontSize: 12, fontWeight: '700', color: Colors.accent.secondary },
   dangerButton: { alignItems: 'center', paddingHorizontal: 14, justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: `${Colors.functional.danger}66` },

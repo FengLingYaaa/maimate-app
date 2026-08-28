@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { AppSettings } from '../data/types';
 import { CACHE_KEYS } from '../constants/game';
-import { DEFAULT_SETTINGS, mergeDetailBoards } from '../data/settings-defaults';
+import { DEFAULT_SETTINGS, mergeDetailBoards, normalizeSnapshotLimit } from '../data/settings-defaults';
 
 interface SettingsStore {
   settings: AppSettings;
@@ -31,6 +31,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
             ...parsed,
             defaultSort: { ...DEFAULT_SETTINGS.defaultSort, ...(parsed.defaultSort || {}) },
             detailBoards: mergeDetailBoards(parsed),
+            snapshotLimit: normalizeSnapshotLimit(parsed.snapshotLimit),
           },
           loaded: true,
         });
@@ -47,6 +48,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       ...get().settings,
       ...patch,
       defaultSort: { ...get().settings.defaultSort, ...(patch.defaultSort || {}) },
+      ...(patch.snapshotLimit !== undefined ? { snapshotLimit: normalizeSnapshotLimit(patch.snapshotLimit) } : {}),
     };
     set({ settings });
     try {

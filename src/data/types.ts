@@ -208,6 +208,8 @@ export interface AppSettings {
   musicAppSearchFirst: boolean;
   /** 歌曲详情页板块排序与默认折叠状态。 */
   detailBoards: Record<DetailBoardId, DetailBoardConfig>;
+  /** v1.15.0：本地成绩快照保留数量（1–1000，默认 20）。 */
+  snapshotLimit: number;
 }
 
 /** 推分计划 */

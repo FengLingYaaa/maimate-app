@@ -3,8 +3,6 @@ import { Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'reac
 import { Colors, DifficultyColorMap, DifficultyLabels } from '../constants';
 import { BILIBILI_QUICK_TAGS, getBilibiliLinkChartKey, getChartKey, normalizeBilibiliVideoUrl, parseBilibiliShare } from '../data/bilibili-links';
 import { openBilibiliSearch, openBilibiliVideo } from '../data/external-links';
-import { getDirectVideoAppUrls } from '../data/bilibili-resolve';
-import { isBilibiliShortLink } from '../data/bilibili-search';
 import { useBilibiliStore } from '../store';
 
 interface Props {
@@ -37,15 +35,6 @@ export function BilibiliSearchPanel({ songId, songTitle, musicType, difficultyIn
   const [tags, setTags] = useState<string[]>([]);
   const [customTag, setCustomTag] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [diagVisible, setDiagVisible] = useState(false);
-
-  /** 深链诊断：描述每条已存视频当前的跳转策略。 */
-  const describeDeepLink = (linkUrl: string): string => {
-    if (isBilibiliShortLink(linkUrl)) return 'b23.tv 短链：点击时自动解析成 BV 并转 av 拉起客户端（首次需联网，结果会缓存）';
-    const appUrls = getDirectVideoAppUrls(linkUrl);
-    if (appUrls.length > 0) return `深链就绪：${appUrls.join(' ｜ ')}`;
-    return '无法提取视频 ID：将以网页方式打开';
-  };
 
   const openAdd = () => {
     setEditingId(null);
@@ -154,18 +143,6 @@ export function BilibiliSearchPanel({ songId, songTitle, musicType, difficultyIn
               </View>
             </View>
           ))}
-          <Pressable onPress={() => setDiagVisible(value => !value)}>
-            <Text style={styles.diagToggle}>{diagVisible ? '▲ 深链诊断' : '▼ 深链诊断'}</Text>
-          </Pressable>
-          {diagVisible && links.map(link => (
-            <View key={`diag-${link.id}`} style={styles.diagRow}>
-              <Text style={styles.diagTitle} numberOfLines={1}>{link.title || link.url}</Text>
-              <Text style={styles.diagStatus}>{describeDeepLink(link.url)}</Text>
-              <Pressable onPress={() => void openBilibiliVideo(link.url)}>
-                <Text style={styles.diagTest}>▶ 试开（应用优先）</Text>
-              </Pressable>
-            </View>
-          ))}
         </>
       )}
       </>
@@ -239,19 +216,6 @@ const styles = StyleSheet.create({
   remark: { fontSize: 11, color: Colors.text.primary },
   tags: { fontSize: 10, color: Colors.text.muted },
   metadataHint: { fontSize: 9, color: Colors.text.muted },
-  diagToggle: { fontSize: 11, fontWeight: '800', color: Colors.accent.secondary, marginTop: 4 },
-  diagRow: {
-    borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.border.light,
-    backgroundColor: Colors.bg.tertiary,
-    paddingVertical: 7,
-    paddingHorizontal: 10,
-    gap: 3,
-  },
-  diagTitle: { fontSize: 11, fontWeight: '700', color: Colors.text.primary },
-  diagStatus: { fontSize: 10, lineHeight: 14, color: Colors.text.muted },
-  diagTest: { fontSize: 11, fontWeight: '700', color: Colors.accent.primary },
   linkActions: { justifyContent: 'space-around', alignItems: 'flex-end' },
   actionText: { fontSize: 10, color: Colors.accent.primary },
   deleteText: { fontSize: 10, color: Colors.functional.danger },
