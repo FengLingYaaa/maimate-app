@@ -180,7 +180,7 @@ function BattleReportCard({ base, target, report, rawData, onClose, onShare }: {
         {raDelta !== null && (
           <View style={styles.summaryChip}>
             <Text style={styles.summaryChipValue}>{raDelta >= 0 ? `+${raDelta}` : `${raDelta}`}</Text>
-            <Text style={styles.summaryChipLabel}>服务器 RA</Text>
+            <Text style={styles.summaryChipLabel}>DX Rating</Text>
           </View>
         )}
       </View>

@@ -22,6 +22,8 @@ interface Props {
   allSongs?: MusicData[];
   /** v1.12.0：曲库行 B50 徽标（该曲任一谱面在 B50 榜内时显示「B50 #池内排名」）。 */
   b50Badge?: { rank: number; pool: 'new' | 'old' } | null;
+  /** v1.16.0：拟合定数排序启用时，按难度返回拟合定数（无数据 null），徽章旁标注。 */
+  fitDiffForIndex?: (index: number) => number | null;
 }
 
 export const SongCard = memo(function SongCard({
@@ -33,6 +35,7 @@ export const SongCard = memo(function SongCard({
   showChinaVersion = true,
   allSongs = [],
   b50Badge = null,
+  fitDiffForIndex,
 }: Props) {
   const selected = selectedDifficultyIndex !== undefined
     ? music.level[selectedDifficultyIndex] !== undefined
@@ -76,15 +79,20 @@ export const SongCard = memo(function SongCard({
           <Text style={styles.version} numberOfLines={1}>国区：{chinaVersion}</Text>
         )}
         <View style={styles.difficulties}>
-          {selected.map(index => (
-            <DifficultyBadge
-              key={index}
-              index={index}
-              level={music.level[index]}
-              size="sm"
-              highlighted={highlightedDifficulties?.includes(index) ?? selectedDifficultyIndex !== undefined}
-            />
-          ))}
+          {selected.map(index => {
+            const fitDiff = fitDiffForIndex?.(index) ?? null;
+            return (
+              <View key={index} style={styles.diffCell}>
+                <DifficultyBadge
+                  index={index}
+                  level={music.level[index]}
+                  size="sm"
+                  highlighted={highlightedDifficulties?.includes(index) ?? selectedDifficultyIndex !== undefined}
+                />
+                {fitDiff !== null && <Text style={styles.fitDiffText}>fit {fitDiff.toFixed(1)}</Text>}
+              </View>
+            );
+          })}
           {selected.length === 0 && <Text style={styles.missingDifficulty}>该难度已不在当前曲库</Text>}
         </View>
       </View>
@@ -170,6 +178,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     marginTop: 4,
+    flexWrap: 'wrap',
+  },
+  diffCell: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  fitDiffText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: Colors.accent.secondary,
   },
   missingDifficulty: {
     fontSize: 10,

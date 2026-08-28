@@ -9,7 +9,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useMusicStore, useScoreStore, useSettingsStore } from '../../src/store';
 import { SongCard, FilterBar, TitleRecognizer } from '../../src/components';
 import { Colors } from '../../src/constants';
-import { getMatchingDifficultyIndices, MusicList } from '../../src/data/music-list';
+import { getMatchingDifficultyIndices, getFitChartConstant, MusicList } from '../../src/data/music-list';
 import { getChinaVersionOptions, getVersionOptions } from '../../src/data/version-catalog';
 import { computeB50 } from '../../src/data/b50';
 import type { FilterOptions, MusicData } from '../../src/data/types';
@@ -29,6 +29,7 @@ export default function SongBrowser() {
   const cacheTimestamp = useMusicStore(s => s.cacheTimestamp);
   const error = useMusicStore(s => s.error);
   const filters = useMusicStore(s => s.filters);
+  const chartStats = useMusicStore(s => s.chartStats);
   const applyFilters = useMusicStore(s => s.applyFilters);
   const clearFilters = useMusicStore(s => s.clearFilters);
   const settings = useSettingsStore(s => s.settings);
@@ -94,9 +95,15 @@ export default function SongBrowser() {
     router.push({ pathname: '/song/[id]' as any, params: { id: music.id, type: music.type, source: 'library' } });
   }, [router]);
 
-  const sortDifficultyIndex = filters.sort?.mode === 'constantAsc' || filters.sort?.mode === 'constantDesc'
-    ? (filters.sort.difficultyIndex ?? 3)
+  const isFitSort = filters.sort?.mode === 'fitAsc' || filters.sort?.mode === 'fitDesc';
+  const sortDifficultyIndex = filters.sort?.mode === 'constantAsc' || filters.sort?.mode === 'constantDesc' || isFitSort
+    ? (filters.sort?.difficultyIndex ?? 3)
     : undefined;
+  // v1.16.0：拟合定数排序时，行内徽章旁标注该难度拟合定数。
+  const fitDiffForIndex = useCallback((music: MusicData) => (index: number) => {
+    if (!isFitSort) return null;
+    return getFitChartConstant(music, index, chartStats);
+  }, [isFitSort, chartStats]);
   const hasChartHighlightFilter = Boolean(
     filters.charter?.trim()
       || filters.difficulty !== undefined
@@ -154,6 +161,7 @@ export default function SongBrowser() {
                 allSongs={rawData}
                 highlightedDifficulties={highlighted.size > 0 ? [...highlighted] : undefined}
                 b50Badge={b50BadgeBySong?.get(item.id) ?? null}
+                fitDiffForIndex={fitDiffForIndex(item)}
               />
             </View>
           );

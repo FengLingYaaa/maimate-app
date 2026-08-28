@@ -4,7 +4,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { FilterBar, PlanDragList, type PlanDragRow } from '../../src/components';
+import { FilterBar, PlanDragList, PlanProgressRing, type PlanDragRow } from '../../src/components';
 import { Colors, DifficultyColorMap, DifficultyLabels } from '../../src/constants';
 import { getChinaVersionOptions, getVersionOptions } from '../../src/data/version-catalog';
 import { getMusicSearchScore, getOfficialChartConstant, matchesMusic } from '../../src/data/music-list';
@@ -195,11 +195,12 @@ export default function PushPlan() {
         <Text style={styles.headerSub}>{entries.length > 0 ? `${entries.length} 首待练习` : '还没有添加歌曲'} · 长按曲目拖拽排序</Text>
         {progressSummary.withTargetCount > 0 && (
           <View style={styles.progressSummaryRow}>
-            <View style={[styles.progressRing, progressSummary.allAchieved && styles.progressRingDone]}>
-              <Text style={[styles.progressRingText, progressSummary.allAchieved && styles.progressRingTextDone]}>
-                {progressSummary.achieved}/{progressSummary.withTargetCount}
-              </Text>
-            </View>
+            <PlanProgressRing
+              achieved={progressSummary.achieved}
+              total={progressSummary.withTargetCount}
+              averagePercent={progressSummary.averagePercent}
+              allAchieved={progressSummary.allAchieved}
+            />
             <View style={styles.progressSummaryInfo}>
               <Text style={styles.progressSummaryTitle}>
                 已达标 {progressSummary.achieved} / {progressSummary.withTargetCount}
@@ -356,13 +357,6 @@ const styles = StyleSheet.create({
   b50Row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, flexWrap: 'wrap', gap: 6 },
   b50Entry: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 9, backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.light },
   progressSummaryRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 },
-  progressRing: {
-    width: 40, height: 40, borderRadius: 20, borderWidth: 3, borderColor: Colors.accent.secondary,
-    alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bg.tertiary,
-  },
-  progressRingDone: { borderColor: '#ffd166' },
-  progressRingText: { fontSize: 11, fontWeight: '900', color: Colors.accent.secondary },
-  progressRingTextDone: { color: '#ffd166' },
   progressSummaryInfo: { flex: 1, gap: 1 },
   progressSummaryTitle: { fontSize: 12, fontWeight: '800', color: Colors.text.primary },
   progressSummaryText: { fontSize: 10, color: Colors.text.muted },

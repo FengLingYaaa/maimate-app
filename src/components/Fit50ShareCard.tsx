@@ -39,7 +39,7 @@ export function Fit50ShareCard({ rawData, scores, chartStats, serverRating, user
         </View>
         <View style={styles.totalWrap}>
           <Text style={styles.totalValue}>{fit50.total}</Text>
-          <Text style={styles.totalLabel}>FIT50</Text>
+          <Text style={styles.totalLabel}>nb50</Text>
         </View>
       </View>
 

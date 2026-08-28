@@ -24,14 +24,17 @@ interface Row {
 
 interface Props {
   report: SnapshotBattleReport;
-  base: { syncedAt: number };
-  target: { syncedAt: number };
+  base: { syncedAt: number; serverRating?: number | null };
+  target: { syncedAt: number; serverRating?: number | null };
   rawData: MusicData[];
   userName?: string;
 }
 
 export function BattleReportShareCard({ report, base, target, rawData, userName }: Props) {
   const rows = report.rows.filter(row => row.kind !== 'removed');
+  const raDelta = base.serverRating != null && target.serverRating != null
+    ? target.serverRating - base.serverRating
+    : null;
   return (
     <View style={styles.card}>
       <View style={styles.header}>
@@ -52,6 +55,12 @@ export function BattleReportShareCard({ report, base, target, rawData, userName 
           <Text style={styles.chipValue}>{report.changedCount}</Text>
           <Text style={styles.chipLabel}>上分</Text>
         </View>
+        {raDelta !== null && (
+          <View style={styles.chip}>
+            <Text style={styles.chipValue}>{raDelta >= 0 ? `+${raDelta}` : `${raDelta}`}</Text>
+            <Text style={styles.chipLabel}>DX Rating</Text>
+          </View>
+        )}
       </View>
       {rows.length === 0 && <Text style={styles.emptyText}>两份快照之间成绩没有变化</Text>}
       {rows.map(row => {

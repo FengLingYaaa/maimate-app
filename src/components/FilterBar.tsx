@@ -276,6 +276,7 @@ export function FilterBar({
     if (filters.sort && filters.sort.mode !== 'relevance') {
       const labels: Record<string, string> = {
         titleAsc: 'A→Z', titleDesc: 'Z→A', constantAsc: '定数↑', constantDesc: '定数↓',
+        fitAsc: '拟合定数↑', fitDesc: '拟合定数↓',
       };
       chips.push({
         key: 'sort',
@@ -381,6 +382,8 @@ export function FilterBar({
                   ['titleDesc', '歌曲名 Z→A'],
                   ['constantAsc', '定数低→高'],
                   ['constantDesc', '定数高→低'],
+                  ['fitAsc', '拟合定数低→高'],
+                  ['fitDesc', '拟合定数高→低'],
                 ].map(([mode, label]) => {
                   const active = localFilters.sort?.mode === mode || (!localFilters.sort && mode === 'relevance');
                   return (
@@ -390,9 +393,14 @@ export function FilterBar({
                   );
                 })}
               </View>
-              {(localFilters.sort?.mode === 'constantAsc' || localFilters.sort?.mode === 'constantDesc') && (
+              {(localFilters.sort?.mode === 'constantAsc' || localFilters.sort?.mode === 'constantDesc'
+                || localFilters.sort?.mode === 'fitAsc' || localFilters.sort?.mode === 'fitDesc') && (
                 <>
-                  <Text style={styles.sortHint}>按官方定数排序使用的难度（列表会高亮该难度）</Text>
+                  <Text style={styles.sortHint}>
+                    {localFilters.sort?.mode === 'fitAsc' || localFilters.sort?.mode === 'fitDesc'
+                      ? '按拟合定数排序使用的难度（无拟合数据的谱面排在末尾）'
+                      : '按官方定数排序使用的难度（列表会高亮该难度）'}
+                  </Text>
                   <View style={styles.chipRow}>
                     {DifficultyLabels.map((label, index) => {
                       const active = localFilters.sort?.difficultyIndex === index;

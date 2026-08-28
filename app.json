@@ -2,7 +2,7 @@
   "expo": {
     "name": "MaiMate",
     "slug": "maimate-app",
-    "version": "1.15.2",
+    "version": "1.16.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -23,7 +23,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "package": "cc.flya.maimate",
-      "versionCode": 25,
+      "versionCode": 26,
       "permissions": ["android.permission.CAMERA"],
       "blockedPermissions": ["android.permission.RECORD_AUDIO"],
       "predictiveBackGestureEnabled": false

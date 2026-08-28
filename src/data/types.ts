@@ -49,7 +49,7 @@ export interface MusicData {
 export type ChartStatsMap = Record<string, Array<ChartStats | null>>;
 
 /** 曲库排序模式。定数排序时使用 difficultyIndex 指定目标难度。 */
-export type SortMode = 'relevance' | 'titleAsc' | 'titleDesc' | 'constantAsc' | 'constantDesc';
+export type SortMode = 'relevance' | 'titleAsc' | 'titleDesc' | 'constantAsc' | 'constantDesc' | 'fitDesc' | 'fitAsc';
 
 export interface SortOptions {
   mode: SortMode;

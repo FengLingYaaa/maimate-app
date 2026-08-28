@@ -47,9 +47,9 @@ function hasFilters(filters: FilterOptions): boolean {
   });
 }
 
-function createMusicList(data: MusicData[], filters: FilterOptions): MusicList {
+function createMusicList(data: MusicData[], filters: FilterOptions, chartStats?: ChartStatsMap): MusicList {
   return hasFilters(filters)
-    ? new MusicList(data).filter(filters)
+    ? new MusicList(data).filter(filters, chartStats)
     : new MusicList(data);
 }
 
@@ -209,8 +209,9 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
   },
 
   applyFilters: (filters: FilterOptions) => {
-    const { rawData } = get();
-    set({ musicList: createMusicList(rawData, filters), filters });
+    const { rawData, chartStats } = get();
+    // v1.16.0：带 chartStats 供拟合定数排序使用。
+    set({ musicList: createMusicList(rawData, filters, chartStats), filters });
   },
 
   clearFilters: () => {

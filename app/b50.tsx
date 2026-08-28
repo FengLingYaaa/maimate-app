@@ -41,7 +41,7 @@ export default function B50Screen() {
 
   const [screenMode, setScreenMode] = useState<ScreenMode>('b50');
   const [poolTab, setPoolTab] = useState<PoolTab>('new');
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [fitSort, setFitSort] = useState<Fit50Sort>('rating');
   const [shareVisible, setShareVisible] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);

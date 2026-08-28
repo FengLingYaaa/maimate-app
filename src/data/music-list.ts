@@ -5,7 +5,7 @@
  * 因此连续切换分类、SD/DX、版本和搜索条件不会互相污染。
  */
 
-import type { FilterOptions, MusicData, ChartData, SortOptions } from './types';
+import type { FilterOptions, MusicData, ChartData, SortOptions, ChartStatsMap } from './types';
 import { getChinaVersionName, isBanquetGenre } from '../constants/game';
 import { expandVersionSelection } from './version-catalog';
 import { getSearchTitles } from './song-aliases';
@@ -15,6 +15,16 @@ export function getOfficialChartConstant(music: MusicData, index: number): numbe
   if (isBanquetGenre(music.basic_info.genre)) return null;
   const value = music.ds[index];
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/** 读取谱面拟合定数（chart_stats fit_diff）；无数据返回 null（排序时排末尾）。 */
+export function getFitChartConstant(
+  music: MusicData,
+  index: number,
+  chartStatsMap: ChartStatsMap | undefined,
+): number | null {
+  const value = chartStatsMap?.[music.id]?.[index]?.fit_diff;
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
 }
 
 export function hasOfficialChartConstant(music: MusicData, index: number): boolean {
@@ -214,7 +224,12 @@ function compareTitles(left: MusicData, right: MusicData, descending: boolean): 
   return parseInt(left.id, 10) - parseInt(right.id, 10);
 }
 
-function sortMusicItems(items: MusicData[], sort: SortOptions | undefined, query?: string): MusicData[] {
+function sortMusicItems(
+  items: MusicData[],
+  sort: SortOptions | undefined,
+  query?: string,
+  chartStatsMap?: ChartStatsMap,
+): MusicData[] {
   const mode = sort?.mode || (query?.trim() ? 'relevance' : null);
   if (!mode || mode === 'relevance') {
     if (!query?.trim()) return items;
@@ -230,6 +245,18 @@ function sortMusicItems(items: MusicData[], sort: SortOptions | undefined, query
   if (mode === 'titleDesc') return items.sort((left, right) => compareTitles(left, right, true));
 
   const difficultyIndex = Number.isInteger(sort?.difficultyIndex) ? sort!.difficultyIndex! : 3;
+  // v1.16.0：拟合定数排序（fit_desc/fit_asc）——按 chart_stats fit_diff 排，无数据排末尾。
+  if (mode === 'fitDesc' || mode === 'fitAsc') {
+    const descending = mode === 'fitDesc';
+    return items.sort((left, right) => {
+      const fitResult = compareNullableConstants(
+        getFitChartConstant(left, difficultyIndex, chartStatsMap),
+        getFitChartConstant(right, difficultyIndex, chartStatsMap),
+        descending,
+      );
+      return fitResult !== 0 ? fitResult : compareTitles(left, right, false);
+    });
+  }
   const descending = mode === 'constantDesc';
   return items.sort((left, right) => {
     const constantResult = compareNullableConstants(
@@ -271,9 +298,9 @@ export class MusicList {
     return shuffled.slice(0, Math.min(n, shuffled.length));
   }
 
-  filter(opts: FilterOptions): MusicList {
+  filter(opts: FilterOptions, chartStatsMap?: ChartStatsMap): MusicList {
     const result = this.items.filter(music => matchesMusic(music, opts));
-    return new MusicList(sortMusicItems(result, opts.sort, opts.titleSearch));
+    return new MusicList(sortMusicItems(result, opts.sort, opts.titleSearch, chartStatsMap));
   }
 
   sortById(asc = true): MusicList {

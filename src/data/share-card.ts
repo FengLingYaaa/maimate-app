@@ -5,7 +5,7 @@
  */
 
 import * as Sharing from 'expo-sharing';
-import * as MediaLibrary from 'expo-media-library';
+import * as MediaLibrary from 'expo-media-library/legacy';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
