@@ -96,10 +96,10 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | v1.16.3 功能主体（前一代 `81f1789` 为 v1.16.2 文档收尾） |
-| 当前标签 | v1.16.3 已推送（触发云构建，构建结果见发布补记） |
+| 当前提交 | v1.16.4 功能主体（前一代 `78ceeba` 为 v1.16.3 文档收尾） |
+| 当前标签 | v1.16.4 已推送（触发云构建，构建结果见发布补记） |
 | Android applicationId | `cc.flya.maimate` |
-| App 版本 | `1.16.3`（Android versionCode `29`） |
+| App 版本 | `1.16.4`（Android versionCode `30`） |
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
@@ -1037,4 +1037,11 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 
 - 用户反馈与处置：① 快照管理仍会跳转设置页——独立为根级路由 `/snapshots`（app/snapshots.tsx，脱离设置 Stack，归位逻辑从此不可达），根 `_layout` 注册、信息查询入口改跳、设置栈移除注册并简化归位逻辑（不再比较 pathname，仅「从其它 tab 切回」时 replace 回设置首页）；② 战报对比逐曲 RA 改为「对 B50 的影响」——`SnapshotBattleRow` 新增 `b50Delta`：以新快照侧 `computeB50` 榜内键集合为准，榜内显示 `+N RA（B50）`、榜外不显示（`app/snapshots.tsx` 与 `BattleReportShareCard` 同步切换渲染字段，`ratingDelta` 保留在数据层）；③ 计划「到底部」悬浮按钮贴右下角（bottom 200+insets → 12，tab 容器已排除 tab 栏）；④ 计划卡已设目标的条目隐藏「点击重新选择」提示行压缩高度（点卡片仍可进入行内改目标）；⑤ 计划查漏——计划页摘要下新增可折叠提示条，列出计划中无成绩记录的曲目（`type:songId:difficulty` 与 scores 比对），每项可跳详情；⑥ 下载站「检查下载地址」在国内卡 GitHub——下载按钮改 GitHub Release 直链并删除 fetch 探测脚本（页面不再发任何预检请求）。落地页 route-check 断言同步（settings 栈不再含 snapshots、根级必须有 snapshots）。
 - 回归与版本：lint/routes/features/phase-af/rating/backup/update 全绿；`expo-doctor` 21/21；`expo export --platform android` 通过；`app.json` 升 `1.16.3`/versionCode `29`。发布补记待构建后回填。
+- 发布补记（当日）：功能提交 `f20a4e2`（14 文件 +113/−56）；轻量标签 `v1.16.3` git 推送一次成功。云构建 run `33241108334` 一次通过。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.16.3>；资产 `MaiMate-latest.apk` 大小 `62,246,388` bytes（59.4 MB），SHA-256 `a784260fce6035e7565c8cfc64f23af0fbe8009f6ae3021cc045a248c05c85d5`（本地下载资产复算）。落地页更新 v1.16.3 文案、日志、SHA 与 GitHub 直链下载按钮（探测脚本已删）后经 wrangler 部署 Pages（deployment `fad35420.maimate-landing.pages.dev`）；线上校验落地页含 v1.16.3 与新 SHA、下载按钮 href 为 `releases/latest/download/MaiMate-latest.apk` 直链、页面无 fetch 探测代码、GitHub 直链 200 / content-length `62,246,388` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（快照管理从信息查询进入为独立页面且不再跳设置、战报 RA（B50）口径、到底按钮右下角、计划卡紧凑、计划查漏条、下载站直链在国内的连通性）。
+
+### v1.16.4（2026-08-29，第十轮用户反馈）
+
+- 用户反馈与处置：① 快照页无标题/返回键且文字被状态栏遮挡——根级 `_layout` 给 `snapshots` 启用原生 header（标题「快照管理」+ 深色底 + 返回键），内容自然落在安全区下；② 战报 B50 榜内曲目仍不显示 RA——定位为键序 bug：`b50Keys` 用 `musicType:songId:difficultyIndex` 而行键是 `songId:type:difficultyIndex`，永远匹配不上，统一为后者（`snapshot-battle.ts`）；③ 搜索历史长按删除——`FilterBar` 历史 chip 加 `onLongPress`（350ms）逐条移除并持久化（曲库/计划/牌子三处共用组件自动生效）；④ 新功能「单谱成绩曲线」——新组件 `ScoreTrendCard`（react-native-svg 纯折线，无新依赖），从本地快照重建该谱面达成率序列，纵轴下限按 20% 取整、显示快照次数与净变化、无数据整卡隐藏；挂在歌曲详情页 boardOrder（Rating/胜负场/B站/音乐平台）之后，切难度即切换曲线。更新日志浮层补 1.16.4 条目。
+- 回归与版本：七组门禁全绿；`expo-doctor` 21/21；`expo export --platform android` 通过；`app.json` 升 `1.16.4`/versionCode `30`。发布补记待构建后回填。
+- 发布补记（当日）：功能提交 `8e6ba6d`（9 文件 +176/−6）；轻量标签 `v1.16.4` git 推送一次成功。云构建 run `33243998179` 一次通过。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.16.4>；资产 `MaiMate-latest.apk` 大小 `62,250,492` bytes（59.4 MB），SHA-256 `febe9869970eaea67ab958b2ba85056b5b55339bc068014c73ef6c101bd5fd25`（本地下载资产复算）。落地页更新 v1.16.4 文案、日志与 SHA 后经 wrangler 部署 Pages（deployment `4fd06512.maimate-landing.pages.dev`，部署后边缘传播约 20 秒）；线上校验落地页含 v1.16.4 与新 SHA、下载按钮 GitHub 直链有效、GitHub 直链 200 / content-length `62,250,492` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（快照页标题/返回键/状态栏不再遮挡、战报榜内曲目显示 +N RA（B50）、搜索历史长按删除、详情页成绩曲线（多快照后更有意义））。
 - 发布补记（当日）：功能提交 `f20a4e2`（14 文件 +113/−56）；轻量标签 `v1.16.3` git 推送一次成功。云构建 run `33241108334` 一次通过。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.16.3>；资产 `MaiMate-latest.apk` 大小 `62,246,388` bytes（59.4 MB），SHA-256 `a784260fce6035e7565c8cfc64f23af0fbe8009f6ae3021cc045a248c05c85d5`（本地下载资产复算）。落地页更新 v1.16.3 文案、日志、SHA 与 GitHub 直链下载按钮（探测脚本已删）后经 wrangler 部署 Pages（deployment `fad35420.maimate-landing.pages.dev`）；线上校验落地页含 v1.16.3 与新 SHA、下载按钮 href 为 `releases/latest/download/MaiMate-latest.apk` 直链、页面无 fetch 探测代码、GitHub 直链 200 / content-length `62,246,388` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（快照管理从信息查询进入为独立页面且不再跳设置、战报 RA（B50）口径、到底按钮右下角、计划卡紧凑、计划查漏条、下载站直链在国内的连通性）。
