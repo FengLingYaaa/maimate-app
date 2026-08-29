@@ -43,6 +43,10 @@ interface Fit50Result {
   total: number;
   /** 有 fit_diff 数据的谱面数（0 表示 chart_stats 未加载）。 */
   chartsWithFitDiff: number;
+  /** v1.16.1：榜满时「挤掉第 50 名所需单谱 Rating」（≥1）；榜未满或无候补为 null。 */
+  pushOutGap: number | null;
+  /** 榜外候补谱面数。 */
+  outsideCount: number;
 }
 
 /**
@@ -85,7 +89,14 @@ export function computeFit50(
     || left.difficultyIndex - right.difficultyIndex);
   const entries = rows.slice(0, FIT50_SIZE).map((row, index) => ({ ...row, rank: index + 1 }));
   const total = entries.reduce((sum, entry) => sum + entry.rating, 0);
-  return { entries, total, chartsWithFitDiff };
+  // v1.16.1：挤榜提示——榜满（候选 >50）时，距挤掉第 50 名还差多少单谱 Rating。
+  const rank50Rating = entries.length === FIT50_SIZE ? entries[FIT50_SIZE - 1].rating : null;
+  const bubbles = rows.slice(FIT50_SIZE);
+  const bestBubbleRating = bubbles.length > 0 ? bubbles[0].rating : null;
+  const pushOutGap = rank50Rating !== null && bestBubbleRating !== null
+    ? Math.max(1, rank50Rating - bestBubbleRating + 1)
+    : null;
+  return { entries, total, chartsWithFitDiff, pushOutGap, outsideCount: bubbles.length };
 }
 
 /** 拟合 50 池内按其它维度排序（页面排序切换用）。 */

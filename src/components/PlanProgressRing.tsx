@@ -23,17 +23,20 @@ function arcColor(ratio: number, allAchieved: boolean): string {
 interface Props {
   achieved: number;
   total: number;
+  /** 平均完成率（%）。v1.16.1 起弧长与配色改用达标比例，此值仅保留兼容调用方。 */
   averagePercent: number;
   allAchieved: boolean;
 }
 
 export function PlanProgressRing({ achieved, total, averagePercent, allAchieved }: Props) {
-  const ratio = total > 0 ? Math.max(0, Math.min(1, averagePercent / 100)) : 0;
+  // v1.16.1：按达标比例（achieved/total）填充——平均完成率在成绩未导入时恒为 0，
+  // 会导致圆环空转看不见；达标比例与环心 x/y 同口径，有达标即有弧。
+  const ratio = total > 0 ? Math.max(0, Math.min(1, achieved / total)) : 0;
   const color = arcColor(ratio, allAchieved);
   return (
     <View style={styles.holder}>
       <Svg width={SIZE} height={SIZE}>
-        <Circle cx={SIZE / 2} cy={SIZE / 2} r={RADIUS} stroke={Colors.bg.tertiary} strokeWidth={STROKE} fill="none" />
+        <Circle cx={SIZE / 2} cy={SIZE / 2} r={RADIUS} stroke={Colors.border.medium} strokeWidth={STROKE} fill="none" />
         {ratio > 0 && (
           <Circle
             cx={SIZE / 2}

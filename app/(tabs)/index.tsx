@@ -142,6 +142,7 @@ export default function SongBrowser() {
         chinaVersionOptions={chinaVersionOptions}
         artists={artists}
         charters={charters}
+        historyKey="library"
       />
 
       {/* 歌曲列表 */}

@@ -254,6 +254,14 @@ export default function B50Screen() {
               </View>
             )}
 
+            {screenMode === 'fit50' && fit50.pushOutGap !== null && (
+              <View style={styles.bulkNoticeBar}>
+                <Text style={styles.bulkNoticeText}>
+                  榜已满 · 榜外还有 {fit50.outsideCount} 张谱面，打出 {fit50.pushOutGap} 分以上的单谱拟合 Rating 即可挤掉第 50 名
+                </Text>
+              </View>
+            )}
+
             {screenMode === 'fit50' && fit50.entries.length < 50 && chartStatsLoading && (
               <View style={styles.bulkNoticeBar}>
                 <Text style={styles.bulkNoticeText}>拟合定数加载中，榜单暂不完整…</Text>

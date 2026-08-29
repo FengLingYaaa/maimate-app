@@ -16,5 +16,6 @@ export { B50ShareCard } from './B50ShareCard';
 export { Fit50ShareCard } from './Fit50ShareCard';
 export { BattleReportShareCard } from './BattleReportShareCard';
 export { PlanProgressRing } from './PlanProgressRing';
+export { ChangelogOverlay } from './ChangelogOverlay';
 export { SongShareCard } from './SongShareCard';
 export { ShareCardOverlay } from './ShareCardOverlay';

@@ -1,19 +1,26 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Stack, useFocusEffect, usePathname, useRouter } from 'expo-router';
 import { Colors } from '../../../src/constants';
 
 export default function SettingsStackLayout() {
   const router = useRouter();
   const pathname = usePathname();
-  // v1.16.0：每次聚焦设置 tab 强制回到设置首页——否则上次停留在子页
-  // （如快照管理）时，切走再切回会直接恢复子页，不符合操作直觉。
+  // v1.16.1：pathname 只存 ref 不进依赖——否则栈内导航（pathname 变化）也会触发
+  // 归位，把快照管理/检查更新等次级页弹回首页（v1.16.0 回归根因）。
+  // 仅在布局真正聚焦（从其它 tab 切回）时检查一次并归位。
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
+  const prevFocused = useRef(true);
   useFocusEffect(
     React.useCallback(() => {
-      if (pathname !== '/settings') {
+      if (prevFocused.current) {
+        prevFocused.current = false;
+        return;
+      }
+      if (pathnameRef.current !== '/settings') {
         router.replace('/settings');
       }
-      // pathname 变化会重新触发；仅在聚焦时归位一次。
-    }, [pathname, router]),
+    }, [router]),
   );
   return (
     <Stack

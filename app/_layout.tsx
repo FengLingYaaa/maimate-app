@@ -11,6 +11,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View, Text, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Colors } from '../src/constants';
+import { ChangelogOverlay } from '../src/components/ChangelogOverlay';
 import { useBilibiliStore, useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '../src/store';
 
 export default function RootLayout() {
@@ -54,6 +55,8 @@ export default function RootLayout() {
         <Stack.Screen name="song" />
         <Stack.Screen name="b50" />
       </Stack>
+      {/* v1.16.1：新版本首次启动的更新日志浮层，覆盖在最上层。 */}
+      <ChangelogOverlay />
     </GestureHandlerRootView>
   );
 }

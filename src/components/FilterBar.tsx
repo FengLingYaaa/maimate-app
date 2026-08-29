@@ -32,6 +32,8 @@ interface Props {
   chinaVersionOptions?: VersionOption[];
   artists: string[];
   charters: string[];
+  /** 搜索历史存储分键（v1.16.1）：'library' | 'plan'，默认 'library'。 */
+  historyKey?: 'library' | 'plan';
 }
 
 function cleanFilters(input: FilterOptions): FilterOptions {
@@ -70,28 +72,45 @@ export function FilterBar({
   chinaVersionOptions = [],
   artists,
   charters,
+  /** v1.16.1：搜索历史分键——不同页面独立记忆（如 'library' / 'plan'）。 */
+  historyKey = 'library',
 }: Props) {
   const [showModal, setShowModal] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
   const [localFilters, setLocalFilters] = useState<FilterOptions>({ ...filters });
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // v1.15.2：曲库搜索历史（最近 5 条，本机 AsyncStorage 持久化）。
-  const [searchHistory, setSearchHistory] = useState<string[]>([]);
-  const HISTORY_KEY = 'maimate_search_history';
+  // v1.16.1：按 historyKey 分键存储，曲库与计划互不干扰；旧版共享 key 的数据迁给曲库。
   const HISTORY_LIMIT = 5;
+  const historyStorageKey = historyKey === 'plan' ? 'maimate_search_history:plan' : 'maimate_search_history:library';
+  const legacyHistoryKey = 'maimate_search_history';
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const HISTORY_KEY = historyStorageKey;
 
   useEffect(() => {
-    AsyncStorage.getItem(HISTORY_KEY)
-      .then(raw => {
-        try {
-          const parsed = raw ? JSON.parse(raw) : [];
-          if (Array.isArray(parsed)) setSearchHistory(parsed.filter(item => typeof item === 'string').slice(0, HISTORY_LIMIT));
-        } catch {
-          // 忽略坏数据。
+    let cancelled = false;
+    (async () => {
+      try {
+        // v1.16.1：旧版共享 key 的历史迁给曲库（新键为空时），避免用户丢记录。
+        let raw = await AsyncStorage.getItem(historyStorageKey);
+        if (raw === null) {
+          raw = await AsyncStorage.getItem(legacyHistoryKey);
+          if (raw !== null && historyStorageKey === 'maimate_search_history:library') {
+            AsyncStorage.setItem(historyStorageKey, raw).catch(() => undefined);
+          }
         }
-      })
-      .catch(() => undefined);
-  }, []);
+        const parsed = raw ? JSON.parse(raw) : [];
+        if (!cancelled && Array.isArray(parsed)) {
+          setSearchHistory(parsed.filter(item => typeof item === 'string').slice(0, HISTORY_LIMIT));
+        }
+      } catch {
+        // 忽略坏数据。
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [historyStorageKey, legacyHistoryKey]);
 
   const recordSearch = useCallback((query: string) => {
     const trimmed = query.trim();

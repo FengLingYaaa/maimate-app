@@ -239,6 +239,7 @@ export default function PushPlan() {
         chinaVersionOptions={chinaVersionOptions}
         artists={artists}
         charters={charters}
+        historyKey="plan"
       />
       {plannedRows.length === 0 ? (
         <EmptyPlan />
