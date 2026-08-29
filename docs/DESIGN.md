@@ -96,10 +96,10 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | v1.16.0 功能主体（前一代 `9e708e0` 为 v1.15.2 文档收尾） |
-| 当前标签 | v1.16.0 已推送（触发云构建，构建结果见发布补记） |
+| 当前提交 | v1.16.1 功能主体（前一代 `ab101c2` 为 v1.16.0 文档收尾） |
+| 当前标签 | v1.16.1 已推送（触发云构建，构建结果见发布补记） |
 | Android applicationId | `cc.flya.maimate` |
-| App 版本 | `1.16.0`（Android versionCode `26`） |
+| App 版本 | `1.16.1`（Android versionCode `27`） |
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
@@ -1019,3 +1019,10 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - R2 决策：APK 分发迁 Cloudflare R2 方案已向用户说明（bucket+Worker 绑定+发版上传步骤、免费额度 10GB/千万次读、Workers 免费档 10 万请求/天硬顶天然兜底超额），用户选择后续自行配置，落地页本轮仍走 302 → GitHub 直链。
 - 回归与版本：六组本地回归全绿；`expo-doctor` 21/21；`expo export --platform android` 通过；`app.json` 升 `1.16.0`/versionCode `26`。发布补记待构建后回填。
 - 发布补记（当日）：功能提交 `2c64758`（33 文件 +474/−176）；轻量标签 `v1.16.0` git 推送一次成功。云构建 run `33198702590` 一次通过。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.16.0>；资产 `MaiMate-latest.apk` 大小 `62,223,316` bytes（59.3 MB），SHA-256 `e8507acc64adf2a33a1e3a86144388e589751be9f877c423ac8e4b21a354c868`（本地下载资产复算）。落地页更新 v1.16.0 文案、日志与 SHA 后经 wrangler 部署 Pages（deployment `6e565ccf.maimate-landing.pages.dev`）；线上校验落地页 200 且含 v1.16.0 与新 SHA、`HEAD /MaiMate-latest.apk` 返回 302 → GitHub 直链、GitHub 直链 200 / content-length `62,223,316` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（新图标各处置显示、拟合定数排序与标注、环形进度条配色、战报 DX Rating chip、设置栈归位、B50/nb50 默认网格、存相册 legacy 导入后无告警、牌子页分享已移除）。
+
+### v1.16.1（2026-08-28，第七轮用户反馈）
+
+- 用户反馈与处置：① 设置页次级界面全部无法进入/点快照管理跳回设置/检查更新进不去——同一根因：v1.16.0 的 `useFocusEffect` 把 `pathname` 放进依赖数组，栈内导航（pathname 变化）也触发归位 replace 回首页；修法为 pathname 存 ref、回调依赖仅 router，用 `prevFocused` ref 区分布局首次挂载与真正切 tab 聚焦，只在聚焦时检查归位（`settings/_layout.tsx`）；② 环形进度条没生效——弧长按平均完成率填充，成绩未导入时恒为 0 只剩隐形底环；改按达标比例 `achieved/total` 填充与配色（<30% 红/<70% 黄/≥70% 绿/全达标金），底环色从 `bg.tertiary` 提亮到 `border.medium`，`averagePercent` prop 保留兼容（`PlanProgressRing.tsx`）；③ 搜索历史曲库与计划同步——FilterBar 加 `historyKey` prop（'library'|'plan'），存储键分 `maimate_search_history:library` / `:plan`，旧共享 key 数据迁给曲库，曲库页显式传 library、计划页传 plan。
+- 新功能：④ nb50 挤榜提示——`computeFit50` 返回 `pushOutGap`（榜满且榜外有候补时 = 第 50 名 Rating − 榜首候补 Rating + 1，下限 1）与 `outsideCount`，nb50 总览在汇总卡下显示「榜已满 · 榜外还有 N 张谱面，打出 X 分以上的单谱拟合 Rating 即可挤掉第 50 名」；⑤ 更新日志浮层——`src/data/changelog.ts` 内置最近版本日志（离线数据），`ChangelogOverlay` 挂根布局最上层：`Constants.expoConfig.version` 对照 AsyncStorage 已读标记（键存版本号非布尔，跨版本自然再弹），有当日志即自绘 overlay 展示「更新完成 v版 · 日期 + 亮点列表 + 知道了」，读取失败静默不阻塞启动。
+- 回归与版本：六组本地回归全绿；`expo-doctor` 21/21；`expo export --platform android` 通过；`app.json` 升 `1.16.1`/versionCode `27`。发布补记待构建后回填。
+- 发布补记（当日）：功能提交 `cffef63`（13 文件 +213/−24）；轻量标签 `v1.16.1` git 推送一次成功。云构建 run `33232230351` 一次通过。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.16.1>；资产 `MaiMate-latest.apk` 大小 `62,228,744` bytes（59.3 MB），SHA-256 `b80a0deaab46bfc355b9fe8c8987215f272da707b875aa36f2e9f03b072bbeda`（本地下载资产复算）。落地页更新 v1.16.1 文案、日志与 SHA 后经 wrangler 部署 Pages（deployment `ebeb2570.maimate-landing.pages.dev`）；线上校验落地页 200 且含 v1.16.1 与新 SHA、`HEAD /MaiMate-latest.apk` 返回 302 → GitHub 直链、GitHub 直链 200 / content-length `62,228,744` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（设置次级页恢复正常导航、进度环可见、搜索历史分页面记忆、nb50 挤榜提示、更新浮层首启弹出）。
