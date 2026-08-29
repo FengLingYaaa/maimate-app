@@ -96,10 +96,10 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | v1.16.1 功能主体（前一代 `ab101c2` 为 v1.16.0 文档收尾） |
-| 当前标签 | v1.16.1 已推送（触发云构建，构建结果见发布补记） |
+| 当前提交 | v1.16.2 功能主体（前一代 `917d238` 为 v1.16.1 文档收尾） |
+| 当前标签 | v1.16.2 已推送（触发云构建，构建结果见发布补记） |
 | Android applicationId | `cc.flya.maimate` |
-| App 版本 | `1.16.1`（Android versionCode `27`） |
+| App 版本 | `1.16.2`（Android versionCode `28`） |
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
@@ -1026,3 +1026,9 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 新功能：④ nb50 挤榜提示——`computeFit50` 返回 `pushOutGap`（榜满且榜外有候补时 = 第 50 名 Rating − 榜首候补 Rating + 1，下限 1）与 `outsideCount`，nb50 总览在汇总卡下显示「榜已满 · 榜外还有 N 张谱面，打出 X 分以上的单谱拟合 Rating 即可挤掉第 50 名」；⑤ 更新日志浮层——`src/data/changelog.ts` 内置最近版本日志（离线数据），`ChangelogOverlay` 挂根布局最上层：`Constants.expoConfig.version` 对照 AsyncStorage 已读标记（键存版本号非布尔，跨版本自然再弹），有当日志即自绘 overlay 展示「更新完成 v版 · 日期 + 亮点列表 + 知道了」，读取失败静默不阻塞启动。
 - 回归与版本：六组本地回归全绿；`expo-doctor` 21/21；`expo export --platform android` 通过；`app.json` 升 `1.16.1`/versionCode `27`。发布补记待构建后回填。
 - 发布补记（当日）：功能提交 `cffef63`（13 文件 +213/−24）；轻量标签 `v1.16.1` git 推送一次成功。云构建 run `33232230351` 一次通过。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.16.1>；资产 `MaiMate-latest.apk` 大小 `62,228,744` bytes（59.3 MB），SHA-256 `b80a0deaab46bfc355b9fe8c8987215f272da707b875aa36f2e9f03b072bbeda`（本地下载资产复算）。落地页更新 v1.16.1 文案、日志与 SHA 后经 wrangler 部署 Pages（deployment `ebeb2570.maimate-landing.pages.dev`）；线上校验落地页 200 且含 v1.16.1 与新 SHA、`HEAD /MaiMate-latest.apk` 返回 302 → GitHub 直链、GitHub 直链 200 / content-length `62,228,744` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（设置次级页恢复正常导航、进度环可见、搜索历史分页面记忆、nb50 挤榜提示、更新浮层首启弹出）。
+
+### v1.16.2（2026-08-29，第八轮用户反馈）
+
+- 用户反馈与处置：① 拟合定数标注 `fit 13.9` 改为 `13.86`（去前缀 + `toFixed(2)` 两位小数，SongCard），难度行更容易保持单行；② 删 nb50「榜外还有…」板块，`computeFit50` 撤 `pushOutGap`/`outsideCount` 字段；③ 成绩同步后新达标曲目自动沉底——`plan-store` 新增 `sinkAchievedEntries(entryIds)`（保持相对顺序移到末尾并持久化），`score-store.syncScores` 在 diffScores 后按「条目设了目标分且 before < 目标 ≤ after」检出并调用；设置新增 `autoSinkAchieved`（默认开，设置页「新达标自动沉底」行可关，backup 归一化同步兼容 + sortMode 补 fitAsc/fitDesc）；④ 计划页右下悬浮「到底部」按钮——`PlanDragList` 挂 `onScroll`（距底 <40 判定到底）、`React.ElementRef<typeof DraggableFlatList>` ref 调 `scrollToEnd`，到底或拖拽中隐藏；⑤ 计划抽歌默认排除已达标（`achievedPlanIds` 由目标分与成绩比对得出，「含已达标」开关可包含），每日不重复优先——`plan-draw-history.ts` 按本地日期记录最近 7 天已抽键，抽取时优先从未抽池选、抽遍后回落全量并提示；⑥ 抽歌历史——抽歌页「抽歌历史」按钮开自绘弹层，最近 7 天按日分组展示（曲名 + 难度缩写）；⑦ 牌子页一键导入后自绘弹窗（非原生 Alert）询问是否为本次加入谱面统一设 100% 目标，确认后 `updateTargetScore` 逐条写入。更新日志浮层数据源 `changelog.ts` 同步补 1.16.2 条目。
+- 回归与版本：六组本地回归全绿；`expo-doctor` 21/21；`expo export --platform android` 通过；`app.json` 升 `1.16.2`/versionCode `28`。发布补记待构建后回填。
+- 发布补记（当日）：功能提交 `eea481e`（17 文件 +441/−70）；轻量标签 `v1.16.2` git 推送一次成功。云构建 run `33234979260` 一次通过。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.16.2>；资产 `MaiMate-latest.apk` 大小 `62,243,892` bytes（59.4 MB），SHA-256 `f2242fdf5a03820fe32bedeb0fe453e37394325220f0f877c187b81a9064c2ba`（本地下载资产复算）。落地页更新 v1.16.2 文案、日志与 SHA 后经 wrangler 部署 Pages（deployment `241f8138.maimate-landing.pages.dev`）；线上校验落地页 200 且含 v1.16.2 与新 SHA、`HEAD /MaiMate-latest.apk` 返回 302 → GitHub 直链、GitHub 直链 200 / content-length `62,243,892` 与资产一致。SHA/大小回填为文档收尾提交。等待用户真机验收（拟合标注两位小数一行显示、计划到底按钮、同步后沉底与开关、计划抽歌排除已达标与每日不重复、抽歌历史弹层、牌子页导入 100% 目标弹窗）。
