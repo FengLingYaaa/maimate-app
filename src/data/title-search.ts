@@ -44,14 +44,18 @@ function scoreTitle(title: string, recognizedLine: string): number | null {
 
   const distance = levenshtein(normalizedTitle, normalizedLine);
   const similarity = 1 - distance / Math.max(normalizedTitle.length, normalizedLine.length);
+  // v1.16.6：OCR 少识别一个字符（缺字母）是高频场景——允许 1 字符差异的行
+  // 以较高相似度入围（0.72 档），避免「缺一个字母就不显示」。
+  if (distance === 1 && normalizedTitle.length >= 3) return 0.72 + similarity * 0.1;
   return similarity >= 0.55 ? similarity : null;
 }
 
 /**
  * Match OCR text against official titles and the independent alias layer.
  * Artist, charter, cover artwork, and other metadata are deliberately ignored.
+ * v1.16.6：默认上限 8 → 12（一张图可能含多首，10 张图批量导入场景）。
  */
-export function matchSongTitles(rawData: MusicData[], recognizedText: string, limit = 8): TitleMatch[] {
+export function matchSongTitles(rawData: MusicData[], recognizedText: string, limit = 12): TitleMatch[] {
   const lines = recognizedText
     .split(/\r?\n/)
     .map(line => line.trim())

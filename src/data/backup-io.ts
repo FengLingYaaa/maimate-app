@@ -4,6 +4,7 @@ import Constants from 'expo-constants';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
+import { StorageAccessFramework } from 'expo-file-system/legacy';
 import { CACHE_KEYS } from '../constants/game';
 import { useBilibiliStore, usePlanStore, useScoreStore, useSettingsStore } from '../store';
 import {
@@ -66,7 +67,7 @@ async function readFortuneSeed(): Promise<string | null> {
 }
 
 /** 导出完整备份到临时文件并拉起系统分享面板。返回分享的文件名与摘要。 */
-export async function exportBackupToShare(): Promise<{ fileName: string; summary: BackupSummary }> {
+export async function exportBackup(mode: 'share' | 'save'): Promise<{ fileName: string; summary: BackupSummary; savedTo?: string }> {
   const cacheDirectory = FileSystem.cacheDirectory;
   if (!cacheDirectory) throw new BackupError('无法访问应用缓存目录');
 
@@ -74,14 +75,37 @@ export async function exportBackupToShare(): Promise<{ fileName: string; summary
   data.fortuneSeed = await readFortuneSeed();
   const backup = buildBackup(data, currentAppVersion(), Platform.OS);
   const fileName = exportFileName();
-  const fileUri = `${cacheDirectory}${fileName}`;
-  await FileSystem.writeAsStringAsync(fileUri, serializeBackup(backup), { encoding: FileSystem.EncodingType.UTF8 });
+  const content = serializeBackup(backup);
 
+  if (mode === 'save') {
+    try {
+      const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
+      if (!permissions.granted) throw new BackupError('SAF_SAVE_CANCELLED');
+      const fileUri = await StorageAccessFramework.createFileAsync(permissions.directoryUri, fileName, 'application/json');
+      await StorageAccessFramework.writeAsStringAsync(fileUri, content, { encoding: FileSystem.EncodingType.UTF8 });
+      return {
+        fileName,
+        summary: {
+          planEntries: backup.data.plan.entries.length,
+          scores: backup.data.scores.scores.length,
+          snapshots: backup.data.scores.snapshots.length,
+          bilibiliLinks: backup.data.bilibiliLinks.length,
+          hasFortuneSeed: Boolean(backup.data.fortuneSeed),
+        },
+        savedTo: fileUri,
+      };
+    } catch (error) {
+      if (error instanceof BackupError) throw error;
+      throw new BackupError('SAF_SAVE_CANCELLED');
+    }
+  }
+
+  const fileUri = `${cacheDirectory}${fileName}`;
+  await FileSystem.writeAsStringAsync(fileUri, content, { encoding: FileSystem.EncodingType.UTF8 });
   try {
     if (!(await Sharing.isAvailableAsync())) throw new BackupError('当前设备不支持系统分享');
     await Sharing.shareAsync(fileUri, { mimeType: 'application/json', dialogTitle: '导出 MaiMate 备份', UTI: 'public.json' });
   } finally {
-    // 分享面板关闭后清理临时文件；失败不影响导出结果。
     FileSystem.deleteAsync(fileUri, { idempotent: true }).catch(() => undefined);
   }
 

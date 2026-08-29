@@ -113,6 +113,12 @@ function scoreText(text: string, query: string): number | null {
 
 /** 返回歌曲与标题搜索词的相关度，供筛选结果排序。 */
 export function getMusicSearchScore(music: MusicData, query: string): number | null {
+  // v1.16.6：纯数字搜索词优先按歌曲 ID 精确/前缀匹配（ID 为纯数字）。
+  const trimmed = query.trim();
+  if (/^\d{2,}$/.test(trimmed)) {
+    if (music.id === trimmed) return 1;
+    if (music.id.startsWith(trimmed)) return 0.85;
+  }
   const values = [
     ...getSearchTitles(music).map(title => scoreText(title, query)),
     scoreText(music.basic_info.artist, query),

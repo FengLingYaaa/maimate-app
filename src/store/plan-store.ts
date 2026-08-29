@@ -176,6 +176,24 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
       }
       return;
     }
+    // v1.16.6：清空全部时跳过英灵殿归档与 normalize，直接置空 + 立即持久化空数组
+    // （大列表 diff + 全量英灵殿复制是「清空响应慢」的根因；列表随即整体卸载）。
+    if (keySet.size === get().entries.length) {
+      set({ entries: [] });
+      void enqueuePlanPersist([]);
+      if (purge) {
+        const graveyard = get().graveyard.filter(item => !keySet.has(planEntryKey(item.entry)));
+        set({ graveyard });
+        void enqueueGraveyardPersist(graveyard);
+      } else {
+        const now = Date.now();
+        const archived = removed.map((entry, index) => ({ entry, removedAt: now + index }));
+        const graveyard = [...archived, ...get().graveyard];
+        set({ graveyard });
+        void enqueueGraveyardPersist(graveyard);
+      }
+      return;
+    }
     const entries = normalizePlanEntries(get().entries.filter(entry => !keySet.has(planEntryKey(entry))));
     const now = Date.now();
     const graveyard = purge

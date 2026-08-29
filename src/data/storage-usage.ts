@@ -1,12 +1,15 @@
 /**
- * 存储占用分析（v1.16.5）：估算应用三类本机占用量并在设置页展示。
- * - 应用本体：只读展示（APK 安装体积，取应用安装目录大小需原生 API，展示固定口径即可）。
+ * 存储占用分析（v1.16.6）：估算应用三类本机占用量并在设置页展示。
+ * - 应用本体：APK 安装体积（约 59.4 MB）；系统「应用详情」显示的 ~120 MB 为安装后
+ *   解压 so/资源的口径，页面附说明文字。
  * - 成绩与计划数据：遍历 AsyncStorage 全部键值求字节数（UTF-8）。
- * - 曲绘缓存：扫 covers 缓存目录文件数与字节数。
+ * - 曲绘缓存：expo-file-system 新 API（File.size / Directory.size）统计，v1.16.5 的
+ *   legacy getInfoAsync 不带 size 导致恒 0。
+ * - 其它缓存：cache 根目录下 covers 之外的内容（旧版残留/网络缓存），支持清理。
  */
 
-import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
+import { File, Directory } from 'expo-file-system';
 import { clearCoverCache } from './cover-cache';
 
 export interface StorageBreakdown {
@@ -16,10 +19,11 @@ export interface StorageBreakdown {
   coverBytes: number;
   /** 曲绘缓存文件数。 */
   coverCount: number;
+  /** cache 根目录下除 covers 外的其它缓存字节。 */
+  otherBytes: number;
 }
 
 function utf8Bytes(text: string): number {
-  // 轻量估算：CJK 计 3 字节，其余 1 字节（足够做占用展示）。
   let bytes = 0;
   for (let index = 0; index < text.length; index += 1) {
     const code = text.charCodeAt(index);
@@ -30,14 +34,9 @@ function utf8Bytes(text: string): number {
 
 /** 遍历 AsyncStorage 全部键值求字节和。 */
 async function measureAsyncStorage(): Promise<number> {
-  const keys = await (async () => {
-    const mod = await import('@react-native-async-storage/async-storage');
-    return mod.default.getAllKeys();
-  })();
-  const pairs = await (async () => {
-    const mod = await import('@react-native-async-storage/async-storage');
-    return mod.default.multiGet(keys as readonly string[]);
-  })();
+  const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+  const keys = await AsyncStorage.getAllKeys();
+  const pairs = await AsyncStorage.multiGet(keys as readonly string[]);
   let total = 0;
   for (const [key, value] of pairs) {
     total += utf8Bytes(key) + utf8Bytes(value ?? '');
@@ -45,56 +44,86 @@ async function measureAsyncStorage(): Promise<number> {
   return total;
 }
 
-/** 统计目录字节与文件数（递归一层足够：covers 目录是平铺的）。 */
-async function measureDirectory(dirUri: string): Promise<{ bytes: number; count: number }> {
-  let bytes = 0;
-  let count = 0;
-  let items = null;
+/** 用新 File API 统计目录（文件字节 + 文件数）；目录不存在返回 0。 */
+function measureDirectoryWithFileApi(dirUri: string): { bytes: number; count: number } {
   try {
-    items = await FileSystem.readDirectoryAsync(dirUri);
+    const dir = new Directory(dirUri);
+    if (!dir.exists) return { bytes: 0, count: 0 };
+    let bytes = 0;
+    let count = 0;
+    for (const item of dir.list()) {
+      if (item instanceof File) {
+        bytes += item.size;
+        count += 1;
+      }
+    }
+    return { bytes, count };
   } catch {
     return { bytes: 0, count: 0 };
   }
-  for (const name of items) {
-    try {
-      const info = await FileSystem.getInfoAsync(dirUri + name);
-      if (info.exists) {
-        bytes += (info as unknown as { size?: number }).size ?? 0;
-        count += 1;
-      }
-    } catch {
-      // 单个文件失败跳过。
+}
+
+/** cache 根目录一级子项里 covers 之外的字节（含散落文件与其它子目录）。 */
+function measureOtherCache(cacheUri: string, coversDirName: string): number {
+  try {
+    const cacheDir = new Directory(cacheUri);
+    if (!cacheDir.exists) return 0;
+    let bytes = 0;
+    for (const item of cacheDir.list()) {
+      if (item.name === coversDirName) continue;
+      if (item instanceof File) bytes += item.size;
+      else if (item instanceof Directory) bytes += item.size ?? 0;
     }
+    return bytes;
+  } catch {
+    return 0;
   }
-  return { bytes, count };
 }
 
 /** 汇总存储占用（异步，设置页进入时调用一次）。 */
 export async function measureStorageBreakdown(): Promise<StorageBreakdown> {
   const dataBytes = await measureAsyncStorage();
-  const cacheDirectory = FileSystem.cacheDirectory;
-  const coverDir = cacheDirectory ? `${cacheDirectory}covers/` : null;
-  const cover = coverDir ? await measureDirectory(coverDir) : { bytes: 0, count: 0 };
-  return { dataBytes, coverBytes: cover.bytes, coverCount: cover.count };
+  const cacheUri = FileSystem.cacheDirectory;
+  const cover = cacheUri ? measureDirectoryWithFileApi(`${cacheUri}covers/`) : { bytes: 0, count: 0 };
+  const otherBytes = cacheUri ? measureOtherCache(cacheUri, 'covers') : 0;
+  return { dataBytes, coverBytes: cover.bytes, coverCount: cover.count, otherBytes };
 }
 
-/** 清理曲绘缓存并返回是否执行了删除。 */
+/** 清理曲绘缓存。返回是否执行了删除。 */
 export async function clearCovers(): Promise<boolean> {
-  const before = await (async () => {
-    const cacheDirectory = FileSystem.cacheDirectory;
-    const coverDir = cacheDirectory ? `${cacheDirectory}covers/` : null;
-    return coverDir ? measureDirectory(coverDir) : { bytes: 0, count: 0 };
-  })();
+  const cacheUri = FileSystem.cacheDirectory;
+  if (!cacheUri) return false;
+  const before = measureDirectoryWithFileApi(`${cacheUri}covers/`);
   if (before.count === 0) return false;
   await clearCoverCache();
   return true;
 }
 
-/** 清理成绩与计划数据（复用「清除本地成绩」现有链路；此处仅返回数据量字节）。 */
+/** 清理 cache 根目录下 covers 之外的缓存（不动曲绘，不动 document 数据）。 */
+export async function clearOtherCache(): Promise<boolean> {
+  const cacheUri = FileSystem.cacheDirectory;
+  if (!cacheUri) return false;
+  try {
+    const cacheDir = new Directory(cacheUri);
+    if (!cacheDir.exists) return false;
+    let removed = false;
+    for (const item of cacheDir.list()) {
+      if (item.name === 'covers') continue;
+      try {
+        item.delete();
+        removed = true;
+      } catch {
+        // 个别文件被占用时跳过。
+      }
+    }
+    return removed;
+  } catch {
+    return false;
+  }
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${bytes} B`;
 }
-
-export const STORAGE_PLATFORM = Platform.OS;

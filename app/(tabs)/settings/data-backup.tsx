@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { Colors } from '../../../src/constants';
-import { exportBackupToShare, pickAndValidateBackup, restoreBackup } from '../../../src/data/backup-io';
+import { exportBackup, pickAndValidateBackup, restoreBackup } from '../../../src/data/backup-io';
 import type { BackupSummary } from '../../../src/data/backup';
 
 type PendingRestore = { backup: Parameters<typeof restoreBackup>[0]; summary: BackupSummary; fileName: string };
@@ -18,14 +18,19 @@ export default function DataBackupScreen() {
     setMessage(text);
   };
 
-  const handleExport = async () => {
+  const handleExport = async (mode: 'share' | 'save') => {
     setBusy(true);
     setMessage(null);
     try {
-      const { fileName, summary } = await exportBackupToShare();
-      show('success', `已导出 ${fileName}\n计划 ${summary.planEntries} 条 · 成绩 ${summary.scores} 条 · 快照 ${summary.snapshots} 次 · 链接 ${summary.bilibiliLinks} 条`);
+      const { fileName, summary, savedTo } = await exportBackup(mode);
+      if (mode === 'save') {
+        show('success', `已保存 ${fileName} 到所选目录\n计划 ${summary.planEntries} 条 · 成绩 ${summary.scores} 条 · 快照 ${summary.snapshots} 次 · 链接 ${summary.bilibiliLinks} 条`);
+      } else {
+        show('success', `已导出 ${fileName}\n计划 ${summary.planEntries} 条 · 成绩 ${summary.scores} 条 · 快照 ${summary.snapshots} 次 · 链接 ${summary.bilibiliLinks} 条`);
+      }
     } catch (error) {
-      show('error', error instanceof Error ? error.message : '导出失败');
+      const message = error instanceof Error ? error.message : '导出失败';
+      show('error', message === 'SAF_SAVE_CANCELLED' ? '已取消保存' : message);
     } finally {
       setBusy(false);
     }
@@ -81,9 +86,14 @@ export default function DataBackupScreen() {
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>导出</Text>
-        <Pressable style={[styles.primaryButton, busy && styles.disabled]} disabled={busy} onPress={() => void handleExport()}>
-          <Text style={styles.primaryButtonText}>{busy ? '处理中…' : '导出完整备份'}</Text>
-        </Pressable>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Pressable style={[styles.primaryButton, { flex: 1 }, busy && styles.disabled]} disabled={busy} onPress={() => void handleExport('save')}>
+            <Text style={styles.primaryButtonText}>仅保存…</Text>
+          </Pressable>
+          <Pressable style={[styles.primaryButton, { flex: 1 }, busy && styles.disabled]} disabled={busy} onPress={() => void handleExport('share')}>
+            <Text style={styles.primaryButtonText}>保存并分享</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.card}>

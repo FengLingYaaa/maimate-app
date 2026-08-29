@@ -2,32 +2,29 @@
  * 随机抽歌页 — 推分计划、全曲库和按条件抽选。
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useMusicStore, usePlanStore, useScoreStore } from '../../src/store';
 import { DrumRoll, RangeSlider } from '../../src/components';
 import { Colors, DifficultyColorMap, DifficultyLabels, DifficultyShortLabels, MusicTypes } from '../../src/constants';
 import { getMatchingDifficultyIndices, MusicList } from '../../src/data/music-list';
 import { getVersionOptions } from '../../src/data/version-catalog';
-import { getTodayDrawnKeys, recordDraw, localDateKey } from '../../src/data/plan-draw-history';
+import {
+  getTodayRecord,
+  recordDraw,
+  clearFallbackFlag,
+  resetToday,
+  getRecentHistory,
+  localDateKey,
+  type DayRecord,
+  type DrawMode as StoreDrawMode,
+} from '../../src/data/plan-draw-history';
 import type { DrawCandidate, FilterOptions, PlanEntry, PlayerScore } from '../../src/data/types';
 
-type DrawMode = 'plan' | 'any' | 'filtered';
+type DrawMode = StoreDrawMode;
 
-/** 最近 N 天本地日期键列表（升序），抽歌历史过滤用。 */
-function recentDateKeys(days: number): string[] {
-  const keys: string[] = [];
-  for (let i = days - 1; i >= 0; i -= 1) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    const month = `${date.getMonth() + 1}`.padStart(2, '0');
-    const day = `${date.getDate()}`.padStart(2, '0');
-    keys.push(`${date.getFullYear()}-${month}-${day}`);
-  }
-  return keys;
-}
+const MODE_LABELS: Record<DrawMode, string> = { plan: '计划', any: '全曲', filtered: '条件' };
 
 function toggleValue<T extends string | number>(current: T | T[] | undefined, value: T): T | T[] | undefined {
   if (current === undefined) return value;
@@ -56,23 +53,24 @@ export default function RandomPicker() {
   const [spinning, setSpinning] = useState(false);
   // v1.16.2：计划抽歌默认排除已达标曲目（可手动包含）。
   const [includeAchieved, setIncludeAchieved] = useState(false);
-  // v1.16.2：每日不重复——今天已抽的谱面键（抽中后即时更新）。
-  const [drawnKeys, setDrawnKeys] = useState<string[]>([]);
+  // v1.16.6：三模式通用的每日记录（去重键集 + 抽取次数 + 回落标记）。
+  const [todayRecord, setTodayRecord] = useState<DayRecord>({ keys: [], draws: 0, fallback: false });
   // v1.16.2：抽歌历史弹层。
   const [historyVisible, setHistoryVisible] = useState(false);
-  const [historyDays, setHistoryDays] = useState<Array<{ date: string; items: string[] }>>([]);
+  const [historyDays, setHistoryDays] = useState<Awaited<ReturnType<typeof getRecentHistory>>>([]);
+  const [historyModeFilter, setHistoryModeFilter] = useState<'all' | DrawMode>('all');
   // v1.16.2：本次抽选是否回落到全量池（今日已抽遍时提示）。
   const [lastDrawFallback, setLastDrawFallback] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    getTodayDrawnKeys().then(keys => {
-      if (!cancelled) setDrawnKeys(keys);
+    getTodayRecord(mode).then(record => {
+      if (!cancelled) setTodayRecord(record);
     }).catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [mode]);
 
   const genres = useMemo(() => [...new Set(rawData.map(music => music.basic_info.genre))].sort(), [rawData]);
   const versionOptions = useMemo(() => getVersionOptions(rawData), [rawData]);
@@ -148,11 +146,11 @@ export default function RandomPicker() {
 
   const handleDraw = useCallback(() => {
     if (candidates.length === 0 || spinning) return;
-    // v1.16.2：仅计划模式启用每日不重复——优先从今天没抽过的池子里选。
+    // v1.16.6：三模式统一「今日不重复优先」——优先从今天没抽过的池子里选。
     let pool = candidates;
     let usedFallback = false;
-    if (mode === 'plan' && drawnKeys.length > 0) {
-      const fresh = candidates.filter(candidate => !drawnKeys.includes(candidateKey(candidate)));
+    if (todayRecord.keys.length > 0) {
+      const fresh = candidates.filter(candidate => !todayRecord.keys.includes(candidateKey(candidate)));
       if (fresh.length > 0) {
         pool = fresh;
       } else {
@@ -171,13 +169,16 @@ export default function RandomPicker() {
     setAnimationResultIndex(displayItems.length - 1);
     setSpinning(true);
     if (mode === 'filtered') setFiltersCollapsed(true);
-    if (mode === 'plan') {
-      const key = candidateKey(target);
-      setDrawnKeys(previous => (previous.includes(key) ? previous : [...previous, key]));
-      void recordDraw(key);
-      setLastDrawFallback(usedFallback);
-    }
-  }, [candidateKey, candidates, drawnKeys, mode, spinning]);
+    // 记录：次数 +1（抽到重复也算一次）；键去重；回落持久化。
+    const key = candidateKey(target);
+    setTodayRecord(previous => ({
+      keys: previous.keys.includes(key) ? previous.keys : [...previous.keys, key],
+      draws: previous.draws + 1,
+      fallback: previous.fallback || usedFallback,
+    }));
+    void recordDraw(mode, key, usedFallback);
+    setLastDrawFallback(usedFallback);
+  }, [candidateKey, candidates, mode, spinning, todayRecord]);
 
   const handleSpinEnd = useCallback(() => {
     setSpinning(false);
@@ -196,21 +197,34 @@ export default function RandomPicker() {
     });
   }, [router, spinning]);
 
-  /** 打开抽歌历史弹层：读最近 7 天记录并把键解析成可读条目。 */
+  /** 打开抽歌历史弹层：读最近 7 天全模式记录。 */
   const openDrawHistory = useCallback(async () => {
     try {
-      const raw = await AsyncStorage.getItem('maimate_plan_draw_history');
-      const parsed = raw ? JSON.parse(raw) as Record<string, string[]> : {};
-      const days = Object.entries(parsed)
-        .filter(([date]) => date >= recentDateKeys(7)[0])
-        .sort(([left], [right]) => right.localeCompare(left))
-        .map(([date, items]) => ({ date, items }));
-      setHistoryDays(days);
+      setHistoryDays(await getRecentHistory(7));
     } catch {
       setHistoryDays([]);
     }
     setHistoryVisible(true);
   }, []);
+
+  // v1.16.6：计划加入新曲目后，清除「已抽遍」回落标记让全量提示消失。
+  // 判定：计划池出现了 todayRecord.keys 之外的新键。
+  const planKeysRef = useRef<string>('');
+  useEffect(() => {
+    const planKeys = planCandidates.map(candidate => candidateKey(candidate)).sort().join('|');
+    const previousKeys = planKeysRef.current;
+    planKeysRef.current = planKeys;
+    if (previousKeys === '') return;
+    if (mode !== 'plan' || previousKeys === planKeys) return;
+    const addedNew = planKeys
+      .split('|')
+      .some(key => key && !todayRecord.keys.includes(key));
+    if (addedNew && todayRecord.fallback) {
+      void clearFallbackFlag('plan');
+      setTodayRecord(previous => ({ ...previous, fallback: false }));
+      setLastDrawFallback(false);
+    }
+  }, [candidateKey, mode, planCandidates, todayRecord]);
 
   const activeRange: [number, number] = filters.dsRange || [0, 15];
   const candidateLabel = mode === 'plan' ? `${candidates.length} 个计划谱面` : `${candidates.length} 个候选`;
@@ -244,8 +258,19 @@ export default function RandomPicker() {
           <Pressable style={styles.planToggle} onPress={openDrawHistory}>
             <Text style={styles.planToggleText}>抽歌历史</Text>
           </Pressable>
-          {drawnKeys.length > 0 && (
-            <Text style={styles.drawnHint}>今日已抽 {drawnKeys.length} 次（不重复优先）</Text>
+          {todayRecord.draws > 0 && (
+            <Text style={styles.drawnHint}>今日已抽 {todayRecord.draws} 次（不重复优先）</Text>
+          )}
+        </View>
+      )}
+
+      {mode !== 'plan' && (
+        <View style={styles.planOptionRow}>
+          <Pressable style={styles.planToggle} onPress={openDrawHistory}>
+            <Text style={styles.planToggleText}>抽歌历史</Text>
+          </Pressable>
+          {todayRecord.draws > 0 && (
+            <Text style={styles.drawnHint}>今日已抽 {todayRecord.draws} 次（不重复优先）</Text>
           )}
         </View>
       )}
@@ -393,35 +418,70 @@ export default function RandomPicker() {
         </Text>
       </Pressable>
 
-      {lastDrawFallback && mode === 'plan' && drawnKeys.length > 0 && !spinning && (
+      {lastDrawFallback && todayRecord.fallback && !spinning && (
         <View style={styles.fallbackNotice}>
-          <Text style={styles.fallbackNoticeText}>今天计划里的谱面已抽遍，本次从全量池抽取</Text>
+          <Text style={styles.fallbackNoticeText}>今天{MODE_LABELS[mode]}的谱面已抽遍，本次从全量池抽取</Text>
         </View>
       )}
 
-      {/* v1.16.2：抽歌历史弹层（最近 7 天，按日分组）。 */}
+      {/* v1.16.6：抽歌历史弹层（最近 7 天 × 三模式，可筛选）。 */}
       {historyVisible && (
         <View style={styles.historyBackdrop}>
           <View style={styles.historyCard}>
             <Text style={styles.historyTitle}>抽歌历史（最近 7 天）</Text>
+            <View style={styles.historyFilterRow}>
+              {(['all', 'plan', 'any', 'filtered'] as const).map(value => (
+                <Pressable
+                  key={value}
+                  style={[styles.historyFilterChip, historyModeFilter === value && styles.historyFilterChipActive]}
+                  onPress={() => setHistoryModeFilter(value)}
+                >
+                  <Text style={[styles.historyFilterChipText, historyModeFilter === value && styles.historyFilterChipTextActive]}>
+                    {value === 'all' ? '全部' : MODE_LABELS[value]}
+                  </Text>
+                </Pressable>
+              ))}
+              <Pressable
+                style={styles.historyResetBtn}
+                onPress={() => {
+                  void resetToday().then(() => {
+                    setTodayRecord({ keys: [], draws: 0, fallback: false });
+                    setLastDrawFallback(false);
+                    void openDrawHistory();
+                  });
+                }}
+              >
+                <Text style={styles.historyResetBtnText}>重置今日</Text>
+              </Pressable>
+            </View>
             <ScrollView style={styles.historyList} showsVerticalScrollIndicator={false}>
               {historyDays.length === 0 && (
                 <Text style={styles.historyEmpty}>还没有抽歌记录</Text>
               )}
-              {historyDays.map(day => (
-                <View key={day.date} style={styles.historyDay}>
-                  <Text style={styles.historyDate}>{day.date}{day.date === localDateKey() ? ' · 今天' : ''}</Text>
-                  {day.items.map(key => {
-                    const [musicType, songId, difficultyIndex] = key.split(':');
-                    const music = rawData.find(item => item.id === songId && item.type === musicType);
-                    return (
-                      <Text key={key} style={styles.historyItem} numberOfLines={1}>
-                        · {music ? music.title : songId} {DifficultyShortLabels[Number(difficultyIndex)] || ''}
-                      </Text>
-                    );
-                  })}
-                </View>
-              ))}
+              {historyDays.map(day => {
+                const modes = Object.entries(day.modes).filter(([modeKey]) => historyModeFilter === 'all' || modeKey === historyModeFilter);
+                const hasAny = modes.some(([, record]) => record.keys.length > 0 || record.draws > 0);
+                return (
+                  <View key={day.date} style={styles.historyDay}>
+                    <Text style={styles.historyDate}>{day.date}{day.date === localDateKey() ? ' · 今天' : ''}</Text>
+                    {!hasAny && <Text style={styles.historyItem}>· （无记录）</Text>}
+                    {modes.map(([modeKey, record]) => (
+                      <View key={modeKey}>
+                        <Text style={styles.historyModeLabel}>{MODE_LABELS[modeKey as DrawMode] || modeKey} · {record.draws} 次</Text>
+                        {record.keys.map(key => {
+                          const [musicType, songId, difficultyIndex] = key.split(':');
+                          const music = rawData.find(item => item.id === songId && item.type === musicType);
+                          return (
+                            <Text key={key} style={styles.historyItem} numberOfLines={1}>
+                              · {music ? music.title : songId} {DifficultyShortLabels[Number(difficultyIndex)] || ''}
+                            </Text>
+                          );
+                        })}
+                      </View>
+                    ))}
+                  </View>
+                );
+              })}
             </ScrollView>
             <Pressable style={styles.historyClose} onPress={() => setHistoryVisible(false)}>
               <Text style={styles.historyCloseText}>关闭</Text>
@@ -493,6 +553,17 @@ const styles = StyleSheet.create({
     padding: 16, gap: 10,
   },
   historyTitle: { fontSize: 15, fontWeight: '900', color: Colors.text.primary },
+  historyFilterRow: { flexDirection: 'row', gap: 6, alignItems: 'center', flexWrap: 'wrap' },
+  historyFilterChip: {
+    paddingHorizontal: 9, paddingVertical: 4, borderRadius: 7,
+    backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.light,
+  },
+  historyFilterChipActive: { borderColor: Colors.accent.primary, backgroundColor: `${Colors.accent.primary}22` },
+  historyFilterChipText: { fontSize: 10.5, fontWeight: '800', color: Colors.text.secondary },
+  historyFilterChipTextActive: { color: Colors.accent.primary },
+  historyResetBtn: { marginLeft: 'auto', paddingHorizontal: 8, paddingVertical: 4 },
+  historyResetBtnText: { fontSize: 10.5, fontWeight: '800', color: Colors.functional.danger },
+  historyModeLabel: { fontSize: 10.5, fontWeight: '800', color: Colors.text.muted, marginTop: 4 },
   historyList: { maxHeight: 340 },
   historyEmpty: { fontSize: 12, color: Colors.text.muted },
   historyDay: { marginBottom: 10 },

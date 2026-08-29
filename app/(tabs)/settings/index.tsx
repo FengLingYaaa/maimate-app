@@ -4,8 +4,8 @@ import { useRouter } from 'expo-router';
 import { Colors } from '../../../src/constants';
 import { useScoreStore, useSettingsStore } from '../../../src/store';
 import { MUSIC_PLATFORM_OPTIONS, getSortLabel } from '../../../src/data/settings-options';
-import { exportScoresCsvToShare } from '../../../src/data/scores-csv';
-import { measureStorageBreakdown, clearCovers, formatBytes, type StorageBreakdown } from '../../../src/data/storage-usage';
+import { exportScoresCsv } from '../../../src/data/scores-csv';
+import { measureStorageBreakdown, clearCovers, clearOtherCache, formatBytes, type StorageBreakdown } from '../../../src/data/storage-usage';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -35,7 +35,7 @@ export default function SettingsPage() {
         if (!cancelled) setStorageUsage(usage);
       })
       .catch(() => {
-        if (!cancelled) setStorageUsage({ dataBytes: 0, coverBytes: 0, coverCount: 0 });
+        if (!cancelled) setStorageUsage({ dataBytes: 0, coverBytes: 0, coverCount: 0, otherBytes: 0 });
       });
     return () => {
       cancelled = true;
@@ -45,6 +45,16 @@ export default function SettingsPage() {
   /** v1.16.5：清理曲绘缓存并刷新占用显示。 */
   const handleClearCovers = async () => {
     await clearCovers();
+    try {
+      setStorageUsage(await measureStorageBreakdown());
+    } catch {
+      // 刷新失败保持旧值。
+    }
+  };
+
+  /** v1.16.6：清理其它缓存（旧版残留等）并刷新占用显示。 */
+  const handleClearOtherCache = async () => {
+    await clearOtherCache();
     try {
       setStorageUsage(await measureStorageBreakdown());
     } catch {
@@ -86,16 +96,19 @@ export default function SettingsPage() {
     }
   };
 
-  const exportCsv = async () => {
+  const exportCsv = async (mode: 'share' | 'save') => {
     if (working) return;
     setWorking(true);
     try {
-      const { rowCount } = await exportScoresCsvToShare();
+      const { rowCount, savedTo } = await exportScoresCsv(mode);
       if (rowCount === 0) {
         setTokenMessage('没有已导入的成绩可导出');
+      } else if (mode === 'save') {
+        setTokenMessage(`已保存 ${rowCount} 条成绩到所选目录`);
       }
     } catch (error) {
-      setTokenMessage(error instanceof Error ? error.message : 'CSV 导出失败');
+      const message = error instanceof Error ? error.message : 'CSV 导出失败';
+      setTokenMessage(message === 'SAF_SAVE_CANCELLED' ? '已取消保存' : message);
     } finally {
       setWorking(false);
     }
@@ -258,7 +271,7 @@ export default function SettingsPage() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>数据与隐私</Text>
         <Text style={styles.securityNote}>曲库、推分计划和已导入成绩默认保存在本机。删除 Token 不会删除成绩；清除本地成绩不会影响服务器。</Text>
-        {/* v1.16.5：存储占用分析。 */}
+        {/* v1.16.6：存储占用分析（曲绘 size 用新 File API 统计）。 */}
         <View style={styles.storageCard}>
           <Text style={styles.storageTitle}>存储占用</Text>
           {storageUsage === null ? (
@@ -268,7 +281,7 @@ export default function SettingsPage() {
               <View style={styles.storageRow}>
                 <View style={styles.storageText}>
                   <Text style={styles.storageName}>应用本体</Text>
-                  <Text style={styles.storageValue}>约 59.4 MB（APK 安装体积，不可清理）</Text>
+                  <Text style={styles.storageValue}>APK 约 59.4 MB；系统显示 ~120 MB 为安装后解压体积，不可清理</Text>
                 </View>
               </View>
               <View style={styles.storageRow}>
@@ -289,6 +302,15 @@ export default function SettingsPage() {
                   <Text style={styles.storageClearText}>清理</Text>
                 </Pressable>
               </View>
+              <View style={styles.storageRow}>
+                <View style={styles.storageText}>
+                  <Text style={styles.storageName}>其它缓存（旧版残留等）</Text>
+                  <Text style={styles.storageValue}>{formatBytes(storageUsage.otherBytes)}</Text>
+                </View>
+                <Pressable style={styles.storageClearBtn} onPress={() => void handleClearOtherCache()}>
+                  <Text style={styles.storageClearText}>清理</Text>
+                </Pressable>
+              </View>
             </>
           )}
         </View>
@@ -299,13 +321,20 @@ export default function SettingsPage() {
           </View>
           <Text style={styles.valueButtonText}>›</Text>
         </Pressable>
-        <Pressable style={styles.preferenceRow} onPress={() => void exportCsv()}>
+        <View style={styles.preferenceRow}>
           <View style={styles.preferenceText}>
             <Text style={styles.preferenceTitle}>导出成绩 CSV</Text>
             <Text style={styles.preferenceDescription}>把已导入的成绩导出为 CSV 文件，方便在电脑上分析</Text>
+            <View style={styles.exportButtonRow}>
+              <Pressable style={[styles.exportButton, working && styles.disabled]} disabled={working} onPress={() => void exportCsv('save')}>
+                <Text style={styles.exportButtonText}>仅保存…</Text>
+              </Pressable>
+              <Pressable style={[styles.exportButton, working && styles.disabled]} disabled={working} onPress={() => void exportCsv('share')}>
+                <Text style={styles.exportButtonText}>保存并分享</Text>
+              </Pressable>
+            </View>
           </View>
-          <Text style={styles.valueButtonText}>›</Text>
-        </Pressable>
+        </View>
         <Pressable style={styles.preferenceRow} onPress={() => router.push('/settings/update' as any)}>
           <View style={styles.preferenceText}>
             <Text style={styles.preferenceTitle}>检查更新</Text>
@@ -343,6 +372,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '800', color: Colors.text.primary },
   subtitle: { fontSize: 12, color: Colors.text.muted },
   section: { padding: 14, borderRadius: 16, backgroundColor: Colors.bg.secondary, gap: 10 },
+  exportButtonRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  exportButton: {
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8,
+    backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.medium,
+  },
+  exportButtonText: { fontSize: 11.5, fontWeight: '800', color: Colors.accent.secondary },
   storageCard: {
     marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: Colors.border.light,
     backgroundColor: Colors.bg.secondary, padding: 12, gap: 10,

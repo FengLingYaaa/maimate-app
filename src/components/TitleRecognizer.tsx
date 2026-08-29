@@ -171,6 +171,13 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
     updateMatches(nextResults);
   };
 
+  /** v1.16.6：包一层确保 × 点击不被父层手势吞掉（部分设备 Pressable 嵌套失效根因）。 */
+  const removeImagePress = (uri: string) => {
+    return () => {
+      requestAnimationFrame(() => removeImage(uri));
+    };
+  };
+
   const clearImages = () => {
     setImageUris([]);
     setImageTexts([]);
@@ -222,7 +229,15 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
                 {imageUris.map((uri, index) => (
                   <View key={uri} style={styles.thumbnailWrap}>
                     <Image source={{ uri }} style={styles.thumbnail} />
-                    <Pressable style={styles.removeImage} onPress={() => removeImage(uri)}><Text style={styles.removeImageText}>×</Text></Pressable>
+                    <Pressable
+                      style={styles.removeImage}
+                      onPress={removeImagePress(uri)}
+                      onStartShouldSetResponder={() => true}
+                      onTouchEnd={event => event.stopPropagation()}
+                      accessibilityLabel="删除这张图片"
+                    >
+                      <Text style={styles.removeImageText}>×</Text>
+                    </Pressable>
                     <Text style={styles.thumbnailIndex}>{index + 1}</Text>
                   </View>
                 ))}
