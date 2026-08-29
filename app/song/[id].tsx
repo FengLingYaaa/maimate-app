@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '../../src/store';
-import { BilibiliSearchPanel, CoverImage, DifficultyBadge, NoteBar, RatingPanel, AchievementLossCard, MusicPlatformBoard, SongShareCard, ShareCardOverlay } from '../../src/components';
+import { BilibiliSearchPanel, CoverImage, DifficultyBadge, NoteBar, RatingPanel, AchievementLossCard, MusicPlatformBoard, ScoreTrendCard, SongShareCard, ShareCardOverlay } from '../../src/components';
 import { Colors } from '../../src/constants';
 import { DifficultyLabels, getChinaVersionName } from '../../src/constants/game';
 import { getOfficialChartConstant, getTotalNotes } from '../../src/data/music-list';
@@ -33,6 +33,7 @@ export default function SongDetail() {
   const chartStats = useMusicStore(s => s.chartStats);
   const chartStatsLoading = useMusicStore(s => s.chartStatsLoading);
   const scores = useScoreStore(s => s.scores);
+  const snapshots = useScoreStore(s => s.snapshots);
   const settings = useSettingsStore(s => s.settings);
   const isInPlan = usePlanStore(s => s.isInPlan);
   const addEntry = usePlanStore(s => s.addEntry);
@@ -339,6 +340,16 @@ export default function SongDetail() {
                       return null;
                   }
                 })}
+
+                {/* v1.16.4：单谱成绩曲线（本地快照），音乐平台板块下方。 */}
+                {chart && (
+                  <ScoreTrendCard
+                    songId={music.id}
+                    musicType={music.type}
+                    difficultyIndex={selectedDiff}
+                    snapshots={snapshots}
+                  />
+                )}
               </View>
             </View>
 

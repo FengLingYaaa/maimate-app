@@ -11,6 +11,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.16.4',
+    date: '2026-08-29',
+    highlights: [
+      '修复：快照管理页新增标题与返回键，文字不再被手机上边栏遮挡',
+      '修复：战报对比中 B50 榜内曲目现在正确显示 +N RA（B50）',
+      '搜索历史支持长按删除单条记录（曲库/计划/牌子通用）',
+      '歌曲详情新增「成绩曲线」：从本地快照回看这条谱面的达成率变化',
+    ],
+  },
+  {
     version: '1.16.3',
     date: '2026-08-29',
     highlights: [

@@ -55,7 +55,8 @@ export function buildSnapshotBattleReport(
   const baseMap = new Map(base.scores.map(score => [keyOf(score), score]));
   const targetMap = new Map(target.scores.map(score => [keyOf(score), score]));
   // v1.16.3：新快照的 B50 榜内谱面键集合——行内 RA 数值只对榜内谱面显示。
-  const b50Keys = new Set(computeB50(rawData, target.scores).entries.map(entry => `${entry.musicType}:${entry.songId}:${entry.difficultyIndex}`));
+  // 键序必须与行键一致：songId:type:difficultyIndex（v1.16.4 修复此前 musicType 在前的键序不匹配）。
+  const b50Keys = new Set(computeB50(rawData, target.scores).entries.map(entry => `${entry.songId}:${entry.musicType}:${entry.difficultyIndex}`));
 
   const rows: SnapshotBattleRow[] = [];
   let addedCount = 0;

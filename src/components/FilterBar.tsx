@@ -352,6 +352,9 @@ export function FilterBar({
                   setLocalFilters(next);
                   onApply(next);
                 }}
+                onLongPress={() => removeSearchHistory(item)}
+                delayLongPress={350}
+                accessibilityLabel={`长按删除搜索记录 ${item}`}
               >
                 <Text style={styles.historyChipText} numberOfLines={1}>🔍 {item}</Text>
               </Pressable>

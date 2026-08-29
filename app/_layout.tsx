@@ -54,7 +54,16 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="song" />
         <Stack.Screen name="b50" />
-        <Stack.Screen name="snapshots" />
+        <Stack.Screen
+          name="snapshots"
+          options={{
+            headerShown: true,
+            title: '快照管理',
+            headerStyle: { backgroundColor: Colors.bg.primary },
+            headerTintColor: Colors.text.primary,
+            contentStyle: { backgroundColor: Colors.bg.primary },
+          }}
+        />
       </Stack>
       {/* v1.16.1：新版本首次启动的更新日志浮层，覆盖在最上层。 */}
       <ChangelogOverlay />
