@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   detailBoards: DEFAULT_DETAIL_BOARDS,
   /** v1.15.0：快照默认保留 20 份（v1.13–v1.14 为 6），上限 1000。 */
   snapshotLimit: 20,
+  autoSinkAchieved: true,
 };
 
 /** 快照保留数量的合法范围（v1.15.0 起默认 20，用户可设至多 1000）。 */

@@ -43,6 +43,8 @@ interface PlanStore {
   setPin: (songId: string, difficultyIndex: number, pin: PlanEntry['pin'] | undefined, musicType?: 'SD' | 'DX') => void;
   setPinById: (entryId: string, pin: PlanEntry['pin'] | undefined) => void;
   reorderByIds: (orderedIds: string[]) => boolean;
+  /** v1.16.2：把指定条目（保持相对顺序）移到计划末尾（成绩同步新达标自动沉底用）。 */
+  sinkAchievedEntries: (entryIds: string[]) => void;
   isInPlan: (songId: string, difficultyIndex: number, musicType?: 'SD' | 'DX') => boolean;
 }
 
@@ -256,6 +258,19 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
     set({ entries });
     void enqueuePlanPersist(entries);
     return true;
+  },
+
+  /** v1.16.2：新达标沉底——保持相对顺序移到计划末尾并持久化。 */
+  sinkAchievedEntries: entryIds => {
+    if (entryIds.length === 0) return;
+    const idSet = new Set(entryIds);
+    const entries = get().entries;
+    const sunk = entries.filter(entry => idSet.has(entry.entryId));
+    if (sunk.length === 0) return;
+    const kept = entries.filter(entry => !idSet.has(entry.entryId));
+    const next = normalizePlanEntries([...kept, ...sunk]);
+    set({ entries: next });
+    void enqueuePlanPersist(next);
   },
 
   isInPlan: (songId, difficultyIndex, musicType) => get().entries.some(entry => matchesPlanEntry(entry, songId, difficultyIndex, musicType)),

@@ -12,6 +12,7 @@ import {
   validateImportToken,
 } from '../api/score-import';
 import { useSettingsStore } from './settings-store';
+import { usePlanStore } from './plan-store';
 import { normalizeSnapshotLimit } from '../data/settings-defaults';
 
 interface StoredScorePayload {
@@ -177,6 +178,24 @@ export const useScoreStore = create<ScoreStore>((set, get) => ({
       await AsyncStorage.setItem(CACHE_KEYS.scoreSnapshots, JSON.stringify(snapshots));
       await AsyncStorage.setItem(CACHE_KEYS.scoreChanges, JSON.stringify(changes));
       set({ scores: result.scores, profile: result.profile, sync, snapshots, changes, tokenConfigured: true });
+      // v1.16.2：同步后把「新达标」的计划条目沉底（设置可关）。
+      // 判定：计划条目设了目标分，且该谱面成绩从 <目标 变为 ≥目标。
+      if (useSettingsStore.getState().settings.autoSinkAchieved) {
+        const planState = usePlanStore.getState();
+        const changedMap = new Map(changes.map(change => [change.chartKey, change]));
+        const sunkIds: string[] = [];
+        for (const entry of planState.entries) {
+          if (entry.targetScore === undefined) continue;
+          const key = getChartKey(entry.songId, entry.musicType || 'SD', entry.difficultyIndex);
+          const change = changedMap.get(key);
+          if (!change) continue;
+          const before = change.previous?.achievement;
+          const after = change.current?.achievement;
+          if (before === undefined || after === undefined) continue;
+          if (before < entry.targetScore && after >= entry.targetScore) sunkIds.push(entry.entryId);
+        }
+        if (sunkIds.length > 0) planState.sinkAchievedEntries(sunkIds);
+      }
     } catch (error) {
       const message = getErrorMessage(error);
       const status = error && typeof error === 'object' && 'kind' in error && error.kind === 'invalid-token'

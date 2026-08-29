@@ -210,6 +210,8 @@ export interface AppSettings {
   detailBoards: Record<DetailBoardId, DetailBoardConfig>;
   /** v1.15.0：本地成绩快照保留数量（1–1000，默认 20）。 */
   snapshotLimit: number;
+  /** v1.16.2：成绩同步后自动把新达标曲目移到推分计划底部（默认开）。 */
+  autoSinkAchieved: boolean;
 }
 
 /** 推分计划 */

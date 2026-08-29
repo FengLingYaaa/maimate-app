@@ -124,7 +124,7 @@ function normalizeSettings(input: unknown): AppSettings {
   const parsed = isRecord(input) ? input as Partial<AppSettings> : {};
   const sortMode = parsed.defaultSort?.mode;
   const defaultSort = {
-    mode: (sortMode === 'titleAsc' || sortMode === 'titleDesc' || sortMode === 'constantAsc' || sortMode === 'constantDesc' || sortMode === 'relevance')
+    mode: (sortMode === 'titleAsc' || sortMode === 'titleDesc' || sortMode === 'constantAsc' || sortMode === 'constantDesc' || sortMode === 'fitAsc' || sortMode === 'fitDesc' || sortMode === 'relevance')
       ? sortMode
       : DEFAULT_SETTINGS.defaultSort.mode,
     difficultyIndex: finiteNumber(parsed.defaultSort?.difficultyIndex)
@@ -140,6 +140,7 @@ function normalizeSettings(input: unknown): AppSettings {
     musicAppSearchFirst: typeof parsed.musicAppSearchFirst === 'boolean' ? parsed.musicAppSearchFirst : DEFAULT_SETTINGS.musicAppSearchFirst,
     detailBoards: mergeDetailBoards(parsed),
     snapshotLimit: normalizeSnapshotLimit(parsed.snapshotLimit),
+    autoSinkAchieved: typeof parsed.autoSinkAchieved === 'boolean' ? parsed.autoSinkAchieved : DEFAULT_SETTINGS.autoSinkAchieved,
   };
 }
 

@@ -32,6 +32,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
             defaultSort: { ...DEFAULT_SETTINGS.defaultSort, ...(parsed.defaultSort || {}) },
             detailBoards: mergeDetailBoards(parsed),
             snapshotLimit: normalizeSnapshotLimit(parsed.snapshotLimit),
+            autoSinkAchieved: parsed.autoSinkAchieved !== false,
           },
           loaded: true,
         });

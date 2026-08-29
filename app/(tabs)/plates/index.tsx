@@ -79,6 +79,9 @@ export default function PlatesPage() {
 
   const [lastBulkKeys, setLastBulkKeys] = useState<string[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  // v1.16.2：一键导入后的自绘确认弹窗（是否统一设 100% 目标）。
+  const [bulkTargetPrompt, setBulkTargetPrompt] = useState<{ visible: boolean; count: number }>({ visible: false, count: 0 });
+  const updateTargetScore = usePlanStore(s => s.updateTargetScore);
   // 进入页面时强制刷新一次：修复嵌套 Stack 初次渲染偶发空白、
   // 点击筛选后才显示的问题。
   const [focusTick, setFocusTick] = useState(0);
@@ -166,6 +169,18 @@ export default function PlatesPage() {
     }
     setLastBulkKeys(added);
     setNotice(`已把 ${added.length} 张 14 以上谱面加入推分计划`);
+    // v1.16.2：自绘确认弹窗——询问是否为本次加入的谱面统一设 100% 目标。
+    setBulkTargetPrompt({ visible: true, count: added.length });
+  };
+
+  /** v1.16.2：本次批量加入的谱面统一设 100% 目标分。 */
+  const confirmBulkTarget = () => {
+    for (const key of lastBulkKeys) {
+      const [musicType, songId, difficultyIndex] = key.split(':');
+      updateTargetScore(songId, Number(difficultyIndex), 100);
+    }
+    setBulkTargetPrompt({ visible: false, count: 0 });
+    setNotice(`已为 ${lastBulkKeys.length} 张谱面设置 100% 目标`);
   };
 
   const handleBulkUndo = () => {
@@ -264,6 +279,23 @@ export default function PlatesPage() {
     // 首帧测量异常（配合 chips 换行容器修复初始无字问题）。
     <View key={`plates-root-${focusTick}`} style={styles.container}>
       <Stack.Screen options={{ title: '牌子查询', headerStyle: { backgroundColor: Colors.bg.primary }, headerTintColor: Colors.text.primary }} />
+      {/* v1.16.2：一键导入后询问是否统一设 100% 目标（自绘，非原生 Alert）。 */}
+      {bulkTargetPrompt.visible && (
+        <View style={styles.promptBackdrop}>
+          <View style={styles.promptCard}>
+            <Text style={styles.promptTitle}>设置目标达成率？</Text>
+            <Text style={styles.promptText}>已把 {bulkTargetPrompt.count} 张 14 以上谱面加入推分计划。要为它们统一设置 100% 目标吗？之后可随时在计划中修改。</Text>
+            <View style={styles.promptButtons}>
+              <Pressable style={[styles.promptButton, styles.promptButtonGhost]} onPress={() => setBulkTargetPrompt({ visible: false, count: 0 })}>
+                <Text style={styles.promptButtonGhostText}>暂不</Text>
+              </Pressable>
+              <Pressable style={[styles.promptButton, styles.promptButtonPrimary]} onPress={confirmBulkTarget}>
+                <Text style={styles.promptButtonPrimaryText}>设为 100%</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      )}
       <FlatList
         data={mergedRows}
         keyExtractor={item => item.key}
@@ -347,6 +379,25 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg.primary },
   header: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8 },
   title: { fontSize: 23, fontWeight: '800', color: Colors.text.primary },
+  promptBackdrop: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(8,8,16,0.82)', zIndex: 40, elevation: 40,
+    alignItems: 'center', justifyContent: 'center', padding: 28,
+  },
+  promptCard: {
+    width: '100%', maxWidth: 320,
+    backgroundColor: Colors.bg.secondary, borderRadius: 16,
+    borderWidth: 1, borderColor: Colors.border.light,
+    padding: 16, gap: 10,
+  },
+  promptTitle: { fontSize: 15, fontWeight: '900', color: Colors.text.primary },
+  promptText: { fontSize: 12.5, lineHeight: 19, color: Colors.text.secondary },
+  promptButtons: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  promptButton: { flex: 1, paddingVertical: 11, borderRadius: 10, alignItems: 'center' },
+  promptButtonGhost: { backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.medium },
+  promptButtonGhostText: { fontSize: 13, fontWeight: '800', color: Colors.text.secondary },
+  promptButtonPrimary: { backgroundColor: Colors.accent.primary },
+  promptButtonPrimaryText: { fontSize: 13, fontWeight: '900', color: '#fff' },
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',

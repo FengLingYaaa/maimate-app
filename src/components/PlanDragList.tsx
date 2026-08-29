@@ -1,5 +1,5 @@
-import React, { useCallback, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import DraggableFlatList, { ScaleDecorator, type RenderItemParams } from 'react-native-draggable-flatlist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../constants';
@@ -30,6 +30,7 @@ interface Props {
  * 推分计划唯一的可排序视图。业务页面不接触拖拽 index，也不缓存 Row 对象；
  * 所有更新只通过持久 entryId 寻址，拖拽结束一次性提交完整 ID 顺序。
  * v1.12.0：置顶/置底功能删除，所有曲目一个分组，长按即可拖拽。
+ * v1.16.2：右下角悬浮「到底部」按钮——已在底部或拖拽中隐藏。
  */
 export function PlanDragList({
   rows,
@@ -46,6 +47,18 @@ export function PlanDragList({
 }: Props) {
   const insets = useSafeAreaInsets();
   const draggingRef = useRef(false);
+  const listRef = useRef<React.ElementRef<typeof DraggableFlatList<PlanDragRow>>>(null);
+  const [atBottom, setAtBottom] = useState(false);
+
+  const handleScroll = useCallback((event: { nativeEvent: { contentOffset: { y: number }; contentSize: { height: number }; layoutMeasurement: { height: number } } }) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const distance = contentSize.height - layoutMeasurement.height - contentOffset.y;
+    setAtBottom(distance < 40);
+  }, []);
+
+  const scrollToEnd = useCallback(() => {
+    listRef.current?.scrollToEnd({ animated: true });
+  }, []);
 
   const renderItem = useCallback((params: RenderItemParams<PlanDragRow>) => (
     <PlanDragRowView
@@ -63,30 +76,44 @@ export function PlanDragList({
   ), [allSongs, allScores, canDrag, getScore, onOpen, onRemove, onTarget, showChinaVersion, showProjectedRating]);
 
   return (
-    <DraggableFlatList
-      data={rows}
-      keyExtractor={item => item.entry.entryId}
-      renderItem={renderItem}
-      activationDistance={12}
-      autoscrollThreshold={72}
-      autoscrollSpeed={120}
-      dragItemOverflow={false}
-      onDragBegin={() => { draggingRef.current = true; }}
-      onRelease={() => { draggingRef.current = false; }}
-      onDragEnd={({ data }) => {
-        draggingRef.current = false;
-        if (!canDrag || data.length !== rows.length) return;
-        const orderedIds = data.map(row => row.entry.entryId);
-        const currentIds = rows.map(row => row.entry.entryId);
-        if (orderedIds.every((id, index) => id === currentIds[index])) return;
-        onReorder(orderedIds);
-      }}
-      contentContainerStyle={[styles.content, { paddingBottom: LIST_BOTTOM_INSET + insets.bottom }]}
-      ListFooterComponent={<View style={{ height: LIST_BOTTOM_INSET + insets.bottom }} />}
-      showsVerticalScrollIndicator
-      keyboardShouldPersistTaps="handled"
-      removeClippedSubviews={false}
-    />
+    <View style={styles.flex}>
+      <DraggableFlatList
+        ref={listRef}
+        data={rows}
+        keyExtractor={item => item.entry.entryId}
+        renderItem={renderItem}
+        activationDistance={12}
+        autoscrollThreshold={72}
+        autoscrollSpeed={120}
+        dragItemOverflow={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={64}
+        onDragBegin={() => { draggingRef.current = true; setAtBottom(false); }}
+        onRelease={() => { draggingRef.current = false; }}
+        onDragEnd={({ data }) => {
+          draggingRef.current = false;
+          if (!canDrag || data.length !== rows.length) return;
+          const orderedIds = data.map(row => row.entry.entryId);
+          const currentIds = rows.map(row => row.entry.entryId);
+          if (orderedIds.every((id, index) => id === currentIds[index])) return;
+          onReorder(orderedIds);
+        }}
+        contentContainerStyle={[styles.content, { paddingBottom: LIST_BOTTOM_INSET + insets.bottom }]}
+        ListFooterComponent={<View style={{ height: LIST_BOTTOM_INSET + insets.bottom }} />}
+        showsVerticalScrollIndicator
+        keyboardShouldPersistTaps="handled"
+        removeClippedSubviews={false}
+      />
+      {!atBottom && rows.length > 0 && (
+        <Pressable
+          style={[styles.jumpButton, { bottom: LIST_BOTTOM_INSET + insets.bottom + 8 }]}
+          onPress={scrollToEnd}
+          accessibilityLabel="滑动到计划最底部"
+        >
+          <Text style={styles.jumpButtonText}>↓ 底部</Text>
+        </Pressable>
+      )}
+    </View>
   );
 }
 
@@ -129,7 +156,15 @@ function PlanDragRowView({
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   content: { paddingTop: 2 },
   row: { backgroundColor: Colors.bg.primary },
   activeRow: { opacity: 0.96, backgroundColor: Colors.bg.tertiary },
+  jumpButton: {
+    position: 'absolute', right: 14,
+    paddingHorizontal: 14, paddingVertical: 9, borderRadius: 22,
+    backgroundColor: Colors.accent.primary, elevation: 6,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.35, shadowRadius: 4,
+  },
+  jumpButtonText: { fontSize: 12, fontWeight: '900', color: '#fff' },
 });

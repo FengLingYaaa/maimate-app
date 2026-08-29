@@ -89,7 +89,7 @@ export const SongCard = memo(function SongCard({
                   size="sm"
                   highlighted={highlightedDifficulties?.includes(index) ?? selectedDifficultyIndex !== undefined}
                 />
-                {fitDiff !== null && <Text style={styles.fitDiffText}>fit {fitDiff.toFixed(1)}</Text>}
+                {fitDiff !== null && <Text style={styles.fitDiffText}>{fitDiff.toFixed(2)}</Text>}
               </View>
             );
           })}

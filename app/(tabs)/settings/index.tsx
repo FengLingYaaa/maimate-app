@@ -195,6 +195,15 @@ export default function SettingsPage() {
             maxLength={4}
           />
         </View>
+        <Pressable style={styles.snapshotLimitRow} onPress={() => void updateSettings({ autoSinkAchieved: !settings.autoSinkAchieved })}>
+          <View style={styles.preferenceText}>
+            <Text style={styles.preferenceTitle}>新达标自动沉底</Text>
+            <Text style={styles.preferenceDescription}>同步成绩后自动把新达标的曲目移到推分计划最下侧</Text>
+          </View>
+          <Text style={[styles.valueButtonText, { color: settings.autoSinkAchieved ? Colors.functional.success : Colors.text.muted }]}>
+            {settings.autoSinkAchieved ? '开' : '关'}
+            </Text>
+        </Pressable>
         <View style={styles.syncCard}>
           <Text style={styles.syncTitle}>同步状态：{getSyncLabel(sync.status)}</Text>
           <Text style={styles.syncText}>本地记录：{sync.recordCount} 条</Text>

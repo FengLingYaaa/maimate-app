@@ -1,18 +1,33 @@
-﻿/**
+/**
  * 随机抽歌页 — 推分计划、全曲库和按条件抽选。
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useMusicStore, usePlanStore } from '../../src/store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useMusicStore, usePlanStore, useScoreStore } from '../../src/store';
 import { DrumRoll, RangeSlider } from '../../src/components';
-import { Colors, DifficultyColorMap, DifficultyLabels, MusicTypes } from '../../src/constants';
+import { Colors, DifficultyColorMap, DifficultyLabels, DifficultyShortLabels, MusicTypes } from '../../src/constants';
 import { getMatchingDifficultyIndices, MusicList } from '../../src/data/music-list';
 import { getVersionOptions } from '../../src/data/version-catalog';
-import type { DrawCandidate, FilterOptions } from '../../src/data/types';
+import { getTodayDrawnKeys, recordDraw, localDateKey } from '../../src/data/plan-draw-history';
+import type { DrawCandidate, FilterOptions, PlanEntry, PlayerScore } from '../../src/data/types';
 
 type DrawMode = 'plan' | 'any' | 'filtered';
+
+/** 最近 N 天本地日期键列表（升序），抽歌历史过滤用。 */
+function recentDateKeys(days: number): string[] {
+  const keys: string[] = [];
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+    keys.push(`${date.getFullYear()}-${month}-${day}`);
+  }
+  return keys;
+}
 
 function toggleValue<T extends string | number>(current: T | T[] | undefined, value: T): T | T[] | undefined {
   if (current === undefined) return value;
@@ -28,6 +43,7 @@ export default function RandomPicker() {
   const router = useRouter();
   const rawData = useMusicStore(s => s.rawData);
   const planEntries = usePlanStore(s => s.entries);
+  const scores = useScoreStore(s => s.scores);
 
   const [mode, setMode] = useState<DrawMode>('plan');
   const [filters, setFilters] = useState<FilterOptions>({});
@@ -38,20 +54,55 @@ export default function RandomPicker() {
   const [animationItems, setAnimationItems] = useState<DrawCandidate[]>([]);
   const [animationResultIndex, setAnimationResultIndex] = useState<number | null>(null);
   const [spinning, setSpinning] = useState(false);
+  // v1.16.2：计划抽歌默认排除已达标曲目（可手动包含）。
+  const [includeAchieved, setIncludeAchieved] = useState(false);
+  // v1.16.2：每日不重复——今天已抽的谱面键（抽中后即时更新）。
+  const [drawnKeys, setDrawnKeys] = useState<string[]>([]);
+  // v1.16.2：抽歌历史弹层。
+  const [historyVisible, setHistoryVisible] = useState(false);
+  const [historyDays, setHistoryDays] = useState<Array<{ date: string; items: string[] }>>([]);
+  // v1.16.2：本次抽选是否回落到全量池（今日已抽遍时提示）。
+  const [lastDrawFallback, setLastDrawFallback] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getTodayDrawnKeys().then(keys => {
+      if (!cancelled) setDrawnKeys(keys);
+    }).catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const genres = useMemo(() => [...new Set(rawData.map(music => music.basic_info.genre))].sort(), [rawData]);
   const versionOptions = useMemo(() => getVersionOptions(rawData), [rawData]);
+  /** 计划条目是否已达标（有目标分且当前成绩 ≥ 目标）。 */
+  const achievedPlanIds = useMemo(() => {
+    const set = new Set<string>();
+    const scoreOf = (entry: PlanEntry): PlayerScore | undefined => scores.find(item =>
+      item.songId === entry.songId
+      && item.type === (entry.musicType || 'SD')
+      && item.difficultyIndex === entry.difficultyIndex);
+    for (const entry of planEntries) {
+      if (entry.targetScore === undefined) continue;
+      const score = scoreOf(entry);
+      if (score && score.achievement >= entry.targetScore) set.add(entry.entryId);
+    }
+    return set;
+  }, [planEntries, scores]);
+
   const planCandidates = useMemo<DrawCandidate[]>(() => {
     const byChart = new Map(rawData.map(music => [`${music.type}:${music.id}`, music]));
     return planEntries
       .slice()
       .sort((left, right) => left.order - right.order)
       .flatMap(entry => {
+        if (!includeAchieved && achievedPlanIds.has(entry.entryId)) return [];
         const music = byChart.get(`${entry.musicType || 'SD'}:${entry.songId}`) || rawData.find(item => item.id === entry.songId);
         if (!music || entry.difficultyIndex < 0 || entry.difficultyIndex >= music.charts.length) return [];
         return [{ music, difficultyIndex: entry.difficultyIndex, planEntry: entry }];
       });
-  }, [planEntries, rawData]);
+  }, [achievedPlanIds, includeAchieved, planEntries, rawData]);
 
   const candidates = useMemo<DrawCandidate[]>(() => {
     if (mode === 'plan') return planCandidates;
@@ -89,9 +140,26 @@ export default function RandomPicker() {
     updateFilters({ ...filters, [key]: value || undefined });
   };
 
+  /** 计划条目键（每日不重复记录用，与抽歌历史存储对齐）。 */
+  const candidateKey = useCallback((candidate: DrawCandidate): string => {
+    const musicType = candidate.planEntry?.musicType || candidate.music.type;
+    return `${musicType}:${candidate.music.id}:${candidate.difficultyIndex ?? -1}`;
+  }, []);
+
   const handleDraw = useCallback(() => {
     if (candidates.length === 0 || spinning) return;
-    const target = candidates[Math.floor(Math.random() * candidates.length)];
+    // v1.16.2：仅计划模式启用每日不重复——优先从今天没抽过的池子里选。
+    let pool = candidates;
+    let usedFallback = false;
+    if (mode === 'plan' && drawnKeys.length > 0) {
+      const fresh = candidates.filter(candidate => !drawnKeys.includes(candidateKey(candidate)));
+      if (fresh.length > 0) {
+        pool = fresh;
+      } else {
+        usedFallback = true;
+      }
+    }
+    const target = pool[Math.floor(Math.random() * pool.length)];
     const decoys = candidates.filter(candidate => candidate !== target);
     const displayItems: DrawCandidate[] = [];
     for (let i = 0; i < 32; i += 1) {
@@ -103,7 +171,13 @@ export default function RandomPicker() {
     setAnimationResultIndex(displayItems.length - 1);
     setSpinning(true);
     if (mode === 'filtered') setFiltersCollapsed(true);
-  }, [candidates, mode, spinning]);
+    if (mode === 'plan') {
+      const key = candidateKey(target);
+      setDrawnKeys(previous => (previous.includes(key) ? previous : [...previous, key]));
+      void recordDraw(key);
+      setLastDrawFallback(usedFallback);
+    }
+  }, [candidateKey, candidates, drawnKeys, mode, spinning]);
 
   const handleSpinEnd = useCallback(() => {
     setSpinning(false);
@@ -121,6 +195,22 @@ export default function RandomPicker() {
       },
     });
   }, [router, spinning]);
+
+  /** 打开抽歌历史弹层：读最近 7 天记录并把键解析成可读条目。 */
+  const openDrawHistory = useCallback(async () => {
+    try {
+      const raw = await AsyncStorage.getItem('maimate_plan_draw_history');
+      const parsed = raw ? JSON.parse(raw) as Record<string, string[]> : {};
+      const days = Object.entries(parsed)
+        .filter(([date]) => date >= recentDateKeys(7)[0])
+        .sort(([left], [right]) => right.localeCompare(left))
+        .map(([date, items]) => ({ date, items }));
+      setHistoryDays(days);
+    } catch {
+      setHistoryDays([]);
+    }
+    setHistoryVisible(true);
+  }, []);
 
   const activeRange: [number, number] = filters.dsRange || [0, 15];
   const candidateLabel = mode === 'plan' ? `${candidates.length} 个计划谱面` : `${candidates.length} 个候选`;
@@ -143,6 +233,22 @@ export default function RandomPicker() {
           <Text style={[styles.modeBtnText, mode === 'filtered' && styles.modeBtnTextActive]}>按条件</Text>
         </Pressable>
       </View>
+
+      {mode === 'plan' && (
+        <View style={styles.planOptionRow}>
+          <Pressable style={styles.planToggle} onPress={() => setIncludeAchieved(value => !value)}>
+            <Text style={[styles.planToggleText, includeAchieved && styles.planToggleTextActive]}>
+              {includeAchieved ? '✓ ' : ''}含已达标
+            </Text>
+          </Pressable>
+          <Pressable style={styles.planToggle} onPress={openDrawHistory}>
+            <Text style={styles.planToggleText}>抽歌历史</Text>
+          </Pressable>
+          {drawnKeys.length > 0 && (
+            <Text style={styles.drawnHint}>今日已抽 {drawnKeys.length} 次（不重复优先）</Text>
+          )}
+        </View>
+      )}
 
       {mode === 'plan' && planEntries.length === 0 && (
         <View style={styles.notice}>
@@ -286,6 +392,43 @@ export default function RandomPicker() {
           {spinning ? '🌀 旋转中...' : `🎰 抽一项（${candidateLabel}）`}
         </Text>
       </Pressable>
+
+      {lastDrawFallback && mode === 'plan' && drawnKeys.length > 0 && !spinning && (
+        <View style={styles.fallbackNotice}>
+          <Text style={styles.fallbackNoticeText}>今天计划里的谱面已抽遍，本次从全量池抽取</Text>
+        </View>
+      )}
+
+      {/* v1.16.2：抽歌历史弹层（最近 7 天，按日分组）。 */}
+      {historyVisible && (
+        <View style={styles.historyBackdrop}>
+          <View style={styles.historyCard}>
+            <Text style={styles.historyTitle}>抽歌历史（最近 7 天）</Text>
+            <ScrollView style={styles.historyList} showsVerticalScrollIndicator={false}>
+              {historyDays.length === 0 && (
+                <Text style={styles.historyEmpty}>还没有抽歌记录</Text>
+              )}
+              {historyDays.map(day => (
+                <View key={day.date} style={styles.historyDay}>
+                  <Text style={styles.historyDate}>{day.date}{day.date === localDateKey() ? ' · 今天' : ''}</Text>
+                  {day.items.map(key => {
+                    const [musicType, songId, difficultyIndex] = key.split(':');
+                    const music = rawData.find(item => item.id === songId && item.type === musicType);
+                    return (
+                      <Text key={key} style={styles.historyItem} numberOfLines={1}>
+                        · {music ? music.title : songId} {DifficultyShortLabels[Number(difficultyIndex)] || ''}
+                      </Text>
+                    );
+                  })}
+                </View>
+              ))}
+            </ScrollView>
+            <Pressable style={styles.historyClose} onPress={() => setHistoryVisible(false)}>
+              <Text style={styles.historyCloseText}>关闭</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -316,6 +459,47 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
+  planOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+    flexWrap: 'wrap',
+  },
+  planToggle: {
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
+    backgroundColor: Colors.bg.secondary, borderWidth: 1, borderColor: Colors.border.light,
+  },
+  planToggleText: { fontSize: 11.5, fontWeight: '800', color: Colors.text.secondary },
+  planToggleTextActive: { color: Colors.accent.secondary },
+  drawnHint: { fontSize: 10.5, color: Colors.text.muted, flex: 1, textAlign: 'right' },
+  fallbackNotice: {
+    position: 'absolute', bottom: 84, left: 16, right: 16,
+    backgroundColor: 'rgba(25,25,34,0.95)', borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 8,
+  },
+  fallbackNoticeText: { fontSize: 11, color: Colors.text.secondary, textAlign: 'center' },
+  historyBackdrop: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(8,8,16,0.82)',
+    alignItems: 'center', justifyContent: 'center', padding: 28,
+    zIndex: 40, elevation: 40,
+  },
+  historyCard: {
+    width: '100%', maxWidth: 340,
+    backgroundColor: Colors.bg.secondary, borderRadius: 16,
+    borderWidth: 1, borderColor: Colors.border.light,
+    padding: 16, gap: 10,
+  },
+  historyTitle: { fontSize: 15, fontWeight: '900', color: Colors.text.primary },
+  historyList: { maxHeight: 340 },
+  historyEmpty: { fontSize: 12, color: Colors.text.muted },
+  historyDay: { marginBottom: 10 },
+  historyDate: { fontSize: 11.5, fontWeight: '900', color: Colors.accent.secondary, marginBottom: 4 },
+  historyItem: { fontSize: 12, lineHeight: 18, color: Colors.text.secondary },
+  historyClose: { backgroundColor: Colors.accent.primary, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
+  historyCloseText: { fontSize: 13, fontWeight: '900', color: '#fff' },
   modeBtn: {
     flex: 1,
     paddingVertical: 10,
