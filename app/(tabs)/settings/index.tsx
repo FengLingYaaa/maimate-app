@@ -5,6 +5,7 @@ import { Colors } from '../../../src/constants';
 import { useScoreStore, useSettingsStore } from '../../../src/store';
 import { MUSIC_PLATFORM_OPTIONS, getSortLabel } from '../../../src/data/settings-options';
 import { exportScoresCsvToShare } from '../../../src/data/scores-csv';
+import { measureStorageBreakdown, clearCovers, formatBytes, type StorageBreakdown } from '../../../src/data/storage-usage';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -24,6 +25,32 @@ export default function SettingsPage() {
   const [working, setWorking] = useState(false);
   // v1.15.0：快照保留数量设置（1–1000，默认 20），修改时警告存储占用。
   const [snapshotLimitInput, setSnapshotLimitInput] = useState(String(settings.snapshotLimit));
+  // v1.16.5：存储占用分析。
+  const [storageUsage, setStorageUsage] = useState<StorageBreakdown | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    measureStorageBreakdown()
+      .then(usage => {
+        if (!cancelled) setStorageUsage(usage);
+      })
+      .catch(() => {
+        if (!cancelled) setStorageUsage({ dataBytes: 0, coverBytes: 0, coverCount: 0 });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /** v1.16.5：清理曲绘缓存并刷新占用显示。 */
+  const handleClearCovers = async () => {
+    await clearCovers();
+    try {
+      setStorageUsage(await measureStorageBreakdown());
+    } catch {
+      // 刷新失败保持旧值。
+    }
+  };
 
   useEffect(() => {
     setSnapshotLimitInput(String(settings.snapshotLimit));
@@ -231,6 +258,40 @@ export default function SettingsPage() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>数据与隐私</Text>
         <Text style={styles.securityNote}>曲库、推分计划和已导入成绩默认保存在本机。删除 Token 不会删除成绩；清除本地成绩不会影响服务器。</Text>
+        {/* v1.16.5：存储占用分析。 */}
+        <View style={styles.storageCard}>
+          <Text style={styles.storageTitle}>存储占用</Text>
+          {storageUsage === null ? (
+            <Text style={styles.storageValue}>正在计算…</Text>
+          ) : (
+            <>
+              <View style={styles.storageRow}>
+                <View style={styles.storageText}>
+                  <Text style={styles.storageName}>应用本体</Text>
+                  <Text style={styles.storageValue}>约 59.4 MB（APK 安装体积，不可清理）</Text>
+                </View>
+              </View>
+              <View style={styles.storageRow}>
+                <View style={styles.storageText}>
+                  <Text style={styles.storageName}>成绩与计划数据</Text>
+                  <Text style={styles.storageValue}>{formatBytes(storageUsage.dataBytes)}</Text>
+                </View>
+                <Pressable style={styles.storageClearBtn} onPress={handleClearScores}>
+                  <Text style={styles.storageClearText}>清理</Text>
+                </Pressable>
+              </View>
+              <View style={styles.storageRow}>
+                <View style={styles.storageText}>
+                  <Text style={styles.storageName}>曲绘缓存</Text>
+                  <Text style={styles.storageValue}>{formatBytes(storageUsage.coverBytes)} · {storageUsage.coverCount} 张</Text>
+                </View>
+                <Pressable style={styles.storageClearBtn} onPress={() => void handleClearCovers()}>
+                  <Text style={styles.storageClearText}>清理</Text>
+                </Pressable>
+              </View>
+            </>
+          )}
+        </View>
         <Pressable style={styles.preferenceRow} onPress={() => router.push('/settings/data-backup' as any)}>
           <View style={styles.preferenceText}>
             <Text style={styles.preferenceTitle}>数据备份与恢复</Text>
@@ -282,6 +343,20 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '800', color: Colors.text.primary },
   subtitle: { fontSize: 12, color: Colors.text.muted },
   section: { padding: 14, borderRadius: 16, backgroundColor: Colors.bg.secondary, gap: 10 },
+  storageCard: {
+    marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: Colors.border.light,
+    backgroundColor: Colors.bg.secondary, padding: 12, gap: 10,
+  },
+  storageTitle: { fontSize: 13, fontWeight: '900', color: Colors.text.primary },
+  storageRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  storageText: { flex: 1 },
+  storageName: { fontSize: 12.5, fontWeight: '800', color: Colors.text.primary },
+  storageValue: { fontSize: 11, color: Colors.text.muted, marginTop: 1 },
+  storageClearBtn: {
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,
+    backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.medium,
+  },
+  storageClearText: { fontSize: 11.5, fontWeight: '800', color: Colors.functional.danger },
   sectionTitle: { fontSize: 15, fontWeight: '800', color: Colors.text.primary },
   preferenceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 4 },
   toolButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: 10, borderRadius: 10, backgroundColor: Colors.bg.tertiary },

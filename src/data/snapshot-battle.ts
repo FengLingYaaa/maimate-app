@@ -21,7 +21,7 @@ export interface SnapshotBattleRow {
   ratingDelta: number | null;
   /** 单谱 Rating 绝对值（新快照的）。 */
   afterRating: number | null;
-  /** v1.16.3：对 B50 的影响——仅当该谱面在新快照的 B50 榜内（B15/B35）才等于单谱 Rating 变化，否则 null（UI 不显示数值）。 */
+  /** v1.16.5：该曲成绩单独对 B50 总分的影响（B50 总分差）；0 或不适用为 null（UI 不显示）。 */
   b50Delta: number | null;
   kind: 'added' | 'removed' | 'changed';
 }
@@ -54,9 +54,19 @@ export function buildSnapshotBattleReport(
   const keyOf = (score: PlayerScore) => `${score.songId}:${score.type}:${score.difficultyIndex}`;
   const baseMap = new Map(base.scores.map(score => [keyOf(score), score]));
   const targetMap = new Map(target.scores.map(score => [keyOf(score), score]));
-  // v1.16.3：新快照的 B50 榜内谱面键集合——行内 RA 数值只对榜内谱面显示。
-  // 键序必须与行键一致：songId:type:difficultyIndex（v1.16.4 修复此前 musicType 在前的键序不匹配）。
-  const b50Keys = new Set(computeB50(rawData, target.scores).entries.map(entry => `${entry.songId}:${entry.musicType}:${entry.difficultyIndex}`));
+  // v1.16.5：行内 RA 数值 = 该曲成绩单独对 B50 总分的影响。
+  // 口径：B50 总分（含此曲新成绩）− B50 总分（把这首曲替换回旧成绩，新增行则移除）。
+  // 现快照成绩不进榜、或替换回旧成绩后总分不变 → 影响 0 → UI 不显示。
+  const currentB50 = computeB50(rawData, target.scores);
+  const currentTotal = currentB50.total;
+
+  /** 计算把 key 这首曲替换回 base 成绩（无则移除）后的 B50 总分与当前总分之差。 */
+  const b50ImpactOf = (key: string, baseScore: PlayerScore | null): number | null => {
+    const replaced = target.scores.filter(score => keyOf(score) !== key);
+    if (baseScore) replaced.push(baseScore);
+    const revertedTotal = computeB50(rawData, replaced).total;
+    return currentTotal - revertedTotal;
+  };
 
   const rows: SnapshotBattleRow[] = [];
   let addedCount = 0;
@@ -86,7 +96,7 @@ export function buildSnapshotBattleReport(
         after: after.achievement,
         ratingDelta,
         afterRating,
-        b50Delta: b50Keys.has(key) ? ratingDelta : null,
+        b50Delta: b50ImpactOf(key, before),
         kind: 'changed',
       });
     } else if (after) {
@@ -104,7 +114,7 @@ export function buildSnapshotBattleReport(
         after: after.achievement,
         ratingDelta: afterRating,
         afterRating,
-        b50Delta: b50Keys.has(key) ? afterRating : null,
+        b50Delta: b50ImpactOf(key, null),
         kind: 'added',
       });
     } else {

@@ -86,6 +86,8 @@ export function FilterBar({
   const legacyHistoryKey = 'maimate_search_history';
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const HISTORY_KEY = historyStorageKey;
+  // v1.16.5：长按历史 chip 进入管理模式——chip 右上角显示 × 角标、行尾出现「清空」。
+  const [historyManaging, setHistoryManaging] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,8 +128,18 @@ export function FilterBar({
     setSearchHistory(previous => {
       const next = previous.filter(item => item !== query);
       AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next)).catch(() => undefined);
+      if (next.length === 0) setHistoryManaging(false);
       return next;
     });
+  }, []);
+
+  /** v1.16.5：清空全部搜索历史。 */
+  const clearSearchHistory = useCallback(() => {
+    setSearchHistory(() => {
+      AsyncStorage.removeItem(HISTORY_KEY).catch(() => undefined);
+      return [];
+    });
+    setHistoryManaging(false);
   }, []);
 
   useEffect(() => {
@@ -338,7 +350,8 @@ export function FilterBar({
         </Pressable>
       </View>
 
-      {/* v1.15.2：搜索历史（最近 5 条，点击复用；输入时自动隐藏）。 */}
+      {/* v1.15.2：搜索历史（最近 5 条，点击复用；输入时自动隐藏）。
+          v1.16.5：长按进入管理模式——右上角 × 删除单条，行尾「清空」。 */}
       {searchHistory.length > 0 && !localFilters.titleSearch && (
         <View style={styles.historyRow}>
           <Text style={styles.historyLabel}>最近</Text>
@@ -348,17 +361,33 @@ export function FilterBar({
                 key={item}
                 style={styles.historyChip}
                 onPress={() => {
+                  if (historyManaging) return;
                   const next = cleanFilters({ ...localFilters, titleSearch: item });
                   setLocalFilters(next);
                   onApply(next);
                 }}
-                onLongPress={() => removeSearchHistory(item)}
+                onLongPress={() => setHistoryManaging(true)}
                 delayLongPress={350}
-                accessibilityLabel={`长按删除搜索记录 ${item}`}
+                accessibilityLabel={`长按管理搜索记录 ${item}`}
               >
                 <Text style={styles.historyChipText} numberOfLines={1}>🔍 {item}</Text>
+                {historyManaging && (
+                  <Pressable
+                    hitSlop={8}
+                    style={styles.historyChipRemove}
+                    onPress={() => removeSearchHistory(item)}
+                    accessibilityLabel={`删除搜索记录 ${item}`}
+                  >
+                    <Text style={styles.historyChipRemoveText}>×</Text>
+                  </Pressable>
+                )}
               </Pressable>
             ))}
+            {historyManaging && (
+              <Pressable style={styles.historyClearBtn} onPress={clearSearchHistory} accessibilityLabel="清空搜索历史">
+                <Text style={styles.historyClearBtnText}>清空</Text>
+              </Pressable>
+            )}
           </ScrollView>
         </View>
       )}
@@ -633,9 +662,23 @@ const styles = StyleSheet.create({
   historyRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 2, paddingBottom: 6, gap: 6 },
   historyLabel: { fontSize: 11, color: Colors.text.muted, fontWeight: '700' },
   historyContent: { gap: 6, alignItems: 'center' },
+  historyChipRemove: {
+    position: 'absolute', top: -7, right: -7,
+    width: 16, height: 16, borderRadius: 8,
+    backgroundColor: Colors.functional.danger,
+    alignItems: 'center', justifyContent: 'center',
+    elevation: 4,
+  },
+  historyChipRemoveText: { fontSize: 12, lineHeight: 14, fontWeight: '900', color: '#fff' },
+  historyClearBtn: {
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, alignSelf: 'center',
+    backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.medium,
+  },
+  historyClearBtnText: { fontSize: 11, fontWeight: '800', color: Colors.functional.danger },
   historyChip: {
     paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
     backgroundColor: Colors.bg.secondary, borderWidth: 1, borderColor: Colors.border.light,
+    position: 'relative',
     maxWidth: 160,
   },
   historyChipText: { fontSize: 11, color: Colors.text.secondary },

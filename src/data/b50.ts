@@ -144,7 +144,25 @@ function toEntries(pool: 'new' | 'old', picked: Candidate[], startRank: number):
 }
 
 /** 计算 B50：旧曲 TOP35 + 新曲 TOP15，并给出与池末位同分的未入榜曲目。 */
+// v1.16.5：computeB50 结果缓存（按 musicList / scores 数组身份弱引用）。
+// 计划卡每张都要算「替换前后的 B50 总分」，无缓存时滑动列表会重复全量计算，
+// 惯性滚动与「到底」跳转时阻塞 JS 线程导致掉帧甚至被系统判定无响应。
+const b50ResultCache = new WeakMap<MusicData[], Map<PlayerScore[], B50Result>>();
+
 export function computeB50(musicList: MusicData[], scores: PlayerScore[]): B50Result {
+  let byScores = b50ResultCache.get(musicList);
+  if (!byScores) {
+    byScores = new Map();
+    b50ResultCache.set(musicList, byScores);
+  }
+  const cached = byScores.get(scores);
+  if (cached) return cached;
+  const result = computeB50Uncached(musicList, scores);
+  byScores.set(scores, result);
+  return result;
+}
+
+function computeB50Uncached(musicList: MusicData[], scores: PlayerScore[]): B50Result {
   const candidates = buildCandidates(musicList, scores);
   const newPicked = pickTop(candidates.filter(candidate => candidate.isNew), B15_SIZE);
   const oldPicked = pickTop(candidates.filter(candidate => !candidate.isNew), B35_SIZE);
@@ -169,7 +187,45 @@ export function computeB50(musicList: MusicData[], scores: PlayerScore[]): B50Re
  * v1.12.0：目标达成增量——把指定谱面的成绩替换为目标达成率后重算 B50，
  * 返回与当前总分的差值。目标无效（非有限正数）返回 null；谱面不在曲库中返回 null。
  */
+// v1.16.5：B50 收益结果缓存——键为「谱面+目标+成绩指纹」，避免每张卡重复全量计算。
+interface GainCacheKey {
+  musicRef: MusicData[];
+  scoresRef: PlayerScore[];
+}
+const gainCache = new WeakMap<MusicData[], WeakMap<PlayerScore[], Map<string, number | null>>>();
+
+function gainCacheKey(chart: { songId: string; musicType: 'SD' | 'DX'; difficultyIndex: number }, targetAchievement: number, scores: PlayerScore[]): string {
+  const own = scores.find(score => score.songId === chart.songId
+    && score.type === chart.musicType
+    && score.difficultyIndex === chart.difficultyIndex);
+  return `${chart.musicType}:${chart.songId}:${chart.difficultyIndex}@${targetAchievement}#${own?.achievement ?? 'none'}`;
+}
+
 export function computeB50Gain(
+  musicList: MusicData[],
+  scores: PlayerScore[],
+  chart: { songId: string; musicType: 'SD' | 'DX'; difficultyIndex: number },
+  targetAchievement: number,
+): number | null {
+  if (!Number.isFinite(targetAchievement) || targetAchievement <= 0) return null;
+  let byScores = gainCache.get(musicList);
+  if (!byScores) {
+    byScores = new WeakMap();
+    gainCache.set(musicList, byScores);
+  }
+  let byKey = byScores.get(scores);
+  if (!byKey) {
+    byKey = new Map();
+    byScores.set(scores, byKey);
+  }
+  const key = gainCacheKey(chart, targetAchievement, scores);
+  if (byKey.has(key)) return byKey.get(key) as number | null;
+  const value = computeB50GainUncached(musicList, scores, chart, targetAchievement);
+  byKey.set(key, value);
+  return value;
+}
+
+function computeB50GainUncached(
   musicList: MusicData[],
   scores: PlayerScore[],
   chart: { songId: string; musicType: 'SD' | 'DX'; difficultyIndex: number },

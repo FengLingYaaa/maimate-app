@@ -57,7 +57,8 @@ export function PlanDragList({
   }, []);
 
   const scrollToEnd = useCallback(() => {
-    listRef.current?.scrollToEnd({ animated: true });
+    // v1.16.5：动画滚动会连续渲染途经卡片造成 JS 线程拥塞（滑动卡顿/闪退诱因），改瞬时跳转。
+    listRef.current?.scrollToEnd({ animated: false });
   }, []);
 
   const renderItem = useCallback((params: RenderItemParams<PlanDragRow>) => (

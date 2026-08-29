@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMusicStore } from '../../src/store';
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
   listEmpty: { fontSize: 12, color: Colors.text.muted },
   songCard: { padding: 14, borderRadius: 16, backgroundColor: Colors.bg.tertiary, gap: 5 },
   sectionTitle: { fontSize: 13, fontWeight: '800', color: Colors.text.primary },
-   songCover: { width: '100%', height: 180, borderRadius: 12, marginTop: 4, backgroundColor: Colors.bg.secondary },
+   songCover: { width: '100%', aspectRatio: 1, borderRadius: 12, marginTop: 4, backgroundColor: Colors.bg.secondary },
   songTitle: { fontSize: 18, fontWeight: '800', color: Colors.accent.secondary },
   songMeta: { fontSize: 12, color: Colors.text.secondary },
   songVersion: { fontSize: 10, lineHeight: 15, color: Colors.text.muted },
