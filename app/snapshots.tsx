@@ -8,14 +8,14 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
-import { Colors, DifficultyColorMap, DifficultyLabels } from '../../../src/constants';
-import { CoverImage } from '../../../src/components/CoverImage';
-import { ShareCardOverlay } from '../../../src/components/ShareCardOverlay';
-import { BattleReportShareCard } from '../../../src/components/BattleReportShareCard';
-import { buildSnapshotBattleReport } from '../../../src/data/snapshot-battle';
-import { shareCardFileName } from '../../../src/data/share-card';
-import { useMusicStore, useScoreStore, useSettingsStore } from '../../../src/store';
-import type { MusicData, ScoreSnapshot } from '../../../src/data/types';
+import { Colors, DifficultyColorMap, DifficultyLabels } from '../src/constants';
+import { CoverImage } from '../src/components/CoverImage';
+import { ShareCardOverlay } from '../src/components/ShareCardOverlay';
+import { BattleReportShareCard } from '../src/components/BattleReportShareCard';
+import { buildSnapshotBattleReport } from '../src/data/snapshot-battle';
+import { shareCardFileName } from '../src/data/share-card';
+import { useMusicStore, useScoreStore, useSettingsStore } from '../src/store';
+import type { MusicData, ScoreSnapshot } from '../src/data/types';
 
 export default function SnapshotsPage() {
   const snapshots = useScoreStore(state => state.snapshots);
@@ -216,9 +216,9 @@ function BattleReportCard({ base, target, report, rawData, onClose, onShare }: {
                   {row.before === null ? '—' : `${row.before.toFixed(4)}%`}
                   {' → '}
                   {row.after === null ? '—' : `${row.after.toFixed(4)}%`}
-                  {row.ratingDelta !== null && (
+                  {row.b50Delta !== null && (
                     <Text style={styles.ratingDeltaText}>
-                      {row.ratingDelta >= 0 ? `  +${row.ratingDelta}` : `  ${row.ratingDelta}`} RA
+                      {row.b50Delta >= 0 ? `  +${row.b50Delta}` : `  ${row.b50Delta}`} RA（B50）
                     </Text>
                   )}
                 </Text>

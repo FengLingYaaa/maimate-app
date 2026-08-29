@@ -106,7 +106,7 @@ export function PlanDragList({
       />
       {!atBottom && rows.length > 0 && (
         <Pressable
-          style={[styles.jumpButton, { bottom: LIST_BOTTOM_INSET + insets.bottom + 8 }]}
+          style={[styles.jumpButton, { bottom: 12 }]}
           onPress={scrollToEnd}
           accessibilityLabel="滑动到计划最底部"
         >

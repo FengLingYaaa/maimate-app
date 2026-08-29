@@ -54,6 +54,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="song" />
         <Stack.Screen name="b50" />
+        <Stack.Screen name="snapshots" />
       </Stack>
       {/* v1.16.1：新版本首次启动的更新日志浮层，覆盖在最上层。 */}
       <ChangelogOverlay />

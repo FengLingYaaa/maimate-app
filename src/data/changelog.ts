@@ -11,6 +11,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.16.3',
+    date: '2026-08-29',
+    highlights: [
+      '快照管理独立成顶级页面，彻底修复跳转到设置页的问题',
+      '战报对比的 RA 数值改为「对 B50 的影响」：仅 B50 榜内谱面显示 +N RA（B50），榜外不再显示',
+      '推分计划「到底部」悬浮按钮移到真正的右下角',
+      '计划卡片已设目标的条目隐藏「点击重新选择」，卡片更紧凑',
+      '新增计划查漏：提醒计划中还没有成绩记录的曲目，可展开查看并直达详情',
+      '下载站改为 GitHub 直链，去掉「检查下载地址」检测步骤',
+    ],
+  },
+  {
     version: '1.16.2',
     date: '2026-08-29',
     highlights: [

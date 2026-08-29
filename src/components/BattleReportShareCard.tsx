@@ -87,9 +87,9 @@ export function BattleReportShareCard({ report, base, target, rawData, userName 
                 {row.kind === 'added' ? '新增 ' : ''}{row.before === null ? '—' : `${row.before.toFixed(4)}%`}
                 {' → '}
                 {row.after === null ? '—' : `${row.after.toFixed(4)}%`}
-                {row.ratingDelta !== null && (
+                {row.b50Delta !== null && (
                   <Text style={styles.raDelta}>
-                    {row.ratingDelta >= 0 ? `  +${row.ratingDelta}` : `  ${row.ratingDelta}`} RA
+                    {row.b50Delta >= 0 ? `  +${row.b50Delta}` : `  ${row.b50Delta}`} RA（B50）
                   </Text>
                 )}
               </Text>

@@ -165,6 +165,14 @@ export default function PushPlan() {
     };
   }, [plannedRows, scores, achievedEntryIds]);
 
+  // v1.16.3：计划查漏——计划中已有曲目在已导入成绩里找不到对应谱面记录时提示。
+  const missingScoreRows = useMemo(() => {
+    const scoreKeys = new Set(scores.map(score => `${score.type}:${score.songId}:${score.difficultyIndex}`));
+    return plannedRows.filter(row =>
+      !scoreKeys.has(`${row.music.type}:${row.music.id}:${row.entry.difficultyIndex}`));
+  }, [plannedRows, scores]);
+  const [missingOpen, setMissingOpen] = useState(false);
+
   const [achieveFilter, setAchieveFilter] = useState<'all' | 'achieved' | 'unachieved'>('all');
   // v1.15.1：按用户要求移除「缺口优先」排序切换，恢复 v1.14 手动拖拽序布局。
 
@@ -209,6 +217,30 @@ export default function PushPlan() {
                 平均完成 {progressSummary.averagePercent}% · 未设目标 {progressSummary.noTargetCount}
               </Text>
             </View>
+          </View>
+        )}
+        {missingScoreRows.length > 0 && (
+          <View style={styles.missingBar}>
+            <Pressable style={styles.missingHead} onPress={() => setMissingOpen(open => !open)}>
+              <Text style={styles.missingTitle}>⚠ 有 {missingScoreRows.length} 首计划曲目还没有成绩记录</Text>
+              <Text style={styles.missingToggle}>{missingOpen ? '收起 ▲' : '展开 ▼'}</Text>
+            </Pressable>
+            {missingOpen && (
+              <View style={styles.missingList}>
+                {missingScoreRows.slice(0, 50).map(row => (
+                  <Pressable
+                    key={row.entry.entryId}
+                    style={styles.missingItem}
+                    onPress={() => router.push({ pathname: '/song/[id]' as any, params: { id: row.music.id, type: row.music.type, difficultyIndex: String(row.entry.difficultyIndex) } })}
+                  >
+                    <Text style={styles.missingItemTitle} numberOfLines={1}>{row.music.title}</Text>
+                    <Text style={[styles.missingItemDiff, { color: DifficultyColorMap[row.entry.difficultyIndex] }]}>
+                      {DifficultyLabels[row.entry.difficultyIndex] || `难度 ${row.entry.difficultyIndex}`}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
           </View>
         )}
         <View style={styles.b50Row}>
@@ -355,6 +387,35 @@ const styles = StyleSheet.create({
   graveyardBadgeText: { fontSize: 9, color: '#fff', fontWeight: '800' },
   headerTitle: { fontSize: 26, fontWeight: '800', color: Colors.text.primary },
   headerSub: { fontSize: 12, lineHeight: 18, color: Colors.text.muted, marginTop: 2 },
+  missingBar: {
+    marginTop: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: `${Colors.functional.warning}66`,
+    backgroundColor: `${Colors.functional.warning}14`,
+    overflow: 'hidden',
+  },
+  missingHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  missingTitle: { fontSize: 11.5, fontWeight: '800', color: Colors.functional.warning, flex: 1 },
+  missingToggle: { fontSize: 11, color: Colors.text.muted, marginLeft: 8 },
+  missingList: { paddingHorizontal: 10, paddingBottom: 8, gap: 6 },
+  missingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.bg.secondary,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  missingItemTitle: { fontSize: 12, color: Colors.text.primary, flex: 1 },
+  missingItemDiff: { fontSize: 11, fontWeight: '900', marginLeft: 10 },
   b50Row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, flexWrap: 'wrap', gap: 6 },
   b50Entry: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 9, backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.light },
   progressSummaryRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 },

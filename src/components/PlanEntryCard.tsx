@@ -79,7 +79,7 @@ export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, 
           <Pressable style={styles.targetSummary} onPress={() => setEditingTarget(true)}>
             <Text style={styles.targetSummaryText}>目标：{entry.targetScore!.toFixed(4)}%</Text>
             {showProjectedRating && <Text style={styles.targetRating}>目标 Rating：{targetRating ?? '—'}{b50Gain !== null ? `（${b50Gain >= 0 ? '+' : ''}${b50Gain}）` : ''}</Text>}
-            <Text style={styles.editHint}>点击重新选择</Text>
+            {/* v1.16.3：已选目标的条目不再显示「点击重新选择」提示，压缩卡片高度。 */}
           </Pressable>
         )}
         {officialConstant === null && <Text style={styles.warning}>宴会场或数据缺失：不计算官方目标 Rating。</Text>}

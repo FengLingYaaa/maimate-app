@@ -248,12 +248,11 @@
     <div class="download-card">
       <h3>📦 下载 MaiMate</h3>
       <p class="info">当前版本：v1.16.2（Android arm64 内测）</p>
-      <a href="/MaiMate-latest.apk" class="download-btn disabled" id="dlBtn" aria-disabled="true" onclick="return false;">
-        ⏳ 检查下载地址
+      <a href="https://github.com/FengLingYaaa/maimate-app/releases/latest/download/MaiMate-latest.apk" class="download-btn" id="dlBtn">
+        ⬇️ 下载 APK（GitHub 直链）
       </a>
       <p class="download-hint" id="downloadHint">
-        正在检查最新 APK；下载将跳转 GitHub 直链
-        
+        直接连接 GitHub Releases 下载，无需等待检测
       </p>
       <span class="size-badge" id="apkSize">Android · arm64-v8a · 59.4 MB · debug 签名</span>
        <p class="download-hint">SHA-256：<code id="apkSha">f2242fdf5a03820fe32bedeb0fe453e37394325220f0f877c187b81a9064c2ba</code></p>
@@ -533,23 +532,5 @@
     </footer>
   </div>
 
-  <script>
-    (() => {
-      const apkPath = '/MaiMate-latest.apk';
-      const button = document.getElementById('dlBtn');
-      const hint = document.getElementById('downloadHint');
-
-      // v1.15.2：APK 链接改为 302 → GitHub 直链。探测仍走本地路径（302 也算可用），
-      // 大小展示用静态徽标（发布时更新），不再依赖 HEAD content-length。
-      fetch(apkPath, { method: 'HEAD', cache: 'no-store', redirect: 'follow' })
-        .then((response) => {
-          if (!response.ok) return;
-          button.classList.remove('disabled');
-          button.removeAttribute('aria-disabled');
-          button.removeAttribute('onclick');
-          button.textContent = '⬇️ 下载 APK（GitHub 直链）';
-          hint.innerHTML = '下载将跳转 GitHub Releases，速度更稳定<br>';
-    })();
-  </script>
 </body>
 </html>

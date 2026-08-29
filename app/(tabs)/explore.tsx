@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 信息查询（v1.15.1）：聚合 B50（含拟合 50）、牌子查询、今日运势、快照管理入口。
  * 纯入口页：各功能页面本身不变，仍走原路由。
  */
@@ -45,7 +45,7 @@ const ENTRIES: Array<{
     icon: '📷',
     title: '快照管理',
     desc: '本地成绩快照与推分战报对比',
-    route: '/settings/snapshots',
+    route: '/snapshots',
     accent: Colors.functional.success,
   },
 ];
