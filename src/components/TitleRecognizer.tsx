@@ -51,11 +51,13 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
   const applyImageResult = useCallback((result: ImageTextResult) => {
     const matches = matchSongTitlesForImage(rawData, result.text);
     setPerImageMatches(previous => {
+      // v1.16.8：在途竞态守卫——图片在识别期间被删除时丢弃迟到结果。
+      if (!imageUris.includes(result.uri)) return previous;
       const next = new Map(previous);
       next.set(result.uri, matches);
       return next;
     });
-  }, [rawData]);
+  }, [imageUris, rawData]);
 
   const recognizeUris = useCallback(async (uris: string[]) => {
     const existingUris = new Set(imageTexts.map(item => item.uri));

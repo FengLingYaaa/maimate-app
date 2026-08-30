@@ -51,15 +51,42 @@ function scoreTitle(title: string, recognizedLine: string): number | null {
 }
 
 /**
+ * v1.16.8：成绩图 UI 噪音行——规范化后「整行等于」这些词（或纯数字/百分比）的行
+ * 不参与匹配。整行判定保证《Break!Break!Break!》等真曲名（breakbreakbreak）不受影响；
+ * 曲名豁免在 matchSongTitles 内再做一层（行被任一真实曲名包含时不丢）。
+ */
+const NOISE_LINE_PATTERNS: RegExp[] = [
+  /^(perfect|great|good|miss|bad|break|combo|full\s*combo|fc|fs|fs\+|fdx|fdx\+|ap|app|sync|clear|failed|fail|track\s*over|gameover|game\s*over|new\s*record|rating|dx\s*rating|plate|maimai|maimaidx|dx|est|theoretical|theorie|creation|achieve ment|achievement|score|max|combo\s*count|critical)\+?$/,
+  /^\d+(\.\d+)?%?$/,
+];
+
+function isNoiseLine(line: string): boolean {
+  const compact = line.normalize('NFKC').toLocaleLowerCase().replace(/[\s\u3000]+/g, '');
+  if (compact.length === 0) return true;
+  return NOISE_LINE_PATTERNS.some(pattern => pattern.test(compact));
+}
+
+/**
  * Match OCR text against official titles and the independent alias layer.
  * Artist, charter, cover artwork, and other metadata are deliberately ignored.
  * v1.16.6：默认上限 8 → 12（一张图可能含多首，10 张图批量导入场景）。
  */
 export function matchSongTitles(rawData: MusicData[], recognizedText: string, limit = 12): TitleMatch[] {
-  const lines = recognizedText
+  const rawLines = recognizedText
     .split(/\r?\n/)
     .map(line => line.trim())
     .filter(line => line.length >= 2);
+  if (rawLines.length === 0) return [];
+
+  // v1.16.8：先取全部真实标题集合用于「曲名豁免」。
+  const allTitles = rawData.flatMap(music => getSearchTitles(music));
+  const titleContains = (line: string) => {
+    const compactLine = line.normalize('NFKC').toLocaleLowerCase().replace(/[\s\u3000]+/g, '');
+    if (compactLine.length < 3) return false;
+    return allTitles.some(title => title.replace(/[\s\u3000]+/g, '').toLowerCase().includes(compactLine));
+  };
+
+  const lines = rawLines.filter(line => !isNoiseLine(line) || titleContains(line));
   if (lines.length === 0) return [];
 
   return rawData

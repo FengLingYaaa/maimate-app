@@ -217,9 +217,11 @@ export function FilterBar({
 
   // v1.16.7：确认式搜索状态——键入不检索，「搜索」按钮触发分片匹配并显示进度。
   const [searching, setSearching] = useState(false);
-  const [searchProgress, setSearchProgress] = useState<string | null>(null);
+  // v1.16.8：真实进度（0-1）驱动进度条；完成后短暂显示「N 首」。
+  const [searchProgress, setSearchProgress] = useState<number | null>(null);
+  const [searchDoneText, setSearchDoneText] = useState<string | null>(null);
 
-  /** v1.16.7：执行确认式搜索：分片匹配（让出线程）→ 进度 → onApply。 */
+  /** v1.16.7：执行确认式搜索：分片匹配（让出线程）→ 进度条 → onApply。 */
   const runConfirmedSearch = useCallback(async () => {
     const next = cleanFilters(localFilters);
     setLocalFilters(next);
@@ -227,9 +229,12 @@ export function FilterBar({
     if (runSearch && query) {
       if (searching) return;
       setSearching(true);
+      setSearchDoneText(null);
+      setSearchProgress(0);
       try {
-        const matched = await runSearch(next, (done, total) => setSearchProgress(`匹配中 ${done}/${total} 首…`));
-        setSearchProgress(`匹配完成，${matched} 首`);
+        const matched = await runSearch(next, (done, total) => setSearchProgress(total > 0 ? done / total : 1));
+        setSearchProgress(1);
+        setSearchDoneText(`${matched} 首`);
       } catch {
         setSearchProgress(null);
       } finally {
@@ -376,8 +381,14 @@ export function FilterBar({
           </Text>
         </Pressable>
       </View>
-      {searchProgress && (
-        <Text style={styles.searchProgressText}>{searchProgress}</Text>
+      {/* v1.16.8：确认式搜索进度条（0→100%），完成后短暂显示命中数。 */}
+      {searchProgress !== null && (
+        <View style={styles.searchProgressTrack}>
+          <View style={[styles.searchProgressFill, { width: `${Math.round(searchProgress * 100)}%` }]} />
+        </View>
+      )}
+      {searchDoneText && (
+        <Text style={styles.searchProgressText}>匹配完成 · {searchDoneText}</Text>
       )}
 
       {/* v1.15.2：搜索历史（最近 5 条，点击复用；输入时自动隐藏）。
@@ -729,6 +740,19 @@ const styles = StyleSheet.create({
   },
   searchGoText: { fontSize: 13, fontWeight: '900', color: '#fff' },
   disabledBtn: { opacity: 0.5 },
+  searchProgressTrack: {
+    marginHorizontal: 12,
+    marginBottom: 4,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: Colors.bg.tertiary,
+    overflow: 'hidden',
+  },
+  searchProgressFill: {
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: Colors.accent.primary,
+  },
   searchProgressText: {
     fontSize: 10.5,
     color: Colors.text.muted,

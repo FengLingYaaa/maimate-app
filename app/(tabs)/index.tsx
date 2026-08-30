@@ -31,6 +31,7 @@ export default function SongBrowser() {
   const filters = useMusicStore(s => s.filters);
   const chartStats = useMusicStore(s => s.chartStats);
   const applyFilters = useMusicStore(s => s.applyFilters);
+  const applyFiltersChunked = useMusicStore(s => s.applyFiltersChunked);
   const clearFilters = useMusicStore(s => s.clearFilters);
   const settings = useSettingsStore(s => s.settings);
   const settingsLoaded = useSettingsStore(s => s.loaded);
@@ -87,28 +88,10 @@ export default function SongBrowser() {
     return new MusicList(rawData).filter(nextFilters).length;
   }, [rawData]);
 
-  // v1.16.7：确认式搜索——分片跑匹配让出线程，进度回调给 FilterBar 显示，最后正常应用筛选。
-  const runSearch = useCallback(async (nextFilters: FilterOptions, onProgress: (done: number, total: number) => void) => {
-    const query = nextFilters.titleSearch?.trim() || '';
-    const items = new MusicList(rawData).all();
-    const total = items.length;
-    if (!query) {
-      applyFilters(nextFilters);
-      return total;
-    }
-    let matched = 0;
-    const CHUNK = 80;
-    for (let start = 0; start < total; start += CHUNK) {
-      const end = Math.min(start + CHUNK, total);
-      for (let index = start; index < end; index += 1) {
-        if (getMusicSearchScore(items[index], query) !== null) matched += 1;
-      }
-      onProgress(end, total);
-      await new Promise<void>(resolve => setImmediate(resolve));
-    }
-    applyFilters(nextFilters);
-    return matched;
-  }, [applyFilters, rawData]);
+  // v1.16.8：确认式搜索走 store 分片路径（评分+过滤一趟完成，进度条真实推进）。
+  const runSearch = useCallback((nextFilters: FilterOptions, onProgress: (done: number, total: number) => void) => {
+    return applyFiltersChunked(nextFilters, onProgress);
+  }, [applyFiltersChunked]);
 
   const handleSongPress = useCallback((music: MusicData) => {
     router.push({ pathname: '/song/[id]' as any, params: { id: music.id, type: music.type, source: 'library' } });

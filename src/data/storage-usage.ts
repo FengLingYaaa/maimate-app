@@ -11,6 +11,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { File, Directory } from 'expo-file-system';
 import { clearCoverCache } from './cover-cache';
+import { clearCoverFullLru } from './cover-lru';
 
 export interface StorageBreakdown {
   /** 成绩与计划数据（AsyncStorage 全量）字节。 */
@@ -21,6 +22,8 @@ export interface StorageBreakdown {
   coverCount: number;
   /** cache 根目录下除 covers 外的其它缓存字节。 */
   otherBytes: number;
+  /** v1.16.8：其它缓存的一级子项明细（名字+字节，降序），设置页展示用。 */
+  otherItems: Array<{ name: string; bytes: number }>;
 }
 
 function utf8Bytes(text: string): number {
@@ -63,21 +66,24 @@ function measureDirectoryWithFileApi(dirUri: string): { bytes: number; count: nu
   }
 }
 
-/** cache 根目录一级子项里 covers 之外的字节（含散落文件与其它子目录）。 */
-function measureOtherCache(cacheUri: string, coversDirName: string): number {
+/** cache 根目录一级子项里 covers 之外的字节与明细。 */
+function measureOtherCache(cacheUri: string, coversDirName: string): { bytes: number; items: Array<{ name: string; bytes: number }> } {
   try {
     const cacheDir = new Directory(cacheUri);
-    if (!cacheDir.exists) return 0;
+    if (!cacheDir.exists) return { bytes: 0, items: [] };
     let bytes = 0;
+    const items: Array<{ name: string; bytes: number }> = [];
     for (const item of cacheDir.list()) {
       // v1.16.7：用 URI 后缀判定（部分平台上 name 可能带路径成分，等值比较曾漏判 covers）。
       if (item.uri.endsWith(`/${coversDirName}`)) continue;
-      if (item instanceof File) bytes += item.size;
-      else if (item instanceof Directory) bytes += item.size ?? 0;
+      const size = item instanceof File ? item.size : item instanceof Directory ? item.size ?? 0 : 0;
+      if (size > 0) items.push({ name: item.name || item.uri.split('/').filter(Boolean).pop() || item.uri, bytes: size });
+      bytes += size;
     }
-    return bytes;
+    items.sort((left, right) => right.bytes - left.bytes);
+    return { bytes, items };
   } catch {
-    return 0;
+    return { bytes: 0, items: [] };
   }
 }
 
@@ -86,8 +92,8 @@ export async function measureStorageBreakdown(): Promise<StorageBreakdown> {
   const dataBytes = await measureAsyncStorage();
   const cacheUri = FileSystem.cacheDirectory;
   const cover = cacheUri ? measureDirectoryWithFileApi(`${cacheUri}covers/`) : { bytes: 0, count: 0 };
-  const otherBytes = cacheUri ? measureOtherCache(cacheUri, 'covers') : 0;
-  return { dataBytes, coverBytes: cover.bytes, coverCount: cover.count, otherBytes };
+  const other = cacheUri ? measureOtherCache(cacheUri, 'covers') : { bytes: 0, items: [] as Array<{ name: string; bytes: number }> };
+  return { dataBytes, coverBytes: cover.bytes, coverCount: cover.count, otherBytes: other.bytes, otherItems: other.items };
 }
 
 /** 清理曲绘缓存。返回是否执行了删除。 */
@@ -95,19 +101,19 @@ export async function clearCovers(): Promise<boolean> {
   const cacheUri = FileSystem.cacheDirectory;
   if (!cacheUri) return false;
   const before = measureDirectoryWithFileApi(`${cacheUri}covers/`);
-  if (before.count === 0) return false;
   await clearCoverCache();
-  return true;
+  await clearCoverFullLru();
+  return before.count > 0;
 }
 
 /** 清理 cache 根目录下 covers 之外的缓存（不动曲绘，不动 document 数据）。 */
 export async function clearOtherCache(): Promise<boolean> {
   const cacheUri = FileSystem.cacheDirectory;
   if (!cacheUri) return false;
+  let removed = false;
   try {
     const cacheDir = new Directory(cacheUri);
     if (!cacheDir.exists) return false;
-    let removed = false;
     for (const item of cacheDir.list()) {
       // v1.16.7：URI 后缀判定，避免误删 covers。
       if (item.uri.endsWith('/covers')) continue;
@@ -118,10 +124,18 @@ export async function clearOtherCache(): Promise<boolean> {
         // 个别文件被占用时跳过。
       }
     }
-    return removed;
   } catch {
-    return false;
+    // 根目录不存在等情况。
   }
+  // v1.16.8：系统图片库（Fresco）磁盘缓存单独清理。
+  try {
+    const Image = require('react-native').Image;
+    if (typeof Image?.clearDiskCache === 'function') await Image.clearDiskCache();
+    if (typeof Image?.clearMemoryCache === 'function') await Image.clearMemoryCache();
+  } catch {
+    // 不可用时静默忽略。
+  }
+  return removed;
 }
 
 export function formatBytes(bytes: number): string {

@@ -11,6 +11,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.16.8',
+    date: '2026-08-30',
+    highlights: [
+      '曲绘分级缓存：列表用低清缩略图，详情页大图按需加载原图（LRU 上限 80 张）',
+      '曲绘不再进入系统图片缓存，「其它缓存」恢复干净并新增明细子项',
+      '纯数字搜索短路：搜 ID 秒出结果且无噪音（11809 只出 1 条是正确行为）',
+      '搜索卡顿修复：评分+过滤一趟分片完成，新增真实进度条',
+      '成绩图噪音行过滤：BREAK/PERFECT/百分比等 UI 文字不再干扰识别（真曲名不受影响）',
+      '修复：识别中删除图片不再出现迟到结果复活',
+    ],
+  },
+  {
     version: '1.16.7',
     date: '2026-09-02',
     highlights: [

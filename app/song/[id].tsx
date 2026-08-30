@@ -188,7 +188,7 @@ export default function SongDetail() {
         {/* 歌曲基本信息 */}
         <View style={styles.heroCard}>
           <Pressable onPress={() => setCoverViewerVisible(true)} accessibilityLabel={`查看 ${music.title} 曲绘大图`}>
-            <CoverImage music={music} allSongs={rawData} style={styles.heroCover} accessibilityLabel={`${music.title} 曲绘`} />
+            <CoverImage music={music} allSongs={rawData} style={styles.heroCover} preferFull accessibilityLabel={`${music.title} 曲绘`} />
           </Pressable>
           <View style={styles.heroInfo}>
             <Text style={styles.heroTitle}>{music.title}</Text>
@@ -392,7 +392,7 @@ export default function SongDetail() {
       {/* v1.15.0：曲绘大图查看器（点背景关闭，自绘 overlay）。 */}
       <Modal transparent visible={coverViewerVisible} animationType="fade" onRequestClose={() => setCoverViewerVisible(false)}>
         <Pressable style={styles.coverViewerBackdrop} onPress={() => setCoverViewerVisible(false)}>
-          <CoverImage music={music} allSongs={rawData} style={styles.coverViewerImage} />
+          <CoverImage music={music} allSongs={rawData} style={styles.coverViewerImage} preferFull />
           <Text style={styles.coverViewerHint}>已加载源图为 512×512 · 点任意处关闭</Text>
         </Pressable>
       </Modal>

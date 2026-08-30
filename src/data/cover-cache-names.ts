@@ -19,6 +19,11 @@ export function getCoverCacheFilename(songId: string, coverUrl: string): string 
   return `cover-${encodeURIComponent(songId)}-${hashUrl(coverUrl)}.png`;
 }
 
+/** v1.16.8：不带扩展名的缓存文件主干（full/ 原图沿用 .png，thumbs/ 用 .jpg）。 */
+export function getCoverCacheStem(songId: string, coverUrl: string): string {
+  return `cover-${encodeURIComponent(songId)}-${hashUrl(coverUrl)}`;
+}
+
 /** 判断文件名是否属于指定歌曲的曲绘缓存（清理时使用）。 */
 export function isCoverCacheFileForSong(fileName: string, songId: string): boolean {
   return fileName.startsWith(`cover-${encodeURIComponent(songId)}-`);

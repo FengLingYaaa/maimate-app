@@ -34,7 +34,7 @@ export default function SettingsPage() {
         if (!cancelled) setStorageUsage(usage);
       })
       .catch(() => {
-        if (!cancelled) setStorageUsage({ dataBytes: 0, coverBytes: 0, coverCount: 0, otherBytes: 0 });
+        if (!cancelled) setStorageUsage({ dataBytes: 0, coverBytes: 0, coverCount: 0, otherBytes: 0, otherItems: [] });
       });
     return () => {
       cancelled = true;
@@ -287,8 +287,13 @@ export default function SettingsPage() {
               </View>
               <View style={styles.storageRow}>
                 <View style={styles.storageText}>
-                  <Text style={styles.storageName}>其它缓存（旧版残留等）</Text>
+                  <Text style={styles.storageName}>其它缓存（系统图片缓存等）</Text>
                   <Text style={styles.storageValue}>{formatBytes(storageUsage.otherBytes)}</Text>
+                  {storageUsage.otherItems?.filter(item => item.bytes >= 1024).slice(0, 3).map(item => (
+                    <Text key={item.name} style={styles.storageSubItem}>
+                      · {item.name}: {formatBytes(item.bytes)}
+                    </Text>
+                  ))}
                 </View>
                 <Pressable style={styles.storageClearBtn} onPress={() => void handleClearOtherCache()}>
                   <Text style={styles.storageClearText}>清理</Text>
@@ -356,6 +361,7 @@ const styles = StyleSheet.create({
   storageRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   storageText: { flex: 1 },
   storageName: { fontSize: 12.5, fontWeight: '800', color: Colors.text.primary },
+  storageSubItem: { fontSize: 10, color: Colors.text.muted, marginTop: 2 },
   storageValue: { fontSize: 11, color: Colors.text.muted, marginTop: 1 },
   storageClearBtn: {
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,

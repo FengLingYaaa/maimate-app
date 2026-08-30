@@ -113,11 +113,16 @@ function scoreText(text: string, query: string): number | null {
 
 /** 返回歌曲与标题搜索词的相关度，供筛选结果排序。 */
 export function getMusicSearchScore(music: MusicData, query: string): number | null {
-  // v1.16.6：纯数字搜索词优先按歌曲 ID 精确/前缀匹配（ID 为纯数字）。
   const trimmed = query.trim();
+  // v1.16.8：纯数字查询短路——只做歌曲 ID 精确/前缀匹配，完全跳过标题/曲师/谱师
+  // 模糊评分（搜 ID 秒出；杜绝数字撞上标题子串产生无关结果）。
   if (/^\d{2,}$/.test(trimmed)) {
     if (music.id === trimmed) return 1;
     if (music.id.startsWith(trimmed)) return 0.85;
+    // ≤3 位短数字（如成绩图里的 39）只允许「ID 含该数字串」以低分入围，
+    // 且永远低于任何 ID 精确/前缀命中。
+    if (trimmed.length <= 3 && music.id.includes(trimmed)) return 0.5;
+    return null;
   }
   const values = [
     ...getSearchTitles(music).map(title => scoreText(title, query)),
@@ -230,7 +235,8 @@ function compareTitles(left: MusicData, right: MusicData, descending: boolean): 
   return parseInt(left.id, 10) - parseInt(right.id, 10);
 }
 
-function sortMusicItems(
+/** v1.16.8：导出供 store 的分片过滤路径复用（原模块私有）。 */
+export function sortMusicItems(
   items: MusicData[],
   sort: SortOptions | undefined,
   query?: string,

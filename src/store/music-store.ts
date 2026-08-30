@@ -5,7 +5,7 @@
 
 import { create } from 'zustand';
 import { MusicData, FilterOptions, ChartStatsMap } from '../data/types';
-import { MusicList } from '../data/music-list';
+import { MusicList, matchesMusic, sortMusicItems } from '../data/music-list';
 import { getCacheTimestamp, getMusicDataWithStatus } from '../api/prober';
 import {
   getChartStatsCacheTimestamp,
@@ -31,6 +31,8 @@ interface MusicStore {
   loadData: (forceRefresh?: boolean) => Promise<void>;
   loadChartStats: (forceRefresh?: boolean) => Promise<void>;
   applyFilters: (filters: FilterOptions) => void;
+  /** v1.16.8：分片应用筛选（评分+过滤一趟完成），进度回调给 UI 进度条。 */
+  applyFiltersChunked: (filters: FilterOptions, onProgress?: (done: number, total: number) => void) => Promise<number>;
   clearFilters: () => void;
   getFullList: () => MusicList;
 }
@@ -212,6 +214,26 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
     const { rawData, chartStats } = get();
     // v1.16.0：带 chartStats 供拟合定数排序使用。
     set({ musicList: createMusicList(rawData, filters, chartStats), filters });
+  },
+
+  applyFiltersChunked: async (filters, onProgress) => {
+    const { rawData, chartStats } = get();
+    const total = rawData.length;
+    // v1.16.8：评分+过滤一趟完成（v1.16.7 是评分一遍、applyFilters 再过滤一遍的双遍），
+    // 每片让出线程给 UI，进度真实反映剩余工作量；排序只对命中子集做。
+    const matched: MusicData[] = [];
+    const CHUNK = 80;
+    for (let start = 0; start < total; start += CHUNK) {
+      const end = Math.min(start + CHUNK, total);
+      for (let index = start; index < end; index += 1) {
+        if (matchesMusic(rawData[index], filters)) matched.push(rawData[index]);
+      }
+      onProgress?.(end, total);
+      await new Promise<void>(resolve => setImmediate(resolve));
+    }
+    const sorted = sortMusicItems(matched, filters.sort, filters.titleSearch, chartStats);
+    set({ musicList: new MusicList(sorted), filters });
+    return matched.length;
   },
 
   clearFilters: () => {
