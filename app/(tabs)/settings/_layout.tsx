@@ -28,6 +28,7 @@ export default function SettingsStackLayout() {
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="data-backup" options={{ title: '数据备份' }} />
+      <Stack.Screen name="export-csv" options={{ title: '导出成绩 CSV' }} />
       <Stack.Screen name="update" options={{ title: '检查更新' }} />
     </Stack>
   );

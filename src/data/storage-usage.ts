@@ -70,7 +70,8 @@ function measureOtherCache(cacheUri: string, coversDirName: string): number {
     if (!cacheDir.exists) return 0;
     let bytes = 0;
     for (const item of cacheDir.list()) {
-      if (item.name === coversDirName) continue;
+      // v1.16.7：用 URI 后缀判定（部分平台上 name 可能带路径成分，等值比较曾漏判 covers）。
+      if (item.uri.endsWith(`/${coversDirName}`)) continue;
       if (item instanceof File) bytes += item.size;
       else if (item instanceof Directory) bytes += item.size ?? 0;
     }
@@ -108,7 +109,8 @@ export async function clearOtherCache(): Promise<boolean> {
     if (!cacheDir.exists) return false;
     let removed = false;
     for (const item of cacheDir.list()) {
-      if (item.name === 'covers') continue;
+      // v1.16.7：URI 后缀判定，避免误删 covers。
+      if (item.uri.endsWith('/covers')) continue;
       try {
         item.delete();
         removed = true;

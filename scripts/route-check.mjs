@@ -53,7 +53,7 @@ assert.equal(rootRoutes.has('index'), false, 'b50 must not shadow tab screens');
 const settingsNode = tabsChildren.get('settings');
 assert.deepEqual(
   settingsNode?.children.map(route => route.route).sort(),
-  ['data-backup', 'detail-boards', 'index', 'music-platform', 'sort', 'update'],
+  ['data-backup', 'detail-boards', 'export-csv', 'index', 'music-platform', 'sort', 'update'],
 );
 assert.equal(rootRoutes.has('snapshots'), true, 'v1.16.3: snapshots must be a root-level Stack screen (independent from settings stack)');
 assert.deepEqual(rootRoutes.get('song')?.children.map(route => route.route), ['[id]']);

@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { CameraType } from 'expo-image-picker';
 import TextRecognition, { TextRecognitionScript } from '@react-native-ml-kit/text-recognition';
 import { Colors, DifficultyLabels } from '../constants';
-import { matchSongTitles, type TitleMatch } from '../data/title-search';
+import { matchSongTitlesForImage, mergeImageMatches, type TitleMatch } from '../data/title-search';
 import { usePlanStore } from '../store';
 import type { MusicData } from '../data/types';
 
@@ -30,22 +30,31 @@ function getQuickAddDifficulty(music: MusicData): number | null {
 export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props) {
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [imageTexts, setImageTexts] = useState<ImageTextResult[]>([]);
-  const [recognizedText, setRecognizedText] = useState('');
-  const [matches, setMatches] = useState<TitleMatch[]>([]);
+  // v1.16.7：每张图自己的匹配结果——删除/新增图只改一张图的候选，再合并，零全量重扫。
+  const [perImageMatches, setPerImageMatches] = useState<Map<string, TitleMatch[]>>(new Map());
   const [status, setStatus] = useState('可连续拍摄，或从相册选择多张图片');
   const [working, setWorking] = useState(false);
   const [planFeedback, setPlanFeedback] = useState<string | null>(null);
+  // v1.16.7：OCR 原始文字默认折叠，点击展开（减少渲染开销与视觉噪音）。
+  const [ocrExpanded, setOcrExpanded] = useState(false);
   const preserveResultsOnClose = useRef(false);
   const addEntry = usePlanStore(s => s.addEntry);
   const isInPlan = usePlanStore(s => s.isInPlan);
   const planLoaded = usePlanStore(s => s.loaded);
 
-  const updateMatches = useCallback((nextImageTexts: ImageTextResult[]) => {
-    const combined = nextImageTexts.map(item => item.text).filter(Boolean).join('\n');
-    setRecognizedText(combined);
-    const nextMatches = matchSongTitles(rawData, combined);
-    setMatches(nextMatches);
-    setStatus(nextMatches.length > 0 ? `已识别 ${nextImageTexts.length} 张图片，找到 ${nextMatches.length} 个可能的歌曲` : nextImageTexts.length > 0 ? '已完成识别，没有匹配到歌曲名' : '可连续拍摄，或从相册选择多张图片');
+  /** 由每图候选合并出展示列表（去重取最优分，排序，截断 12）。 */
+  const mergedMatches = React.useMemo(
+    () => mergeImageMatches([...perImageMatches.values()]),
+    [perImageMatches],
+  );
+
+  const applyImageResult = useCallback((result: ImageTextResult) => {
+    const matches = matchSongTitlesForImage(rawData, result.text);
+    setPerImageMatches(previous => {
+      const next = new Map(previous);
+      next.set(result.uri, matches);
+      return next;
+    });
   }, [rawData]);
 
   const recognizeUris = useCallback(async (uris: string[]) => {
@@ -61,7 +70,7 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
     try {
       for (let index = 0; index < newUris.length; index += 1) {
         const uri = newUris[index];
-        setStatus(`正在识别第 ${imageTexts.length + index + 1} / ${imageTexts.length + newUris.length} 张图片…`);
+        setStatus(`正在识别+匹配 第 ${imageTexts.length + index + 1} / ${imageTexts.length + newUris.length} 张图片…`);
         const recognizedParts: string[] = [];
         for (const script of [TextRecognitionScript.JAPANESE, TextRecognitionScript.CHINESE, TextRecognitionScript.LATIN]) {
           try {
@@ -71,17 +80,20 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
             // Optional language models may be unavailable on a device.
           }
         }
-        nextResults.push({ uri, text: [...new Set(recognizedParts)].join('\n') });
+        const result: ImageTextResult = { uri, text: [...new Set(recognizedParts)].join('\n') };
+        nextResults.push(result);
+        // v1.16.7：逐图即时匹配（单图，几十毫秒），完成后该图候选立即可见。
+        applyImageResult(result);
+        setImageUris(current => (current.includes(uri) ? current : [...current, uri]));
       }
-      setImageUris(current => [...new Set([...current, ...newUris])].slice(0, MAX_IMAGES));
       setImageTexts(nextResults);
-      updateMatches(nextResults);
+      setStatus(`已识别 ${nextResults.length} 张图片`);
     } catch (error: any) {
       setStatus(`识别失败：${error?.message || '未知错误'}`);
     } finally {
       setWorking(false);
     }
-  }, [imageTexts, updateMatches]);
+  }, [applyImageResult, imageTexts]);
 
   useEffect(() => {
     if (!visible) return;
@@ -105,11 +117,11 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
       }
       setImageUris([]);
       setImageTexts([]);
-      setRecognizedText('');
-      setMatches([]);
+      setPerImageMatches(new Map());
       setStatus('可连续拍摄，或从相册选择多张图片');
       setPlanFeedback(null);
       setWorking(false);
+      setOcrExpanded(false);
     }
   }, [visible]);
 
@@ -163,28 +175,24 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
     }
   };
 
+  /** v1.16.7：删图 = 删该图候选 + 重新合并（无全量重扫，卡顿根因移除）。 */
   const removeImage = (uri: string) => {
-    const nextUris = imageUris.filter(item => item !== uri);
-    const nextResults = imageTexts.filter(item => item.uri !== uri);
-    setImageUris(nextUris);
-    setImageTexts(nextResults);
-    updateMatches(nextResults);
-  };
-
-  /** v1.16.6：包一层确保 × 点击不被父层手势吞掉（部分设备 Pressable 嵌套失效根因）。 */
-  const removeImagePress = (uri: string) => {
-    return () => {
-      requestAnimationFrame(() => removeImage(uri));
-    };
+    setImageUris(previous => previous.filter(item => item !== uri));
+    setImageTexts(previous => previous.filter(item => item.uri !== uri));
+    setPerImageMatches(previous => {
+      const next = new Map(previous);
+      next.delete(uri);
+      return next;
+    });
   };
 
   const clearImages = () => {
     setImageUris([]);
     setImageTexts([]);
-    setRecognizedText('');
-    setMatches([]);
-    setPlanFeedback(null);
+    setPerImageMatches(new Map());
     setStatus('可连续拍摄，或从相册选择多张图片');
+    setPlanFeedback(null);
+    setOcrExpanded(false);
   };
 
   const handleOpenSong = (music: MusicData) => {
@@ -231,7 +239,7 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
                     <Image source={{ uri }} style={styles.thumbnail} />
                     <Pressable
                       style={styles.removeImage}
-                      onPress={removeImagePress(uri)}
+                      onPress={() => removeImage(uri)}
                       onStartShouldSetResponder={() => true}
                       onTouchEnd={event => event.stopPropagation()}
                       accessibilityLabel="删除这张图片"
@@ -254,10 +262,10 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
             </View>
             {imageUris.length > 0 && <Pressable style={styles.clearButton} onPress={clearImages} disabled={working}><Text style={styles.clearText}>清空图片并重新识别</Text></Pressable>}
 
-            {matches.length > 0 && (
+            {mergedMatches.length > 0 && (
               <View style={styles.results}>
                 <Text style={styles.sectionTitle}>合并后的可能歌曲（已去重）</Text>
-                {matches.map(match => {
+                {mergedMatches.map(match => {
                   const difficultyIndex = getQuickAddDifficulty(match.music);
                   const difficultyLabel = difficultyIndex === null ? null : DifficultyLabels[difficultyIndex];
                   const alreadyInPlan = difficultyIndex !== null && planLoaded && isInPlan(match.music.id, difficultyIndex, match.music.type);
@@ -282,10 +290,14 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
               </View>
             )}
 
-            {recognizedText && (
+            {imageTexts.length > 0 && (
               <View style={styles.ocrBox}>
-                <Text style={styles.sectionTitle}>各图片识别到的原始文字</Text>
-                {imageTexts.map((item, index) => <Text key={item.uri} style={styles.ocrText}>#{index + 1} {item.text || '（没有识别到文字）'}</Text>)}
+                <Pressable style={styles.ocrToggle} onPress={() => setOcrExpanded(value => !value)}>
+                  <Text style={styles.ocrToggleText}>{ocrExpanded ? '收起识别文字 ▲' : `查看识别文字（${imageTexts.length} 张） ▼`}</Text>
+                </Pressable>
+                {ocrExpanded && imageTexts.map((item, index) => (
+                  <Text key={item.uri} style={styles.ocrText}>#{index + 1} {item.text || '（没有识别到文字）'}</Text>
+                ))}
               </View>
             )}
             {planFeedback && <Text style={styles.planFeedback}>{planFeedback}</Text>}
@@ -323,6 +335,8 @@ const styles = StyleSheet.create({
   clearText: { fontSize: 11, color: Colors.functional.danger },
   ocrBox: { padding: 12, borderRadius: 10, backgroundColor: Colors.bg.secondary, gap: 6 },
   sectionTitle: { fontSize: 12, fontWeight: '800', color: Colors.text.primary },
+  ocrToggle: { paddingVertical: 4 },
+  ocrToggleText: { fontSize: 12, fontWeight: '800', color: Colors.accent.secondary },
   ocrText: { fontSize: 11, lineHeight: 17, color: Colors.text.secondary },
   results: { gap: 8 },
   resultRow: { flexDirection: 'row', alignItems: 'stretch', gap: 8, padding: 11, borderRadius: 10, backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.light },

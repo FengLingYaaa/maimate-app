@@ -7,7 +7,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { Colors, DifficultyColorMap, DifficultyLabels } from '../src/constants';
 import { CoverImage } from '../src/components/CoverImage';
 import { ShareCardOverlay } from '../src/components/ShareCardOverlay';
@@ -149,6 +149,7 @@ function BattleReportCard({ base, target, report, rawData, onClose, onShare }: {
   onClose: () => void;
   onShare: () => void;
 }) {
+  const router = useRouter();
   const raDelta = base.serverRating != null && target.serverRating != null
     ? target.serverRating - base.serverRating
     : null;
@@ -193,8 +194,17 @@ function BattleReportCard({ base, target, report, rawData, onClose, onShare }: {
         report.rows.filter(row => row.kind !== 'removed').map(row => {
           const music = rawData.find(candidate => candidate.id === row.songId && candidate.type === row.musicType);
           const difficultyColor = DifficultyColorMap[row.difficultyIndex] || Colors.accent.secondary;
+          // v1.16.7：行可点击进详情页；详情页返回时 replace 回快照页（source: 'snapshots'）。
           return (
-            <View key={row.chartKey} style={styles.battleRow}>
+            <Pressable
+              key={row.chartKey}
+              style={styles.battleRow}
+              disabled={!music}
+              onPress={() => music && router.push({
+                pathname: '/song/[id]' as any,
+                params: { id: music.id, type: music.type, difficultyIndex: String(row.difficultyIndex), source: 'snapshots' },
+              })}
+            >
               <CoverImage
                 music={music ?? {
                   id: row.songId, title: row.title, type: row.musicType, ds: [], level: [], cids: [], charts: [],
@@ -223,7 +233,7 @@ function BattleReportCard({ base, target, report, rawData, onClose, onShare }: {
                   )}
                 </Text>
               </View>
-            </View>
+            </Pressable>
           );
         })
       )}

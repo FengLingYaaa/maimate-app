@@ -9,7 +9,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useMusicStore, useScoreStore, useSettingsStore } from '../../src/store';
 import { SongCard, FilterBar, TitleRecognizer } from '../../src/components';
 import { Colors } from '../../src/constants';
-import { getMatchingDifficultyIndices, getFitChartConstant, MusicList } from '../../src/data/music-list';
+import { getMatchingDifficultyIndices, getFitChartConstant, getMusicSearchScore, MusicList } from '../../src/data/music-list';
 import { getChinaVersionOptions, getVersionOptions } from '../../src/data/version-catalog';
 import { computeB50 } from '../../src/data/b50';
 import type { FilterOptions, MusicData } from '../../src/data/types';
@@ -87,6 +87,29 @@ export default function SongBrowser() {
     return new MusicList(rawData).filter(nextFilters).length;
   }, [rawData]);
 
+  // v1.16.7：确认式搜索——分片跑匹配让出线程，进度回调给 FilterBar 显示，最后正常应用筛选。
+  const runSearch = useCallback(async (nextFilters: FilterOptions, onProgress: (done: number, total: number) => void) => {
+    const query = nextFilters.titleSearch?.trim() || '';
+    const items = new MusicList(rawData).all();
+    const total = items.length;
+    if (!query) {
+      applyFilters(nextFilters);
+      return total;
+    }
+    let matched = 0;
+    const CHUNK = 80;
+    for (let start = 0; start < total; start += CHUNK) {
+      const end = Math.min(start + CHUNK, total);
+      for (let index = start; index < end; index += 1) {
+        if (getMusicSearchScore(items[index], query) !== null) matched += 1;
+      }
+      onProgress(end, total);
+      await new Promise<void>(resolve => setImmediate(resolve));
+    }
+    applyFilters(nextFilters);
+    return matched;
+  }, [applyFilters, rawData]);
+
   const handleSongPress = useCallback((music: MusicData) => {
     router.push({ pathname: '/song/[id]' as any, params: { id: music.id, type: music.type, source: 'library' } });
   }, [router]);
@@ -137,6 +160,7 @@ export default function SongBrowser() {
         totalCount={rawData.length}
         filteredCount={songs.length}
         getPreviewCount={getPreviewCount}
+        runSearch={runSearch}
         genres={genres}
         versionOptions={versionOptions}
         chinaVersionOptions={chinaVersionOptions}

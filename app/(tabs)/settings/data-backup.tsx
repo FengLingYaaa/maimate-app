@@ -88,7 +88,7 @@ export default function DataBackupScreen() {
         <Text style={styles.sectionTitle}>导出</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Pressable style={[styles.primaryButton, { flex: 1 }, busy && styles.disabled]} disabled={busy} onPress={() => void handleExport('save')}>
-            <Text style={styles.primaryButtonText}>仅保存…</Text>
+            <Text style={styles.primaryButtonText}>仅保存</Text>
           </Pressable>
           <Pressable style={[styles.primaryButton, { flex: 1 }, busy && styles.disabled]} disabled={busy} onPress={() => void handleExport('share')}>
             <Text style={styles.primaryButtonText}>保存并分享</Text>

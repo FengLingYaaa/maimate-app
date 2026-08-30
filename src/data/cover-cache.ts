@@ -59,13 +59,12 @@ export async function resolveCoverCacheUri(songId: string, coverUrl: string): Pr
   return task;
 }
 
-/** 清空曲绘缓存目录（设置页清理入口使用）。 */
+/** 清空曲绘缓存目录（设置页清理入口使用）。v1.16.7：连目录一起删，避免目录残留被误计。 */
 export async function clearCoverCache(): Promise<void> {
   const cacheDirectoryUri = getCacheDirectoryUri();
   if (!cacheDirectoryUri) return;
   try {
-    const files = await FileSystem.readDirectoryAsync(cacheDirectoryUri);
-    await Promise.all(files.map(fileName => FileSystem.deleteAsync(`${cacheDirectoryUri}${fileName}`, { idempotent: true })));
+    await FileSystem.deleteAsync(cacheDirectoryUri, { idempotent: true });
   } catch {
     // 目录不存在等情况忽略。
   }

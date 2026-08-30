@@ -54,6 +54,9 @@ export default function SongDetail() {
   const handleBack = useCallback(() => {
     if (sourceValue === 'plan') {
       router.replace('/plan');
+    } else if (sourceValue === 'snapshots') {
+      // v1.16.7：从快照对比进入，返回时回到快照页而非库页。
+      router.replace('/snapshots');
     } else {
       router.back();
     }
@@ -293,6 +296,12 @@ export default function SongDetail() {
                 <View style={styles.charterRow}>
                   <Text style={styles.charterLabel}>谱师</Text>
                   <Text style={styles.charterValue}>{chart.charter || '-'}</Text>
+                </View>
+
+                {/* v1.16.7：数字 ID（查曲/反馈场景需要精确 ID）。 */}
+                <View style={styles.charterRow}>
+                  <Text style={styles.charterLabel}>ID</Text>
+                  <Text style={styles.charterValue}>{music.id}</Text>
                 </View>
 
                 {currentScore ? (

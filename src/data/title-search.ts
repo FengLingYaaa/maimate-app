@@ -79,3 +79,28 @@ export function matchSongTitles(rawData: MusicData[], recognizedText: string, li
     .sort((left, right) => right.score - left.score)
     .slice(0, limit);
 }
+
+/**
+ * v1.16.7：单图匹配——只对一张图的行做匹配，返回该图的全部候选（不截断）。
+ * 增量匹配的基础：删除图片 = 删除该图的候选并重新合并，不再全量重扫。
+ */
+export function matchSongTitlesForImage(rawData: MusicData[], imageText: string): TitleMatch[] {
+  return matchSongTitles(rawData, imageText, Number.MAX_SAFE_INTEGER);
+}
+
+/**
+ * v1.16.7：合并多图候选——按曲去重取最高分，排序后截断。
+ * 与全量一次性匹配在数学上等价（原实现同样取每曲全文本最优），输出一致。
+ */
+export function mergeImageMatches(imageMatches: TitleMatch[][], limit = 12): TitleMatch[] {
+  const byMusic = new Map<string, TitleMatch>();
+  for (const matches of imageMatches) {
+    for (const match of matches) {
+      const existing = byMusic.get(match.music.id);
+      if (!existing || match.score > existing.score) byMusic.set(match.music.id, match);
+    }
+  }
+  return [...byMusic.values()]
+    .sort((left, right) => right.score - left.score)
+    .slice(0, limit);
+}

@@ -34,6 +34,11 @@ interface Props {
   charters: string[];
   /** 搜索历史存储分键（v1.16.1）：'library' | 'plan'，默认 'library'。 */
   historyKey?: 'library' | 'plan';
+  /**
+   * v1.16.7：确认式搜索——传入后点「搜索」/键盘确认时用分片匹配跑进度，
+   * 完成后才 onApply。不传则确认时直接 onApply（旧行为）。
+   */
+  runSearch?: (filters: FilterOptions, onProgress: (done: number, total: number) => void) => Promise<number>;
 }
 
 function cleanFilters(input: FilterOptions): FilterOptions {
@@ -74,11 +79,11 @@ export function FilterBar({
   charters,
   /** v1.16.1：搜索历史分键——不同页面独立记忆（如 'library' / 'plan'）。 */
   historyKey = 'library',
+  runSearch,
 }: Props) {
   const [showModal, setShowModal] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
   const [localFilters, setLocalFilters] = useState<FilterOptions>({ ...filters });
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // v1.15.2：曲库搜索历史（最近 5 条，本机 AsyncStorage 持久化）。
   // v1.16.1：按 historyKey 分键存储，曲库与计划互不干扰；旧版共享 key 的数据迁给曲库。
   const HISTORY_LIMIT = 5;
@@ -146,10 +151,6 @@ export function FilterBar({
     setLocalFilters({ ...filters });
   }, [filters]);
 
-  useEffect(() => () => {
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-  }, []);
-
   const hasActiveFilters = Object.values(filters).some(value => {
     if (value === undefined || value === null) return false;
     if (typeof value === 'string' && value.trim() === '') return false;
@@ -214,15 +215,35 @@ export function FilterBar({
     update({ ...localFilters, sort: { mode: localFilters.sort?.mode || 'constantDesc', difficultyIndex } });
   };
 
+  // v1.16.7：确认式搜索状态——键入不检索，「搜索」按钮触发分片匹配并显示进度。
+  const [searching, setSearching] = useState(false);
+  const [searchProgress, setSearchProgress] = useState<string | null>(null);
+
+  /** v1.16.7：执行确认式搜索：分片匹配（让出线程）→ 进度 → onApply。 */
+  const runConfirmedSearch = useCallback(async () => {
+    const next = cleanFilters(localFilters);
+    setLocalFilters(next);
+    const query = next.titleSearch?.trim() || '';
+    if (runSearch && query) {
+      if (searching) return;
+      setSearching(true);
+      try {
+        const matched = await runSearch(next, (done, total) => setSearchProgress(`匹配中 ${done}/${total} 首…`));
+        setSearchProgress(`匹配完成，${matched} 首`);
+      } catch {
+        setSearchProgress(null);
+      } finally {
+        setSearching(false);
+      }
+    }
+    onApply(next);
+    if (query.length >= 2) recordSearch(query);
+  }, [localFilters, onApply, recordSearch, runSearch, searching]);
+
+  /** v1.16.7：键入只改本地草稿不再自动检索（原 180ms 防抖删除）。 */
   const handleSearchChange = (text: string) => {
     const next = cleanFilters({ ...localFilters, titleSearch: text || undefined });
     setLocalFilters(next);
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => {
-      onApply(next);
-      // v1.15.2：防抖结束后记录有效搜索词（≥2 字符才记，避免单字符噪音）。
-      if (text.trim().length >= 2) recordSearch(text);
-    }, 180);
   };
 
   const clearSearch = () => {
@@ -328,11 +349,9 @@ export function FilterBar({
             placeholderTextColor={Colors.text.muted}
             value={localFilters.titleSearch || ''}
             onChangeText={handleSearchChange}
-            onSubmitEditing={() => {
-              onApply(cleanFilters(localFilters));
-              if ((localFilters.titleSearch || '').trim().length >= 2) recordSearch(localFilters.titleSearch!);
-            }}
+            onSubmitEditing={() => void runConfirmedSearch()}
             returnKeyType="search"
+            editable={!searching}
           />
           {!!localFilters.titleSearch && (
             <Pressable style={styles.clearSearch} onPress={clearSearch} hitSlop={6} accessibilityLabel="清空搜索">
@@ -340,6 +359,14 @@ export function FilterBar({
             </Pressable>
           )}
         </View>
+        <Pressable
+          style={[styles.searchGoBtn, searching && styles.disabledBtn]}
+          disabled={searching}
+          onPress={() => void runConfirmedSearch()}
+          accessibilityLabel="搜索"
+        >
+          <Text style={styles.searchGoText}>{searching ? '…' : '搜索'}</Text>
+        </Pressable>
         <Pressable
           style={[styles.filterBtn, hasActiveFilters && styles.filterBtnActive]}
           onPress={() => setShowModal(true)}
@@ -349,6 +376,9 @@ export function FilterBar({
           </Text>
         </Pressable>
       </View>
+      {searchProgress && (
+        <Text style={styles.searchProgressText}>{searchProgress}</Text>
+      )}
 
       {/* v1.15.2：搜索历史（最近 5 条，点击复用；输入时自动隐藏）。
           v1.16.5：长按进入管理模式——右上角 × 删除单条，行尾「清空」。 */}
@@ -362,9 +392,8 @@ export function FilterBar({
                 style={styles.historyChip}
                 onPress={() => {
                   if (historyManaging) return;
-                  const next = cleanFilters({ ...localFilters, titleSearch: item });
-                  setLocalFilters(next);
-                  onApply(next);
+                  // v1.16.7：历史 chip 只回填草稿，等用户按「搜索」才检索。
+                  setLocalFilters(cleanFilters({ ...localFilters, titleSearch: item }));
                 }}
                 onLongPress={() => setHistoryManaging(true)}
                 delayLongPress={350}
@@ -690,6 +719,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: Colors.border.light,
+  },
+  searchGoBtn: {
+    backgroundColor: Colors.accent.primary,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    justifyContent: 'center',
+  },
+  searchGoText: { fontSize: 13, fontWeight: '900', color: '#fff' },
+  disabledBtn: { opacity: 0.5 },
+  searchProgressText: {
+    fontSize: 10.5,
+    color: Colors.text.muted,
+    paddingHorizontal: 14,
+    paddingBottom: 4,
   },
   filterBtnActive: {
     borderColor: Colors.accent.primary,

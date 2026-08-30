@@ -92,6 +92,23 @@ export default function PushPlan() {
   const charters = useMemo(() => [...new Set(plannedRows.flatMap(row => row.music.charts.map(chart => chart.charter).filter(value => value && value !== '-')))].sort(), [plannedRows]);
 
   const getPreviewCount = useCallback((nextFilters: FilterOptions) => plannedRows.filter(row => matchesPlanRow(row, nextFilters)).length, [plannedRows]);
+
+  // v1.16.7：确认式搜索——分片跑计划行匹配（复用 matchesPlanRow 保持计划难度口径），进度回调给 FilterBar。
+  const runSearch = useCallback(async (nextFilters: FilterOptions, onProgress: (done: number, total: number) => void) => {
+    const total = plannedRows.length;
+    let matched = 0;
+    const CHUNK = 60;
+    for (let start = 0; start < total; start += CHUNK) {
+      const end = Math.min(start + CHUNK, total);
+      for (let index = start; index < end; index += 1) {
+        if (matchesPlanRow(plannedRows[index], nextFilters)) matched += 1;
+      }
+      onProgress(end, total);
+      await new Promise<void>(resolve => setImmediate(resolve));
+    }
+    setFilters(nextFilters);
+    return matched;
+  }, [plannedRows]);
   const getScore = useCallback((music: MusicData, entry: PlanEntry): PlayerScore | undefined => scores.find(score => score.songId === music.id && score.difficultyIndex === entry.difficultyIndex && score.type === music.type), [scores]);
 
   // 移除走自定义确认控件（不再使用系统 Alert），移除后曲目进入「推歌英灵殿」。
@@ -266,6 +283,7 @@ export default function PushPlan() {
         totalCount={plannedRows.length}
         filteredCount={displayRows.length}
         getPreviewCount={getPreviewCount}
+        runSearch={runSearch}
         genres={genres}
         versionOptions={versionOptions}
         chinaVersionOptions={chinaVersionOptions}

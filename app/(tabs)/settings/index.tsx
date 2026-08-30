@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import { Colors } from '../../../src/constants';
 import { useScoreStore, useSettingsStore } from '../../../src/store';
 import { MUSIC_PLATFORM_OPTIONS, getSortLabel } from '../../../src/data/settings-options';
-import { exportScoresCsv } from '../../../src/data/scores-csv';
 import { measureStorageBreakdown, clearCovers, clearOtherCache, formatBytes, type StorageBreakdown } from '../../../src/data/storage-usage';
 
 export default function SettingsPage() {
@@ -96,23 +95,7 @@ export default function SettingsPage() {
     }
   };
 
-  const exportCsv = async (mode: 'share' | 'save') => {
-    if (working) return;
-    setWorking(true);
-    try {
-      const { rowCount, savedTo } = await exportScoresCsv(mode);
-      if (rowCount === 0) {
-        setTokenMessage('没有已导入的成绩可导出');
-      } else if (mode === 'save') {
-        setTokenMessage(`已保存 ${rowCount} 条成绩到所选目录`);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'CSV 导出失败';
-      setTokenMessage(message === 'SAF_SAVE_CANCELLED' ? '已取消保存' : message);
-    } finally {
-      setWorking(false);
-    }
-  };
+
 
   useEffect(() => {
     if (tokenConfigured) setTokenInput('');
@@ -321,20 +304,13 @@ export default function SettingsPage() {
           </View>
           <Text style={styles.valueButtonText}>›</Text>
         </Pressable>
-        <View style={styles.preferenceRow}>
+        <Pressable style={styles.preferenceRow} onPress={() => router.push('/settings/export-csv' as any)}>
           <View style={styles.preferenceText}>
             <Text style={styles.preferenceTitle}>导出成绩 CSV</Text>
             <Text style={styles.preferenceDescription}>把已导入的成绩导出为 CSV 文件，方便在电脑上分析</Text>
-            <View style={styles.exportButtonRow}>
-              <Pressable style={[styles.exportButton, working && styles.disabled]} disabled={working} onPress={() => void exportCsv('save')}>
-                <Text style={styles.exportButtonText}>仅保存…</Text>
-              </Pressable>
-              <Pressable style={[styles.exportButton, working && styles.disabled]} disabled={working} onPress={() => void exportCsv('share')}>
-                <Text style={styles.exportButtonText}>保存并分享</Text>
-              </Pressable>
-            </View>
           </View>
-        </View>
+          <Text style={styles.valueButtonText}>›</Text>
+        </Pressable>
         <Pressable style={styles.preferenceRow} onPress={() => router.push('/settings/update' as any)}>
           <View style={styles.preferenceText}>
             <Text style={styles.preferenceTitle}>检查更新</Text>
@@ -372,12 +348,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '800', color: Colors.text.primary },
   subtitle: { fontSize: 12, color: Colors.text.muted },
   section: { padding: 14, borderRadius: 16, backgroundColor: Colors.bg.secondary, gap: 10 },
-  exportButtonRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  exportButton: {
-    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8,
-    backgroundColor: Colors.bg.tertiary, borderWidth: 1, borderColor: Colors.border.medium,
-  },
-  exportButtonText: { fontSize: 11.5, fontWeight: '800', color: Colors.accent.secondary },
   storageCard: {
     marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: Colors.border.light,
     backgroundColor: Colors.bg.secondary, padding: 12, gap: 10,
