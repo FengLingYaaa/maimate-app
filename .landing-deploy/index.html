@@ -247,15 +247,15 @@
     <!-- Download -->
     <div class="download-card">
       <h3>📦 下载 MaiMate</h3>
-      <p class="info">当前版本：v1.16.7（Android arm64 内测）</p>
+      <p class="info">当前版本：v1.16.8（Android arm64 内测）</p>
       <a href="https://github.com/FengLingYaaa/maimate-app/releases/latest/download/MaiMate-latest.apk" class="download-btn" id="dlBtn">
         ⬇️ 下载 APK（GitHub 直链）
       </a>
       <p class="download-hint" id="downloadHint">
         直接连接 GitHub Releases 下载，无需等待检测
       </p>
-      <span class="size-badge" id="apkSize">Android · arm64-v8a · 59.4 MB · debug 签名</span>
-       <p class="download-hint">SHA-256：<code id="apkSha">392374db61a6ac47443b815d43de5f9eb41f3fd61a73248a6c98ca58ec3cc95d</code></p>
+      <span class="size-badge" id="apkSize">Android · arm64-v8a · 59.5 MB · debug 签名</span>
+       <p class="download-hint">SHA-256：<code id="apkSha">3b214c0be8b2cf95cd90709b46aa45462ef0860a1d29f41830b6fb4f65d45cd1</code></p>
     </div>
 
     <!-- Features -->
@@ -285,6 +285,16 @@
     <!-- Changelog -->
     <div class="changelog">
       <h3>📝 更新日志</h3>
+      <div class="entry">
+        <span class="version">v1.16.8 · Android 内测</span><span class="date">2026-08-30</span>
+        <ul>
+          <li>曲绘分级缓存：列表用低清缩略图，详情页大图按需加载原图（LRU 上限 80 张），曲绘总体积有硬上限。</li>
+          <li>曲绘不再写入系统图片缓存，「其它缓存」恢复干净并新增明细子项，可一键清理。</li>
+          <li>纯数字搜索短路：搜 ID 秒出结果且无噪音；搜索评分+过滤一趟分片完成，新增真实进度条，卡顿移除。</li>
+          <li>成绩图噪音行过滤：BREAK/PERFECT/百分比等 UI 文字不再干扰识别，《Break!Break!Break!》等真曲名不受影响。</li>
+          <li>修复：识别中删除图片不再出现迟到结果复活。</li>
+        </ul>
+      </div>
       <div class="entry">
         <span class="version">v1.16.7 · Android 内测</span><span class="date">2026-09-02</span>
         <ul>
