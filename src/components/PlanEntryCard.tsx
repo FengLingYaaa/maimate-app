@@ -2,6 +2,7 @@ import React, { memo, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Colors, DifficultyColorMap, DifficultyLabels, getChinaVersionName } from '../constants';
 import { calculateRating, formatAchievement } from '../data/rating';
+import { formatClearStatus } from '../data/status-labels';
 import { getOfficialChartConstant } from '../data/music-list';
 import { computeB50Gain } from '../data/b50';
 import { CoverImage } from './CoverImage';
@@ -84,7 +85,7 @@ export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, 
         )}
         {officialConstant === null && <Text style={styles.warning}>宴会场或数据缺失：不计算官方目标 Rating。</Text>}
         {importedScore ? (
-          <Text style={styles.scoreText}>当前成绩：{formatAchievement(importedScore.achievement)} · DX {importedScore.dxScore}{importedScore.fc ? ` · ${importedScore.fc}` : ''}{importedScore.fs ? ` · ${importedScore.fs}` : ''}{importedScore.serverRating === undefined ? '' : ` · RA ${importedScore.serverRating}`}</Text>
+          <Text style={styles.scoreText}>当前成绩：{formatAchievement(importedScore.achievement)} · DX {importedScore.dxScore}{importedScore.fc ? ` · ${formatClearStatus(importedScore.fc)}` : ''}{importedScore.fs ? ` · ${formatClearStatus(importedScore.fs)}` : ''}{importedScore.serverRating === undefined ? '' : ` · RA ${importedScore.serverRating}`}</Text>
         ) : <Text style={styles.scoreMuted}>当前成绩：尚未导入或没有匹配的成绩</Text>}
         {entry.targetScore !== undefined && achieved && (
           <Text style={[styles.progressText, styles.progressTextDone]}>已达标 ✓</Text>

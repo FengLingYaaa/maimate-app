@@ -8,6 +8,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Colors, DifficultyColorMap, DifficultyLabels } from '../constants';
 import { CoverImage } from './CoverImage';
 import { calculateRating, formatAchievement } from '../data/rating';
+import { formatClearStatus } from '../data/status-labels';
 import type { MusicData, PlayerScore } from '../data/types';
 
 interface Props {
@@ -40,8 +41,8 @@ export function SongShareCard({ music, difficultyIndex, score, officialConstant 
           <View style={styles.scoreRow}>
             <Text style={styles.achievement}>{formatAchievement(score.achievement)}</Text>
             {rating !== null && <Text style={styles.rating}>→ {rating}</Text>}
-            {!!score.fc && <Text style={styles.badge}>{score.fc.toUpperCase()}</Text>}
-            {!!score.fs && <Text style={styles.badge}>{score.fs.toUpperCase()}</Text>}
+            {!!score.fc && <Text style={styles.badge}>{formatClearStatus(score.fc)}</Text>}
+            {!!score.fs && <Text style={styles.badge}>{formatClearStatus(score.fs)}</Text>}
           </View>
         ) : (
           <Text style={styles.noScore}>尚未导入成绩</Text>

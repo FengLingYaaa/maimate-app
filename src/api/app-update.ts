@@ -150,7 +150,7 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateChec
       signal: controller.signal,
     });
     if (!response.ok) {
-      return { ...base, error: response.status === 403 || response.status === 429 ? '更新检查过于频繁，请稍后再试' : `更新服务暂时不可用（${response.status}）` };
+      return { ...base, error: response.status === 403 || response.status === 429 ? '更新服务限流（请求过于频繁），请稍后再试' : `更新服务暂时不可用（${response.status}）` };
     }
     payload = await response.json() as GitHubRelease;
   } catch (error) {

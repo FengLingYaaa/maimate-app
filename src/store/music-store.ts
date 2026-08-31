@@ -229,7 +229,9 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
         if (matchesMusic(rawData[index], filters)) matched.push(rawData[index]);
       }
       onProgress?.(end, total);
-      await new Promise<void>(resolve => setImmediate(resolve));
+      // v1.16.9：setImmediate 在 RN 里不保证让出渲染帧（同一任务队列内连续执行），
+      // 进度条要等全部算完才出现。setTimeout(0) 是宏任务，能让 UI 真实刷新。
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
     }
     const sorted = sortMusicItems(matched, filters.sort, filters.titleSearch, chartStats);
     set({ musicList: new MusicList(sorted), filters });

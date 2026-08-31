@@ -12,20 +12,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../src/constants';
 import { B50ShareCard } from '../src/components/B50ShareCard';
 import { Fit50ShareCard } from '../src/components/Fit50ShareCard';
+import { Ap50ShareCard } from '../src/components/Ap50ShareCard';
 import { ShareCardOverlay } from '../src/components/ShareCardOverlay';
 import {
   RatingEntryRow,
   RatingGridCell,
   RatingTieDivider,
+  ap50ToUnified,
   b50ToUnified,
   fitToUnified,
 } from '../src/components/RatingGrid';
+import { computeAp50, AP50_SIZE } from '../src/data/ap50';
 import { computeB50 } from '../src/data/b50';
 import { computeFit50, sortFit50Entries, type Fit50Sort } from '../src/data/fit50';
 import { shareCardFileName } from '../src/data/share-card';
 import { useMusicStore, usePlanStore, useScoreStore } from '../src/store';
 
-type ScreenMode = 'b50' | 'fit50';
+type ScreenMode = 'b50' | 'fit50' | 'ap50';
 type PoolTab = 'new' | 'old';
 type ViewMode = 'list' | 'grid';
 
@@ -50,6 +53,8 @@ export default function B50Screen() {
 
   const b50 = useMemo(() => computeB50(rawData, scores), [rawData, scores]);
   const fit50 = useMemo(() => computeFit50(rawData, scores, chartStats), [rawData, scores, chartStats]);
+  // v1.16.9：AP50——达成 AP/AP+ 谱面按 RA 单榜。
+  const ap50 = useMemo(() => computeAp50(rawData, scores), [rawData, scores]);
 
   const b50PoolEntries = useMemo(
     () => b50.entries.filter(entry => entry.pool === poolTab).map(b50ToUnified),
@@ -63,12 +68,13 @@ export default function B50Screen() {
     () => sortFit50Entries(fit50.entries, fitSort).map(fitToUnified),
     [fit50, fitSort],
   );
+  const apEntries = useMemo(() => ap50.entries.map(ap50ToUnified), [ap50]);
 
-  const mainEntries = screenMode === 'b50' ? b50PoolEntries : fitEntries;
+  const mainEntries = screenMode === 'b50' ? b50PoolEntries : screenMode === 'ap50' ? apEntries : fitEntries;
   const ties = screenMode === 'b50' ? b50Ties : [];
   const allGridEntries = useMemo(
-    () => (screenMode === 'b50' ? [...b50PoolEntries, ...b50Ties] : fitEntries),
-    [b50PoolEntries, b50Ties, fitEntries, screenMode],
+    () => (screenMode === 'b50' ? [...b50PoolEntries, ...b50Ties] : screenMode === 'ap50' ? apEntries : fitEntries),
+    [b50PoolEntries, b50Ties, apEntries, fitEntries, screenMode],
   );
 
   const openSong = useCallback((entry: { songId: string; musicType: 'SD' | 'DX'; difficultyIndex: number }) => {
@@ -147,7 +153,7 @@ export default function B50Screen() {
         >
           <Text style={styles.backText}>{selectionMode ? '取消' : '‹ 返回'}</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>{screenMode === 'b50' ? 'B50 总览' : '拟合 50'}</Text>
+        <Text style={styles.headerTitle}>{screenMode === 'b50' ? 'B50 总览' : screenMode === 'ap50' ? 'AP50' : '拟合 50'}</Text>
         <View style={styles.headerRight}>
           {hasScores && (
             <Pressable style={styles.shareButton} onPress={() => setShareVisible(true)} accessibilityLabel="分享卡片">
@@ -180,6 +186,12 @@ export default function B50Screen() {
             >
               <Text style={[styles.modeSegmentText, screenMode === 'fit50' && styles.modeSegmentTextActive]}>拟合 50</Text>
             </Pressable>
+            <Pressable
+              style={[styles.modeSegmentTab, screenMode === 'ap50' && styles.modeSegmentTabActive]}
+              onPress={() => setScreenMode('ap50')}
+            >
+              <Text style={[styles.modeSegmentText, screenMode === 'ap50' && styles.modeSegmentTextActive]}>AP50</Text>
+            </Pressable>
           </View>
         </View>
       )}
@@ -187,10 +199,17 @@ export default function B50Screen() {
       {hasScores && shareVisible && (
         <ShareCardOverlay
           visible
-          fileName={shareCardFileName(screenMode === 'b50' ? 'MaiMate-b50' : 'MaiMate-fit50')}
+          fileName={shareCardFileName(screenMode === 'b50' ? 'MaiMate-b50' : screenMode === 'ap50' ? 'MaiMate-ap50' : 'MaiMate-fit50')}
           onClose={() => setShareVisible(false)}
           card={screenMode === 'b50' ? (
             <B50ShareCard
+              rawData={rawData}
+              scores={scores}
+              serverRating={profile?.rating ?? null}
+              userName={profile?.nickname ?? profile?.username}
+            />
+          ) : screenMode === 'ap50' ? (
+            <Ap50ShareCard
               rawData={rawData}
               scores={scores}
               serverRating={profile?.rating ?? null}
@@ -229,6 +248,23 @@ export default function B50Screen() {
                   </View>
                   <View style={styles.summaryCard}>
                     <Text style={styles.sideValue}>{b50.oldSum} <Text style={styles.sideSub}>/ 旧曲 35{b50.oldFull ? '' : '（未满）'}</Text></Text>
+                  </View>
+                  {profile?.rating != null && (
+                    <View style={styles.summaryCard}>
+                      <Text style={styles.sideValue}>{profile.rating} <Text style={styles.sideSub}>/ 服务器 Rating</Text></Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            ) : screenMode === 'ap50' ? (
+              <View style={styles.summaryRow}>
+                <View style={[styles.summaryCard, styles.totalCard]}>
+                  <Text style={styles.totalValue}>{ap50.total}</Text>
+                  <Text style={styles.totalLabel}>AP50 总分</Text>
+                </View>
+                <View style={styles.summarySide}>
+                  <View style={styles.summaryCard}>
+                    <Text style={styles.sideValue}>{ap50.entries.length}<Text style={styles.sideSub}> / 50 谱面{ap50.entries.length < AP50_SIZE ? '（未满）' : ''}</Text></Text>
                   </View>
                   {profile?.rating != null && (
                     <View style={styles.summaryCard}>
@@ -285,6 +321,10 @@ export default function B50Screen() {
                         <Text style={[styles.poolTabText, poolTab === 'old' && styles.poolTabTextActive]}>旧曲 TOP35</Text>
                       </Pressable>
                     </>
+                  ) : screenMode === 'ap50' ? (
+                    <View style={styles.ap50HintWrap}>
+                      <Text style={styles.ap50HintText}>达成 AP / AP+ 的谱面 · 按 RA 单榜</Text>
+                    </View>
                   ) : (
                     <>
                       <Pressable style={[styles.poolTab, fitSort === 'rating' && styles.poolTabActive]} onPress={() => setFitSort('rating')}>
@@ -317,6 +357,12 @@ export default function B50Screen() {
                     onPress={() => openSong(entry)}
                   />
                 ))}
+                {screenMode === 'ap50' && apEntries.length < AP50_SIZE && Array.from({ length: AP50_SIZE - apEntries.length }, (_, index) => (
+                  <View key={`ap-empty-row-${index}`} style={styles.apEmptyRow}>
+                    <Text style={styles.apEmptyRank}>{apEntries.length + index + 1}</Text>
+                    <Text style={styles.apEmptyText}>虚位以待</Text>
+                  </View>
+                ))}
                 {screenMode === 'b50' && ties.length > 0 && (
                   <>
                     <RatingTieDivider count={ties.length} poolLastRank={poolTab === 'new' ? 15 : 35} />
@@ -342,9 +388,15 @@ export default function B50Screen() {
                     allSongs={rawData}
                     selectionMode={selectionMode}
                     selected={selectedKeys.has(entry.key)}
+                    hideAchievementBar={screenMode === 'ap50'}
                     onPress={() => (selectionMode ? toggleEntry(entry) : openSong(entry))}
                     onLongPress={() => (selectionMode ? toggleEntry(entry) : enterSelection(entry))}
                   />
+                ))}
+                {screenMode === 'ap50' && apEntries.length < AP50_SIZE && Array.from({ length: AP50_SIZE - apEntries.length }, (_, index) => (
+                  <View key={`ap-empty-cell-${index}`} style={styles.apEmptyCell}>
+                    <View style={styles.apEmptyBox}><Text style={styles.apEmptyText}>虚位</Text></View>
+                  </View>
                 ))}
                 {screenMode === 'b50' && ties.length > 0 && (
                   <>
@@ -447,6 +499,22 @@ const styles = StyleSheet.create({
     borderColor: Colors.border.light,
   },
   gridTieDividerText: { fontSize: 10, color: Colors.text.muted, fontWeight: '700', textAlign: 'center', paddingHorizontal: 8 },
+  // v1.16.9：AP50 池切换位静态提示与空位占位。
+  ap50HintWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 },
+  ap50HintText: { fontSize: 12, fontWeight: '700', color: Colors.text.muted },
+  apEmptyRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: Colors.bg.tertiary, borderRadius: 12, padding: 10,
+    borderWidth: 1, borderStyle: 'dashed', borderColor: Colors.border.light,
+  },
+  apEmptyRank: { width: 24, fontSize: 14, fontWeight: '900', textAlign: 'center', color: Colors.text.muted },
+  apEmptyText: { fontSize: 11, color: Colors.text.muted, fontWeight: '600' },
+  apEmptyCell: { width: `${100 / 5}%` as any, alignItems: 'center', padding: 3 },
+  apEmptyBox: {
+    width: 60, height: 60, borderRadius: 8,
+    borderWidth: 1.5, borderStyle: 'dashed', borderColor: Colors.border.light,
+    backgroundColor: Colors.bg.secondary, alignItems: 'center', justifyContent: 'center',
+  },
   selectionToolbar: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: Colors.bg.secondary, borderRadius: 10, padding: 8,

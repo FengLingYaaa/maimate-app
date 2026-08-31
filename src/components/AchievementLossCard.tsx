@@ -77,26 +77,33 @@ export function AchievementLossCard({ notes, defaultCollapsed = false }: Props) 
             </Pressable>
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View>
-              <View style={styles.row}>
-                <View style={[styles.cell, styles.typeCell]}><Text style={styles.typeText}>音符</Text></View>
-                {VISIBLE_JUDGMENTS.map(judgment => (
-                  <View key={judgment.key} style={[styles.cell, styles.headCell]}><Text style={[styles.headText, { color: judgment.color }]}>{judgment.label}</Text></View>
-                ))}
-              </View>
+          {/* v1.16.9：音符类型列固定在左侧（不随横向滚动），仅判定数据列滚动。 */}
+          <View style={styles.tableWrap}>
+            <View style={styles.typeColumn}>
+              <View style={[styles.cell, styles.typeCell]}><Text style={styles.typeText}>音符</Text></View>
               {rows.map(row => (
-                <View key={row.label} style={styles.row}>
-                  <View style={[styles.cell, styles.typeCell]}><Text style={styles.typeText}>{row.label}</Text></View>
-                  {VISIBLE_JUDGMENTS.map(judgment => (
-                    <View key={judgment.key} style={styles.cell}>
-                      <Text style={[styles.valueText, { color: judgment.color }]}>{formatCell(row.cells[judgment.key])}</Text>
-                    </View>
-                  ))}
-                </View>
+                <View key={row.label} style={[styles.cell, styles.typeCell]}><Text style={styles.typeText}>{row.label}</Text></View>
               ))}
             </View>
-          </ScrollView>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dataScroll}>
+              <View>
+                <View style={styles.row}>
+                  {VISIBLE_JUDGMENTS.map(judgment => (
+                    <View key={judgment.key} style={[styles.cell, styles.headCell]}><Text style={[styles.headText, { color: judgment.color }]}>{judgment.label}</Text></View>
+                  ))}
+                </View>
+                {rows.map(row => (
+                  <View key={row.label} style={styles.row}>
+                    {VISIBLE_JUDGMENTS.map(judgment => (
+                      <View key={judgment.key} style={styles.cell}>
+                        <Text style={[styles.valueText, { color: judgment.color }]}>{formatCell(row.cells[judgment.key])}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
 
           {/* v1.15.2：等效容错 —— 101%→100.5% 的 0.5 个百分点可折合多少个 Tap(Great)，只依赖谱面，与成绩无关。 */}
           {result.tapGreatUnit > 0 && (
@@ -141,6 +148,10 @@ const styles = StyleSheet.create({
   modeBtnText: { fontSize: 12, color: Colors.text.secondary, fontWeight: '700' },
   modeBtnTextOn: { color: Colors.accent.primary },
   row: { flexDirection: 'row' },
+  // v1.16.9：表格布局——左列（音符类型）固定，右列（判定数据）横向滚动。
+  tableWrap: { flexDirection: 'row' },
+  typeColumn: { width: 92 },
+  dataScroll: { flex: 1 },
   cell: {
     width: 74,
     paddingVertical: 6,

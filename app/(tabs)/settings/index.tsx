@@ -34,7 +34,7 @@ export default function SettingsPage() {
         if (!cancelled) setStorageUsage(usage);
       })
       .catch(() => {
-        if (!cancelled) setStorageUsage({ dataBytes: 0, coverBytes: 0, coverCount: 0, otherBytes: 0, otherItems: [] });
+        if (!cancelled) setStorageUsage({ dataBytes: 0, coverBytes: 0, coverCount: 0, coverThumbCount: 0, coverFullCount: 0, otherBytes: 0, otherItems: [] });
       });
     return () => {
       cancelled = true;
@@ -279,7 +279,7 @@ export default function SettingsPage() {
               <View style={styles.storageRow}>
                 <View style={styles.storageText}>
                   <Text style={styles.storageName}>曲绘缓存</Text>
-                  <Text style={styles.storageValue}>{formatBytes(storageUsage.coverBytes)} · {storageUsage.coverCount} 张</Text>
+                  <Text style={styles.storageValue}>{formatBytes(storageUsage.coverBytes)} · 缩略图 {storageUsage.coverThumbCount} 张 · 原图 {storageUsage.coverFullCount} 张</Text>
                 </View>
                 <Pressable style={styles.storageClearBtn} onPress={() => void handleClearCovers()}>
                   <Text style={styles.storageClearText}>清理</Text>

@@ -21,6 +21,7 @@ import { Colors } from '../../src/constants';
 import { DifficultyLabels, getChinaVersionName } from '../../src/constants/game';
 import { getOfficialChartConstant, getTotalNotes } from '../../src/data/music-list';
 import { formatAchievement, normalizeAchievement } from '../../src/data/rating';
+import { formatClearStatus } from '../../src/data/status-labels';
 import { shareCardFileName } from '../../src/data/share-card';
 import { openMusicPlatformSearch } from '../../src/data/external-links';
 import { getMusicPlatformSearchText, MUSIC_PLATFORM_LABELS } from '../../src/data/music-platforms';
@@ -309,7 +310,7 @@ export default function SongDetail() {
                     <Text style={styles.importedScoreTitle}>已导入成绩</Text>
                     <Text style={styles.importedScoreValue}>{formatAchievement(currentScore.achievement)} · DX Score {currentScore.dxScore}</Text>
                     <Text style={styles.importedScoreMeta}>
-                      {currentScore.fc ? `${currentScore.fc} ` : ''}{currentScore.fs ? `${currentScore.fs} ` : ''}
+                      {currentScore.fc ? `${formatClearStatus(currentScore.fc)} ` : ''}{currentScore.fs ? `${formatClearStatus(currentScore.fs)} ` : ''}
                       {currentScore.serverRating === undefined ? '' : `· 服务器 RA ${currentScore.serverRating}`}
                     </Text>
                   </View>

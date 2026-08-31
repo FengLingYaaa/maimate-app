@@ -228,7 +228,7 @@ function BattleReportCard({ base, target, report, rawData, onClose, onShare }: {
                   {row.after === null ? '—' : `${row.after.toFixed(4)}%`}
                   {row.b50Delta !== null && row.b50Delta > 0 && (
                     <Text style={styles.ratingDeltaText}>
-                      {row.b50Delta >= 0 ? `  +${row.b50Delta}` : `  ${row.b50Delta}`} RA（B50）
+                      {row.b50Delta >= 0 ? `  +${row.b50Delta}` : `  ${row.b50Delta}`} RA
                     </Text>
                   )}
                 </Text>

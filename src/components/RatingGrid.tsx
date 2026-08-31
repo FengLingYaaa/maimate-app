@@ -68,6 +68,26 @@ export function fitToUnified(entry: {
   };
 }
 
+/** v1.16.9：AP50 条目映射（官方定数口径，列表 meta 强调 AP 达成）。 */
+export function ap50ToUnified(entry: {
+  songId: string; musicType: 'SD' | 'DX'; difficultyIndex: number; title: string;
+  ds: number; rating: number; achievement: number; rank: number;
+}): UnifiedEntry {
+  return {
+    key: `${entry.songId}:${entry.musicType}:${entry.difficultyIndex}`,
+    songId: entry.songId,
+    musicType: entry.musicType,
+    difficultyIndex: entry.difficultyIndex,
+    title: entry.title,
+    cornerLeft: entry.ds.toFixed(1),
+    rating: entry.rating,
+    achievement: entry.achievement,
+    rank: entry.rank,
+    metaText: `${entry.musicType} · 定数 ${entry.ds.toFixed(1)} · ${formatAchievement(entry.achievement)}`,
+    chipText: DifficultyLabels[entry.difficultyIndex] || `难度 ${entry.difficultyIndex}`,
+  };
+}
+
 export function fallbackMusicFor(entry: UnifiedEntry): MusicData {
   return {
     id: entry.songId,
@@ -106,7 +126,7 @@ export function RatingEntryRow({ entry, music, allSongs, onPress }: {
   );
 }
 
-export function RatingGridCell({ entry, music, allSongs, selectionMode, selected, onPress, onLongPress }: {
+export function RatingGridCell({ entry, music, allSongs, selectionMode, selected, onPress, onLongPress, hideAchievementBar = false }: {
   entry: UnifiedEntry;
   music?: MusicData;
   allSongs: MusicData[];
@@ -114,6 +134,8 @@ export function RatingGridCell({ entry, music, allSongs, selectionMode, selected
   selected: boolean;
   onPress: () => void;
   onLongPress: () => void;
+  /** v1.16.9：AP50 等场景隐藏完成率颜色条与达成率文本（AP 曲目完成率一律 100.5%+）。 */
+  hideAchievementBar?: boolean;
 }) {
   const borderColor = DifficultyColorMap[entry.difficultyIndex] || Colors.accent.secondary;
   const tier = achievementTier(entry.achievement);
@@ -131,15 +153,19 @@ export function RatingGridCell({ entry, music, allSongs, selectionMode, selected
           </View>
         )}
       </View>
-      {/* v1.15.0：完成率底纹进度条（着色与文本一致）。 */}
-      <View style={styles.gridUnderline}>
-        <View
-          style={[styles.gridUnderlineFill, { width: `${Math.min(100, entry.achievement)}%` as any, backgroundColor: achievementColor }]}
-        />
-      </View>
-      <Text style={[styles.gridAchievement, { color: achievementColor }]} numberOfLines={1}>
-        {formatAchievement(entry.achievement)}
-      </Text>
+      {/* v1.15.0：完成率底纹进度条（着色与文本一致）；v1.16.9 起可按场景隐藏。 */}
+      {!hideAchievementBar && (
+        <>
+          <View style={styles.gridUnderline}>
+            <View
+              style={[styles.gridUnderlineFill, { width: `${Math.min(100, entry.achievement)}%` as any, backgroundColor: achievementColor }]}
+            />
+          </View>
+          <Text style={[styles.gridAchievement, { color: achievementColor }]} numberOfLines={1}>
+            {formatAchievement(entry.achievement)}
+          </Text>
+        </>
+      )}
     </Pressable>
   );
 }

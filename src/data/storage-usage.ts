@@ -20,6 +20,10 @@ export interface StorageBreakdown {
   coverBytes: number;
   /** 曲绘缓存文件数。 */
   coverCount: number;
+  /** v1.16.9：缩略图（covers/thumbs）文件数。 */
+  coverThumbCount: number;
+  /** v1.16.9：原图（covers/full）文件数。 */
+  coverFullCount: number;
   /** cache 根目录下除 covers 外的其它缓存字节。 */
   otherBytes: number;
   /** v1.16.8：其它缓存的一级子项明细（名字+字节，降序），设置页展示用。 */
@@ -47,22 +51,53 @@ async function measureAsyncStorage(): Promise<number> {
   return total;
 }
 
-/** 用新 File API 统计目录（文件字节 + 文件数）；目录不存在返回 0。 */
+/** 用新 File API 统计目录（递归：含子目录的文件字节 + 文件数）；目录不存在返回 0。 */
 function measureDirectoryWithFileApi(dirUri: string): { bytes: number; count: number } {
   try {
     const dir = new Directory(dirUri);
     if (!dir.exists) return { bytes: 0, count: 0 };
     let bytes = 0;
     let count = 0;
-    for (const item of dir.list()) {
-      if (item instanceof File) {
-        bytes += item.size;
-        count += 1;
+    const stack: Directory[] = [dir];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      for (const item of current.list()) {
+        if (item instanceof File) {
+          bytes += item.size;
+          count += 1;
+        } else if (item instanceof Directory) {
+          stack.push(item);
+        }
       }
     }
     return { bytes, count };
   } catch {
     return { bytes: 0, count: 0 };
+  }
+}
+
+/** v1.16.9：分列统计曲绘缓存——缩略图（thumbs）与原图（full）子目录文件数。 */
+function measureCovers(coversUri: string): { bytes: number; count: number; thumbCount: number; fullCount: number } {
+  const result = { bytes: 0, count: 0, thumbCount: 0, fullCount: 0 };
+  try {
+    const dir = new Directory(coversUri);
+    if (!dir.exists) return result;
+    for (const item of dir.list()) {
+      if (item instanceof File) {
+        result.bytes += item.size;
+        result.count += 1;
+      } else if (item instanceof Directory) {
+        const sub = measureDirectoryWithFileApi(item.uri);
+        result.bytes += sub.bytes;
+        result.count += sub.count;
+        const name = item.name || '';
+        if (name === 'thumbs') result.thumbCount = sub.count;
+        else if (name === 'full') result.fullCount = sub.count;
+      }
+    }
+    return result;
+  } catch {
+    return result;
   }
 }
 
@@ -91,16 +126,16 @@ function measureOtherCache(cacheUri: string, coversDirName: string): { bytes: nu
 export async function measureStorageBreakdown(): Promise<StorageBreakdown> {
   const dataBytes = await measureAsyncStorage();
   const cacheUri = FileSystem.cacheDirectory;
-  const cover = cacheUri ? measureDirectoryWithFileApi(`${cacheUri}covers/`) : { bytes: 0, count: 0 };
+  const cover = cacheUri ? measureCovers(`${cacheUri}covers/`) : { bytes: 0, count: 0, thumbCount: 0, fullCount: 0 };
   const other = cacheUri ? measureOtherCache(cacheUri, 'covers') : { bytes: 0, items: [] as Array<{ name: string; bytes: number }> };
-  return { dataBytes, coverBytes: cover.bytes, coverCount: cover.count, otherBytes: other.bytes, otherItems: other.items };
+  return { dataBytes, coverBytes: cover.bytes, coverCount: cover.count, coverThumbCount: cover.thumbCount, coverFullCount: cover.fullCount, otherBytes: other.bytes, otherItems: other.items };
 }
 
 /** 清理曲绘缓存。返回是否执行了删除。 */
 export async function clearCovers(): Promise<boolean> {
   const cacheUri = FileSystem.cacheDirectory;
   if (!cacheUri) return false;
-  const before = measureDirectoryWithFileApi(`${cacheUri}covers/`);
+  const before = measureCovers(`${cacheUri}covers/`);
   await clearCoverCache();
   await clearCoverFullLru();
   return before.count > 0;

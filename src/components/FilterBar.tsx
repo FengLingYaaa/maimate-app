@@ -13,6 +13,7 @@ import {
   Pressable,
   StyleSheet,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { Colors, DifficultyColorMap } from '../constants';
 import { DifficultyLabels, MusicTypes } from '../constants/game';
@@ -231,6 +232,9 @@ export function FilterBar({
       setSearching(true);
       setSearchDoneText(null);
       setSearchProgress(0);
+      // v1.16.9：先让「搜索中」spinner + 进度条渲染一帧再开始分片计算，
+      // 否则第一片同步跑完前 UI 无反馈，用户会误以为卡死。
+      await new Promise(resolve => setTimeout(resolve, 0));
       try {
         const matched = await runSearch(next, (done, total) => setSearchProgress(total > 0 ? done / total : 1));
         setSearchProgress(1);
@@ -350,8 +354,9 @@ export function FilterBar({
         <View style={styles.searchField}>
           <TextInput
             style={styles.searchInput}
-            placeholder="模糊搜索歌曲名、曲师或谱师..."
+            placeholder="搜索曲名 / 曲师 / 谱师"
             placeholderTextColor={Colors.text.muted}
+            numberOfLines={1}
             value={localFilters.titleSearch || ''}
             onChangeText={handleSearchChange}
             onSubmitEditing={() => void runConfirmedSearch()}
@@ -370,7 +375,9 @@ export function FilterBar({
           onPress={() => void runConfirmedSearch()}
           accessibilityLabel="搜索"
         >
-          <Text style={styles.searchGoText}>{searching ? '…' : '搜索'}</Text>
+          {searching
+            ? <ActivityIndicator size="small" color={Colors.text.primary} />
+            : <Text style={styles.searchGoText}>搜索</Text>}
         </Pressable>
         <Pressable
           style={[styles.filterBtn, hasActiveFilters && styles.filterBtnActive]}

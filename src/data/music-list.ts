@@ -94,6 +94,9 @@ function scoreText(text: string, query: string): number | null {
     return 700 - Math.min(Math.max(compactText.length - compactQuery.length, 0), 150);
   }
 
+  // v1.16.9：极短查询（≤2 字符）禁用容错窗口——短词 Levenshtein 命中率是噪音源。
+  if (compactQuery.length <= 2) return null;
+
   // 对 OCR 或手动输入中的少量错字进行容错匹配。
   const maxDistance = Math.max(1, Math.floor(compactQuery.length * 0.35));
   const windowMin = Math.max(1, compactQuery.length - maxDistance);
@@ -113,15 +116,18 @@ function scoreText(text: string, query: string): number | null {
 
 /** 返回歌曲与标题搜索词的相关度，供筛选结果排序。 */
 export function getMusicSearchScore(music: MusicData, query: string): number | null {
-  const trimmed = query.trim();
-  // v1.16.8：纯数字查询短路——只做歌曲 ID 精确/前缀匹配，完全跳过标题/曲师/谱师
-  // 模糊评分（搜 ID 秒出；杜绝数字撞上标题子串产生无关结果）。
-  if (/^\d{2,}$/.test(trimmed)) {
+  // v1.16.9：NFKC 归一（全角数字→半角），纯数字查询四级规则——只做确定性比较，
+  // 零模糊零窗口（搜 ID 秒出；杜绝数字撞上谱师/标题子串产生无关结果）：
+  //   1) ID 精确相等 = 1（搜 ID 的主意图，排最前）
+  //   2) 标题/别名精确相等 = 0.95（《39》这类纯数字曲名由此找回，低于 ID 精确）
+  //   3) ID 前缀 = 0.85（≥2 位数字，输入部分 ID 的场景）
+  //   4) 2~3 位短数字为 ID 子串 = 0.5 封顶（成绩图里的短数字压底不出头）
+  const trimmed = query.trim().normalize('NFKC');
+  if (/^\d+$/.test(trimmed)) {
     if (music.id === trimmed) return 1;
-    if (music.id.startsWith(trimmed)) return 0.85;
-    // ≤3 位短数字（如成绩图里的 39）只允许「ID 含该数字串」以低分入围，
-    // 且永远低于任何 ID 精确/前缀命中。
-    if (trimmed.length <= 3 && music.id.includes(trimmed)) return 0.5;
+    if (getSearchTitles(music).some(title => normalizeSearchText(title).replace(/\s/g, '') === trimmed)) return 0.95;
+    if (trimmed.length >= 2 && music.id.startsWith(trimmed)) return 0.85;
+    if (trimmed.length >= 2 && trimmed.length <= 3 && music.id.includes(trimmed)) return 0.5;
     return null;
   }
   const values = [
