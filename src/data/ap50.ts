@@ -32,6 +32,10 @@ export interface Ap50Result {
   entries: Ap50Entry[];
   /** 前 50 名 Rating 合计（未满 50 按实际数量求和）。 */
   total: number;
+  /** v1.17.0：全库 AP/AP+ 达成谱面总数（含 AP+ 与 AP，供需展示）。 */
+  totalCount: number;
+  /** v1.17.0：其中 AP+ 达成谱面数（fc=AP 不计入）。 */
+  apPlusCount: number;
 }
 
 /** fc 原始值归一化（与 plates.normalizeStatus 同口径）：小写并去掉 +_- 空格。 */
@@ -55,7 +59,7 @@ export function computeAp50(musicList: MusicData[], scores: PlayerScore[]): Ap50
     difficultyIndex: number;
     title: string;
   }
-  const candidates: Candidate[] = [];
+  const candidates: Array<Candidate & { isPlus: boolean }> = [];
   for (const music of musicList) {
     for (let difficultyIndex = 0; difficultyIndex < music.charts.length; difficultyIndex += 1) {
       const ds = music.ds[difficultyIndex];
@@ -74,6 +78,7 @@ export function computeAp50(musicList: MusicData[], scores: PlayerScore[]): Ap50
         musicType: music.type,
         difficultyIndex,
         title: music.title,
+        isPlus: fc === 'app',
       });
     }
   }
@@ -85,5 +90,7 @@ export function computeAp50(musicList: MusicData[], scores: PlayerScore[]): Ap50
     || left.difficultyIndex - right.difficultyIndex);
   const entries = candidates.slice(0, AP50_SIZE).map((row, index) => ({ ...row, rank: index + 1 }));
   const total = entries.reduce((sum, entry) => sum + entry.rating, 0);
-  return { entries, total };
+  const totalCount = candidates.length;
+  const apPlusCount = candidates.filter(candidate => candidate.isPlus).length;
+  return { entries, total, totalCount, apPlusCount };
 }

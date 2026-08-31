@@ -20,6 +20,7 @@ import {
   type DayRecord,
   type DrawMode as StoreDrawMode,
 } from '../../src/data/plan-draw-history';
+import { computeAchievedIds } from '../../src/data/plan-entries';
 import type { DrawCandidate, FilterOptions, PlanEntry, PlayerScore } from '../../src/data/types';
 
 type DrawMode = StoreDrawMode;
@@ -74,20 +75,8 @@ export default function RandomPicker() {
 
   const genres = useMemo(() => [...new Set(rawData.map(music => music.basic_info.genre))].sort(), [rawData]);
   const versionOptions = useMemo(() => getVersionOptions(rawData), [rawData]);
-  /** 计划条目是否已达标（有目标分且当前成绩 ≥ 目标）。 */
-  const achievedPlanIds = useMemo(() => {
-    const set = new Set<string>();
-    const scoreOf = (entry: PlanEntry): PlayerScore | undefined => scores.find(item =>
-      item.songId === entry.songId
-      && item.type === (entry.musicType || 'SD')
-      && item.difficultyIndex === entry.difficultyIndex);
-    for (const entry of planEntries) {
-      if (entry.targetScore === undefined) continue;
-      const score = scoreOf(entry);
-      if (score && score.achievement >= entry.targetScore) set.add(entry.entryId);
-    }
-    return set;
-  }, [planEntries, scores]);
+  /** 计划条目是否已达标（有目标分且当前成绩 ≥ 目标）；与计划页共用同一判定口径。 */
+  const achievedPlanIds = useMemo(() => computeAchievedIds(planEntries, scores, rawData), [planEntries, scores, rawData]);
 
   const planCandidates = useMemo<DrawCandidate[]>(() => {
     const byChart = new Map(rawData.map(music => [`${music.type}:${music.id}`, music]));

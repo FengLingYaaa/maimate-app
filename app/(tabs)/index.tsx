@@ -23,6 +23,9 @@ export default function SongBrowser() {
   const router = useRouter();
   const [titleRecognizerVisible, setTitleRecognizerVisible] = useState(false);
   const restoreTitleRecognizerOnFocus = useRef(false);
+  // v1.17.0：曲库默认不加载全曲，首屏只保留搜索/筛选栏与「加载全曲」按钮，
+  // 点击加载或进行任意搜索/筛选后才显示列表，省去首屏渲染上千曲目的开销。
+  const [libraryLoaded, setLibraryLoaded] = useState(false);
   const rawData = useMusicStore(s => s.rawData);
   const musicList = useMusicStore(s => s.musicList);
   const updating = useMusicStore(s => s.updating);
@@ -64,7 +67,20 @@ export default function SongBrowser() {
     }
   }, []));
 
+  // v1.17.0：未加载前不展示全曲列表（songs 仍可用于计数等）。
   const songs = useMemo(() => musicList.all(), [musicList]);
+  const displaySongs = libraryLoaded ? songs : [];
+
+  const loadAllSongs = useCallback(() => {
+    // 用默认排序（ID 序）加载全曲：若已有筛选则按当前筛选加载。
+    applyFilters(filters);
+    setLibraryLoaded(true);
+  }, [applyFilters, filters]);
+
+  const handleApply = useCallback((next: FilterOptions) => {
+    applyFilters(next);
+    setLibraryLoaded(true);
+  }, [applyFilters]);
 
   const genres = useMemo(() => [...new Set(rawData.map(m => m.basic_info.genre))].sort(), [rawData]);
   const versionOptions = useMemo(() => getVersionOptions(rawData), [rawData]);
@@ -138,7 +154,7 @@ export default function SongBrowser() {
       {/* 筛选栏 */}
       <FilterBar
         filters={filters}
-        onApply={applyFilters}
+        onApply={handleApply}
         onClear={clearFilters}
         totalCount={rawData.length}
         filteredCount={songs.length}
@@ -154,7 +170,7 @@ export default function SongBrowser() {
 
       {/* 歌曲列表 */}
       <FlatList
-        data={songs}
+        data={displaySongs}
         keyExtractor={item => `${item.id}-${item.type}`}
         renderItem={({ item }) => {
           const highlighted = new Set(hasChartHighlightFilter ? getMatchingDifficultyIndices(item, filters) : []);
@@ -176,12 +192,21 @@ export default function SongBrowser() {
         }}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>没有匹配的歌曲</Text>
-            <Pressable onPress={clearFilters}>
-              <Text style={styles.clearLink}>清除筛选</Text>
-            </Pressable>
-          </View>
+          !libraryLoaded ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyText}>曲库尚未加载</Text>
+              <Pressable style={styles.loadAllButton} onPress={loadAllSongs}>
+                <Text style={styles.loadAllButtonText}>加载全曲</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.empty}>
+              <Text style={styles.emptyText}>没有匹配的歌曲</Text>
+              <Pressable onPress={clearFilters}>
+                <Text style={styles.clearLink}>清除筛选</Text>
+              </Pressable>
+            </View>
+          )
         }
         onEndReachedThreshold={0.5}
         removeClippedSubviews={true}
@@ -273,5 +298,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.accent.primary,
     fontWeight: '600',
+  },
+  loadAllButton: {
+    marginTop: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 11,
+    borderRadius: 12,
+    backgroundColor: Colors.accent.primary,
+  },
+  loadAllButtonText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1a0a14',
   },
 });

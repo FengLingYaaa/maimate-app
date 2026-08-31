@@ -266,6 +266,10 @@ export default function B50Screen() {
                   <View style={styles.summaryCard}>
                     <Text style={styles.sideValue}>{ap50.entries.length}<Text style={styles.sideSub}> / 50 谱面{ap50.entries.length < AP50_SIZE ? '（未满）' : ''}</Text></Text>
                   </View>
+                  <View style={styles.summaryCard}>
+                    <Text style={styles.sideValue}>AP <Text style={styles.sideSub}>（含 AP+ {ap50.apPlusCount}）</Text></Text>
+                    <Text style={styles.sideSub}>达成谱面共 {ap50.totalCount} 首</Text>
+                  </View>
                   {profile?.rating != null && (
                     <View style={styles.summaryCard}>
                       <Text style={styles.sideValue}>{profile.rating} <Text style={styles.sideSub}>/ 服务器 Rating</Text></Text>
@@ -360,7 +364,7 @@ export default function B50Screen() {
                 {screenMode === 'ap50' && apEntries.length < AP50_SIZE && Array.from({ length: AP50_SIZE - apEntries.length }, (_, index) => (
                   <View key={`ap-empty-row-${index}`} style={styles.apEmptyRow}>
                     <Text style={styles.apEmptyRank}>{apEntries.length + index + 1}</Text>
-                    <Text style={styles.apEmptyText}>虚位以待</Text>
+                    <Text style={styles.apEmptyText}>-</Text>
                   </View>
                 ))}
                 {screenMode === 'b50' && ties.length > 0 && (
@@ -395,7 +399,7 @@ export default function B50Screen() {
                 ))}
                 {screenMode === 'ap50' && apEntries.length < AP50_SIZE && Array.from({ length: AP50_SIZE - apEntries.length }, (_, index) => (
                   <View key={`ap-empty-cell-${index}`} style={styles.apEmptyCell}>
-                    <View style={styles.apEmptyBox}><Text style={styles.apEmptyText}>虚位</Text></View>
+                    <View style={styles.apEmptyBox}><Text style={styles.apEmptyText}>-</Text></View>
                   </View>
                 ))}
                 {screenMode === 'b50' && ties.length > 0 && (

@@ -1,4 +1,4 @@
-import type { PlanEntry, PlanGraveyardEntry } from './types';
+import type { MusicData, PlanEntry, PlanGraveyardEntry, PlayerScore } from './types';
 import { applyDragWithPinGroups, compareByPinThenOrder } from './plan-order';
 
 let idSequence = 0;
@@ -53,6 +53,49 @@ export function normalizePlanEntries(entries: PlanEntry[]): PlanEntry[] {
   return [...entries]
     .sort(compareByPinThenOrder)
     .map((entry, order) => ({ ...entry, order }));
+}
+
+/**
+ * v1.17.0：判定计划条目是否已达标（当前成绩达成率 ≥ 目标），返回已达到目标条目的 entryId 集合。
+ * 多页面（计划页、随机抽歌页）共用同一口径。
+ *
+ * 关键点：达标判定按音企的【真实 SD/DX type】去匹配成绩，而不是条目字段里的 musicType
+ * （历史条目的 musicType 可能缺失/为 'SD' 默认值，导致 DX 曲漏判——v1.16.x 抽歌「不含已达标」
+ * 计数曾因此偏差）。解析规则与计划页联表一致：先按 id+type 精确匹配，命不中再按 id 回退。
+ *
+ * @param planEntries 计划条目与本地导入成绩、曲库数据同源传入，保证口径一致。
+ */
+export function computeAchievedIds(
+  planEntries: PlanEntry[],
+  scores: PlayerScore[],
+  rawData: MusicData[],
+): Set<string> {
+  const byId = new Map<string, MusicData[]>();
+  for (const music of rawData) {
+    const list = byId.get(music.id);
+    if (list) list.push(music);
+    else byId.set(music.id, [music]);
+  }
+
+  // 成绩按 (songId,type,difficultyIndex) 建立索引，避免逐条线性查找。
+  const scoreByKey = new Map<string, PlayerScore>();
+  for (const score of scores) {
+    scoreByKey.set(`${score.songId}:${score.type}:${score.difficultyIndex}`, score);
+  }
+
+  const achieved = new Set<string>();
+  for (const entry of planEntries) {
+    if (entry.targetScore === undefined) continue;
+    // 先按 id+type 精确找曲，命不中再按 id 取第一首（与计划页联表同口径）。
+    const exact = byId.get(entry.songId)?.find(music => music.type === entry.musicType) ?? null;
+    const music = exact ?? byId.get(entry.songId)?.[0];
+    if (!music) continue;
+    const score = scoreByKey.get(`${music.id}:${music.type}:${entry.difficultyIndex}`);
+    if (score && Number.isFinite(score.achievement) && score.achievement >= entry.targetScore) {
+      achieved.add(entry.entryId);
+    }
+  }
+  return achieved;
 }
 
 /**

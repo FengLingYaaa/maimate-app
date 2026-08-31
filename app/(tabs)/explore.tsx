@@ -20,7 +20,7 @@ const ENTRIES: Array<{
     key: 'b50',
     icon: '📊',
     title: 'B50 总览',
-    desc: '官方 B50 与拟合 50 双模式，列表/网格、多选入计划、分享查分卡',
+    desc: '官方 B50 / 拟合 50 / AP50 三模式，列表/网格、多选入计划、分享查分卡',
     route: '/b50',
     accent: Colors.accent.primary,
   },

@@ -258,6 +258,10 @@ export function FilterBar({
   const clearSearch = () => {
     const next = { ...localFilters, titleSearch: undefined };
     setLocalFilters(next);
+    // v1.17.0：清除搜索后同时复位进度条与「匹配完成」文案，避免残留画面。
+    setSearchProgress(null);
+    setSearchDoneText(null);
+    setSearching(false);
     onApply(cleanFilters(next));
   };
 

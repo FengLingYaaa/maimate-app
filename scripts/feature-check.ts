@@ -16,9 +16,10 @@ import {
   PLATE_BITS,
 } from '../src/data/plates.ts';
 import { applyDragWithPinGroups, canDragPlanRows, compareByPinThenOrder, pinGroupOf } from '../src/data/plan-order.ts';
-import { migratePlanEntryIds, normalizePlanEntries, reorderPlanEntriesById } from '../src/data/plan-entries.ts';
+import { migratePlanEntryIds, computeAchievedIds, normalizePlanEntries, reorderPlanEntriesById } from '../src/data/plan-entries.ts';
 import { computeB50, computeB50Gain, B35_SIZE, B15_SIZE } from '../src/data/b50.ts';
 import { computeFit50, sortFit50Entries } from '../src/data/fit50.ts';
+import { computeAp50, AP50_SIZE } from '../src/data/ap50.ts';
 import { buildSnapshotBattleReport } from '../src/data/snapshot-battle.ts';
 import { normalizeSnapshotLimit } from '../src/data/settings-defaults.ts';
 import { getCoverCacheFilename, isCoverCacheFileForSong } from '../src/data/cover-cache-names.ts';
@@ -338,8 +339,8 @@ assert.equal(fitSorted[0].fitDiff, 14.9);
 
 // v1.15.0：快照推分战报（逐曲 + 总 Rating 变化）。
 const battleMusic: import('../src/data/types.ts').MusicData[] = [
-  { id: '801', title: 'BattleA', type: 'DX', ds: [0, 0, 0, 0, 14.0], level: ['', '', '', '', '14'], cids: [1], charts: [], basic_info: { title: 'BattleA', artist: '', genre: '', bpm: 0, from: '', is_new: true, release_date: '' } },
-  { id: '802', title: 'BattleB', type: 'SD', ds: [0, 0, 0, 0, 13.0], level: ['', '', '', '', '13'], cids: [2], charts: [], basic_info: { title: 'BattleB', artist: '', genre: '', bpm: 0, from: '', is_new: false, release_date: '' } },
+  { id: '801', title: 'BattleA', type: 'DX', ds: [0, 0, 0, 0, 14.0], level: ['', '', '', '', '14'], cids: [1], charts: [{ notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }], basic_info: { title: 'BattleA', artist: '', genre: '', bpm: 0, from: '', is_new: true, release_date: '' } },
+  { id: '802', title: 'BattleB', type: 'SD', ds: [0, 0, 0, 0, 13.0], level: ['', '', '', '', '13'], cids: [2], charts: [{ notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }], basic_info: { title: 'BattleB', artist: '', genre: '', bpm: 0, from: '', is_new: false, release_date: '' } },
 ];
 const mkScore = (songId: string, type: 'SD' | 'DX', achievement: number): import('../src/data/types.ts').PlayerScore => ({
   songId, type, difficultyIndex: 4, achievement, dxScore: 0, importedAt: 1,
@@ -369,5 +370,56 @@ assert.equal(normalizeSnapshotLimit(0), 1);
 assert.equal(normalizeSnapshotLimit(5000), 1000);
 assert.equal(normalizeSnapshotLimit(37.9), 38);
 assert.equal(normalizeSnapshotLimit('55'), 55);
+
+// v1.17.0：抽歌/计划「已达目标」判定按真实 SD/DX type（DX 曲条目 musicType 缺失时仍判对）。
+{
+  const planEntry = (songId: string, targetScore?: number, musicType?: 'SD' | 'DX') => ({
+    entryId: `e-${songId}`, songId, difficultyIndex: 4, targetScore, musicType,
+    addedAt: 1, order: 0, title: `T${songId}` as unknown as string,
+  });
+  const rawMusic: import('../src/data/types.ts').MusicData[] = [
+    { id: '701', title: 'DxSong', type: 'DX', ds: [0, 0, 0, 0, 14], level: [], cids: [], charts: [], basic_info: { title: 'DxSong', artist: '', genre: '', bpm: 0, from: '', is_new: false, release_date: '' } },
+  ];
+  const score: import('../src/data/types.ts').PlayerScore = { songId: '701', type: 'DX', difficultyIndex: 4, achievement: 101, dxScore: 0, importedAt: 1 };
+  // entry 未设 musicType → 仍应依真实 DX type 判为已达标（v1.16.x 曾漏判导致抽歌计数偏大）。
+  const achieved = computeAchievedIds([planEntry('701', 100.5)], [score], rawMusic);
+  assert.equal(achieved.size, 1, 'DX 曲缺 musicType 仍判定达标');
+  const achievedNoTarget = computeAchievedIds([planEntry('701', undefined)], [score], rawMusic);
+  assert.equal(achievedNoTarget.size, 0, '未设目标不判达标');
+}
+
+// v1.17.0：AP50 计数——AP 含 AP+ 总数 与 AP+ 数分开。
+{
+  const rawMusic: import('../src/data/types.ts').MusicData[] = [
+    { id: '710', title: 'A', type: 'DX', ds: [0, 0, 0, 0, 14], level: ['', '', '', '', '14'], cids: [], charts: [{ notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }], basic_info: { title: 'A', artist: '', genre: '', bpm: 0, from: '', is_new: false, release_date: '' } },
+    { id: '711', title: 'B', type: 'DX', ds: [0, 0, 0, 0, 13], level: ['', '', '', '', '13'], cids: [], charts: [{ notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }], basic_info: { title: 'B', artist: '', genre: '', bpm: 0, from: '', is_new: false, release_date: '' } },
+  ];
+  const s = (songId: string, achievement: number, fc: string): import('../src/data/types.ts').PlayerScore =>
+    ({ songId, type: 'DX', difficultyIndex: 4, achievement, dxScore: 0, importedAt: 1, fc });
+  const ap50 = computeAp50(rawMusic, [s('710', 100.5, 'ap'), s('711', 101, 'app')]);
+  assert.equal(ap50.totalCount, 2, 'AP 含 AP+ 计数');
+  assert.equal(ap50.apPlusCount, 1, 'AP+ 计数');
+  assert.equal(AP50_SIZE, 50, 'AP50 上限');
+  // 非 AP/AP+ 成绩不计入。
+  const ap50b = computeAp50(rawMusic, [s('710', 100, 'fc')]);
+  assert.equal(ap50b.totalCount, 0, 'FC 不计入 AP50');
+}
+
+// v1.17.0：战报排序——对 B50 有加分的曲目置顶（按 b50Delta，而非单曲 ratingDelta）。
+{
+  // 复用上方 battle 数据：802（SD 13.0，is_new=false 旧曲）成绩 100→100.5 若入 B35 则 b50Delta>0，
+  // 而 801（is_new=true）无变化。排序应保证：有正 b50Delta 的行在前，removed/零贡献在后。
+  const positive = report.rows.filter(row => row.b50Delta !== null && row.b50Delta > 0);
+  const nonPositive = report.rows.filter(row => row.b50Delta === null || row.b50Delta <= 0);
+  for (const later of nonPositive) {
+    const posIndex = report.rows.indexOf(later);
+    for (const early of positive) {
+      assert.ok(report.rows.indexOf(early) < posIndex, '正 b50Delta 曲目应排在无贡献曲目前');
+    }
+  }
+  // 802 上分且为正贡献 → 必须存在于 positive 且排在报告前部。
+  const up = report.rows.find(row => row.songId === '802');
+  assert.ok(positive.includes(up as NonNullable<typeof up>), '上分曲 802 计入正贡献组');
+}
 
 console.log('Feature checks passed (deep links, Bilibili parsing, version groups, local plates, pins, fortune, fit50, snapshot battle)');

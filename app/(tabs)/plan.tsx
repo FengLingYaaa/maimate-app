@@ -9,6 +9,7 @@ import { Colors, DifficultyColorMap, DifficultyLabels } from '../../src/constant
 import { getChinaVersionOptions, getVersionOptions } from '../../src/data/version-catalog';
 import { getMusicSearchScore, getOfficialChartConstant, matchesMusic } from '../../src/data/music-list';
 import { canDragPlanRows } from '../../src/data/plan-order';
+import { computeAchievedIds } from '../../src/data/plan-entries';
 import type { FilterOptions, MusicData, PlanEntry, PlayerScore, SortOptions } from '../../src/data/types';
 import { useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '../../src/store';
 import { planEntryKey } from '../../src/store/plan-store';
@@ -136,16 +137,11 @@ export default function PushPlan() {
     music: rawData.find(m => m.id === item.entry.songId && (!item.entry.musicType || m.type === item.entry.musicType)) || rawData.find(m => m.id === item.entry.songId),
   })), [graveyard, rawData]);
 
-  // v1.12.0：已达标条目（当前达成率 ≥ 目标），用于「清除已达标目标」按钮。
-  const achievedEntryIds = useMemo(() => plannedRows
-    .filter(row => row.entry.targetScore !== undefined)
-    .filter(row => {
-      const score = scores.find(item => item.songId === row.music.id
-        && item.type === row.music.type
-        && item.difficultyIndex === row.entry.difficultyIndex);
-      return score ? score.achievement >= row.entry.targetScore! : false;
-    })
-    .map(row => row.entry.entryId), [plannedRows, scores]);
+  // v1.12.0：已达标条目（当前达成率 ≥ 目标），用于「清除已达标目标」按钮；与抽歌页共用判定口径。
+  const achievedEntryIds = useMemo(
+    () => [...computeAchievedIds(entries, scores, rawData)],
+    [entries, scores, rawData],
+  );
 
   const handleClearAchieved = useCallback(() => {
     if (achievedEntryIds.length === 0) return;
@@ -234,6 +230,17 @@ export default function PushPlan() {
                 平均完成 {progressSummary.averagePercent}% · 未设目标 {progressSummary.noTargetCount}
               </Text>
             </View>
+            <View style={styles.achieveFilterRow}>
+              {([['all', '全部'], ['achieved', '已达标'], ['unachieved', '未达标']] as const).map(([value, label]) => (
+                <Pressable
+                  key={value}
+                  style={[styles.achieveChip, achieveFilter === value && styles.achieveChipActive]}
+                  onPress={() => setAchieveFilter(value)}
+                >
+                  <Text style={[styles.achieveChipText, achieveFilter === value && styles.achieveChipTextActive]}>{label}</Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
         )}
         {missingScoreRows.length > 0 && (
@@ -260,21 +267,6 @@ export default function PushPlan() {
             )}
           </View>
         )}
-        <View style={styles.b50Row}>
-          {progressSummary.withTargetCount > 0 && (
-            <View style={styles.achieveFilterRow}>
-              {([['all', '全部'], ['achieved', '已达标'], ['unachieved', '未达标']] as const).map(([value, label]) => (
-                <Pressable
-                  key={value}
-                  style={[styles.achieveChip, achieveFilter === value && styles.achieveChipActive]}
-                  onPress={() => setAchieveFilter(value)}
-                >
-                  <Text style={[styles.achieveChipText, achieveFilter === value && styles.achieveChipTextActive]}>{label}</Text>
-                </Pressable>
-              ))}
-            </View>
-          )}
-        </View>
       </View>
       <FilterBar
         filters={filters}

@@ -39,7 +39,11 @@ export function Ap50ShareCard({ rawData, scores, serverRating, userName }: Props
 
       <View style={styles.poolsRow}>
         <View style={styles.poolChip}>
-          <Text style={styles.poolChipLabel}>AP / AP+</Text>
+          <Text style={styles.poolChipLabel}>AP（含 AP+）/ AP+</Text>
+          <Text style={styles.poolChipValue}>{ap50.totalCount} / {ap50.apPlusCount}</Text>
+        </View>
+        <View style={styles.poolChip}>
+          <Text style={styles.poolChipLabel}>入榜</Text>
           <Text style={styles.poolChipValue}>{ap50.entries.length}/{AP50_SIZE}</Text>
         </View>
         {serverRating != null && (

@@ -138,6 +138,11 @@ export function buildSnapshotBattleReport(
     }
   }
 
-  rows.sort((left, right) => (right.ratingDelta ?? 0) - (left.ratingDelta ?? 0));
+  // v1.17.0：排序改为「对 B50 有实际加分（b50Delta>0）的曲目置顶」，内部按 b50Delta 降序；
+  // 再按单曲 RA 变化（ratingDelta）降序；removed（b50Delta 恒 null）沉底。
+  rows.sort((left, right) =>
+    Number((right.b50Delta ?? 0) > 0) - Number((left.b50Delta ?? 0) > 0)
+    || (right.b50Delta ?? 0) - (left.b50Delta ?? 0)
+    || (right.ratingDelta ?? 0) - (left.ratingDelta ?? 0));
   return { rows, addedCount, changedCount, removedCount, totalRatingDelta };
 }

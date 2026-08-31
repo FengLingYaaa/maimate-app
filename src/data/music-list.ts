@@ -74,8 +74,31 @@ function isSubsequence(query: string, text: string): boolean {
   return false;
 }
 
-function scoreText(text: string, query: string): number | null {
-  const normalizedText = normalizeSearchText(text);
+/**
+ * v1.17.0：搜索字段预归一化缓存——`getMusicSearchScore` 每次全库扫描会对每首曲的
+ * 标题/别名/曲师/谱师反复跑 `normalizeSearchText`（NFKC+正则），是模糊搜索的主要耗时。
+ * 以曲对象身份作键缓存归一化结果，全库同一首歌只归一化一次；曲库刷新换新对象时自然失效。
+ */
+const searchFieldCache = new WeakMap<MusicData, string[]>();
+
+function getSearchFields(music: MusicData): string[] {
+  let fields = searchFieldCache.get(music);
+  if (!fields) {
+    fields = [
+      ...getSearchTitles(music),
+      music.basic_info.artist,
+      ...music.charts.map(chart => chart.charter),
+    ]
+      .map(normalizeSearchText)
+      .filter((value): value is string => Boolean(value))
+      .filter((value, index, all) => all.indexOf(value) === index);
+    searchFieldCache.set(music, fields);
+  }
+  return fields;
+}
+
+/** 对【已归一化的文本】打分（查询词内部仍归一化一次）。供搜索字段缓存复用。 */
+function scoreNormalized(normalizedText: string, query: string): number | null {
   const normalizedQuery = normalizeSearchText(query);
   if (!normalizedText || !normalizedQuery) return null;
 
@@ -130,11 +153,9 @@ export function getMusicSearchScore(music: MusicData, query: string): number | n
     if (trimmed.length >= 2 && trimmed.length <= 3 && music.id.includes(trimmed)) return 0.5;
     return null;
   }
-  const values = [
-    ...getSearchTitles(music).map(title => scoreText(title, query)),
-    scoreText(music.basic_info.artist, query),
-    ...music.charts.map(chart => scoreText(chart.charter, query)),
-  ].filter((score): score is number => score !== null);
+  const values = getSearchFields(music)
+    .map(text => scoreNormalized(text, query))
+    .filter((score): score is number => score !== null);
   return values.length > 0 ? Math.max(...values) : null;
 }
 

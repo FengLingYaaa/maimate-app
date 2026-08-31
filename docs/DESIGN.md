@@ -96,10 +96,10 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | v1.16.9 功能主体（前一代 `9a37a6c` 为 v1.16.8 收尾） |
-| 当前标签 | v1.16.8 已推送（v1.16.9 标签待推送，构建结果见发布补记） |
+| 当前提交 | v1.17.0 功能主体（前一代 `163c250` 为 v1.16.9 收尾） |
+| 当前标签 | v1.17.0 待推送（构建结果见发布补记） |
 | Android applicationId | `cc.flya.maimate` |
-| App 版本 | `1.16.9`（Android versionCode `35`） |
+| App 版本 | `1.17.0`（Android versionCode `36`） |
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
