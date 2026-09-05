@@ -247,15 +247,15 @@
     <!-- Download -->
     <div class="download-card">
       <h3>📦 下载 MaiMate</h3>
-      <p class="info">当前版本：v1.17.0（Android arm64 内测）</p>
+      <p class="info">当前版本：v1.17.1（Android arm64 内测）</p>
       <a href="https://github.com/FengLingYaaa/maimate-app/releases/latest/download/MaiMate-latest.apk" class="download-btn" id="dlBtn">
         ⬇️ 下载 APK（GitHub 直链）
       </a>
       <p class="download-hint" id="downloadHint">
         直接连接 GitHub Releases 下载，无需等待检测
       </p>
-      <span class="size-badge" id="apkSize">Android · arm64-v8a · 59.5 MB · debug 签名</span>
-       <p class="download-hint">SHA-256：<code id="apkSha">1db51ea671cf538b0f1f1bc220ca516cf77e480622693ce6f2ad7cb2f98634d6</code></p>
+      <span class="size-badge" id="apkSize">Android · arm64-v8a · 59.5 MB（62,375,776 bytes） · debug 签名</span>
+       <p class="download-hint">SHA-256：<code id="apkSha">82175e12004f505a731c8521378a5259fbbd32cc52b259d8b890b723a3e2a7a1</code></p>
     </div>
 
     <!-- Features -->
@@ -285,6 +285,20 @@
     <!-- Changelog -->
     <div class="changelog">
       <h3>📝 更新日志</h3>
+      <div class="entry">
+        <span class="version">v1.17.1 · Android 内测</span><span class="date">2026-09-05</span>
+        <ul>
+          <li>曲库与推分计划新增「成绩高 → 低」排序：按选中难度的本机达成率排，无成绩排末尾，默认 Master。</li>
+          <li>成绩 / 官方定数 / 拟合定数排序支持指定难度，未选时默认 Master；曲库卡片在选中难度旁标注本机成绩。</li>
+          <li>推分计划卡片新增「排序成绩」行：条目难度与排序难度不同时也能一眼看到用于排序的本机达成率。</li>
+          <li>抽歌「已达目标」判定修复：计划条目 SD/DX 类型缺失或写错时按真实成绩所在谱面解析，达标计数不再偏大。</li>
+          <li>AP50 统计拆成「AP」「AP+」两项分别展示，详情页与分享卡同步。</li>
+          <li>B50 / AP50 页面去掉「服务器 RA」干扰信息，聚焦本页数据。</li>
+          <li>完成率损失卡更新「每 2550 落 ≈ N Tap（Great）」等效容错提示。</li>
+          <li>完成率损失表格新增分割线并统一行高，判定列滚动更易读。</li>
+          <li>下载站提供版本化 APK 文件名（MaiMate-v1.17.1.apk），与 latest 并存便于区分历史版本。</li>
+        </ul>
+      </div>
       <div class="entry">
         <span class="version">v1.17.0 · Android 内测</span><span class="date">2026-09-04</span>
         <ul>
