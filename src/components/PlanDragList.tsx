@@ -20,6 +20,10 @@ interface Props {
   allSongs: MusicData[];
   allScores: PlayerScore[];
   getScore: (music: MusicData, entry: PlanEntry) => PlayerScore | undefined;
+  /** v1.17.1：成绩（scoreDesc）排序启用时为排序难度索引；卡片据此显示排序成绩行。 */
+  scoreSortDifficultyIndex?: number;
+  /** v1.17.1：按歌曲+难度查询排序用完整成绩（无成绩返回 undefined）。 */
+  getSortScore?: (music: MusicData, difficultyIndex: number) => PlayerScore | undefined;
   onOpen: (row: PlanDragRow) => void;
   onRemove: (entryId: string) => void;
   onTarget: (entryId: string, value: number | null) => void;
@@ -40,6 +44,8 @@ export function PlanDragList({
   allSongs,
   allScores,
   getScore,
+  scoreSortDifficultyIndex,
+  getSortScore,
   onOpen,
   onRemove,
   onTarget,
@@ -70,11 +76,13 @@ export function PlanDragList({
       allSongs={allSongs}
       allScores={allScores}
       getScore={getScore}
+      scoreSortDifficultyIndex={scoreSortDifficultyIndex}
+      getSortScore={getSortScore}
       onOpen={onOpen}
       onRemove={onRemove}
       onTarget={onTarget}
     />
-  ), [allSongs, allScores, canDrag, getScore, onOpen, onRemove, onTarget, showChinaVersion, showProjectedRating]);
+  ), [allSongs, allScores, canDrag, getScore, getSortScore, onOpen, onRemove, onTarget, scoreSortDifficultyIndex, showChinaVersion, showProjectedRating]);
 
   return (
     <View style={styles.flex}>
@@ -129,6 +137,8 @@ function PlanDragRowView({
   allSongs,
   allScores,
   getScore,
+  scoreSortDifficultyIndex,
+  getSortScore,
   onOpen,
   onRemove,
   onTarget,
@@ -144,6 +154,8 @@ function PlanDragRowView({
           allSongs={allSongs}
           allScores={allScores}
           importedScore={getScore(item.music, item.entry)}
+          scoreSortDifficultyIndex={scoreSortDifficultyIndex}
+          getSortScore={getSortScore}
           showChinaVersion={showChinaVersion}
           showProjectedRating={showProjectedRating}
           onPress={() => onOpen(item)}

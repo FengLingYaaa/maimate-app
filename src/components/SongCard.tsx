@@ -9,6 +9,7 @@ import { Colors } from '../constants';
 import { DifficultyBadge } from './DifficultyBadge';
 import { CoverImage } from './CoverImage';
 import { getChinaVersionName } from '../constants/game';
+import { formatAchievement } from '../data/rating';
 import type { MusicData } from '../data/types';
 
 interface Props {
@@ -24,6 +25,10 @@ interface Props {
   b50Badge?: { rank: number; pool: 'new' | 'old' } | null;
   /** v1.16.0：拟合定数排序启用时，按难度返回拟合定数（无数据 null），徽章旁标注。 */
   fitDiffForIndex?: (index: number) => number | null;
+  /** v1.17.1：成绩（scoreDesc）排序启用时为选中难度索引；仅该难度旁显示成绩。 */
+  scoreDifficultyIndex?: number;
+  /** v1.17.1：成绩排序启用时，按难度返回本机达成率（无成绩 null），徽章旁标注。 */
+  scoreForDifficulty?: (index: number) => number | null;
 }
 
 export const SongCard = memo(function SongCard({
@@ -36,6 +41,8 @@ export const SongCard = memo(function SongCard({
   allSongs = [],
   b50Badge = null,
   fitDiffForIndex,
+  scoreDifficultyIndex,
+  scoreForDifficulty,
 }: Props) {
   const selected = selectedDifficultyIndex !== undefined
     ? music.level[selectedDifficultyIndex] !== undefined
@@ -81,6 +88,9 @@ export const SongCard = memo(function SongCard({
         <View style={styles.difficulties}>
           {selected.map(index => {
             const fitDiff = fitDiffForIndex?.(index) ?? null;
+            // v1.17.1：成绩排序只在选中难度旁显示本机成绩，普通浏览模式不增加成绩文本。
+            const showScore = scoreDifficultyIndex !== undefined && index === scoreDifficultyIndex;
+            const score = showScore ? (scoreForDifficulty?.(index) ?? null) : null;
             return (
               <View key={index} style={styles.diffCell}>
                 <DifficultyBadge
@@ -90,6 +100,11 @@ export const SongCard = memo(function SongCard({
                   highlighted={highlightedDifficulties?.includes(index) ?? selectedDifficultyIndex !== undefined}
                 />
                 {fitDiff !== null && <Text style={styles.fitDiffText}>{fitDiff.toFixed(2)}</Text>}
+                {showScore && (
+                  <Text style={styles.scoreText} numberOfLines={1}>
+                    {score !== null ? `成绩 ${formatAchievement(score)}` : '成绩 —'}
+                  </Text>
+                )}
               </View>
             );
           })}
@@ -189,6 +204,13 @@ const styles = StyleSheet.create({
     fontSize: 9.5,
     fontWeight: '800',
     color: Colors.accent.secondary,
+  },
+  scoreText: {
+    // v1.17.1：小字号并允许单行收缩，避免长达成率文本（成绩 100.5%）把卡片撑溢出。
+    fontSize: 9,
+    fontWeight: '800',
+    color: Colors.accent.primary,
+    flexShrink: 1,
   },
   missingDifficulty: {
     fontSize: 10,

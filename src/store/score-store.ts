@@ -12,7 +12,9 @@ import {
   validateImportToken,
 } from '../api/score-import';
 import { useSettingsStore } from './settings-store';
+import { useMusicStore } from './music-store';
 import { usePlanStore } from './plan-store';
+import { resolvePlanMusic } from '../data/plan-entries';
 import { normalizeSnapshotLimit } from '../data/settings-defaults';
 
 interface StoredScorePayload {
@@ -182,11 +184,18 @@ export const useScoreStore = create<ScoreStore>((set, get) => ({
       // 判定：计划条目设了目标分，且该谱面成绩从 <目标 变为 ≥目标。
       if (useSettingsStore.getState().settings.autoSinkAchieved) {
         const planState = usePlanStore.getState();
+        // v1.17.1：统一解析口径需要曲库 rawData（按数组身份缓存索引，整块取一次）。
+        const musicRawData = useMusicStore.getState().rawData;
         const changedMap = new Map(changes.map(change => [change.chartKey, change]));
         const sunkIds: string[] = [];
         for (const entry of planState.entries) {
           if (entry.targetScore === undefined) continue;
-          const key = getChartKey(entry.songId, entry.musicType || 'SD', entry.difficultyIndex);
+          // v1.17.1：先把计划条目解析成真实谱面，再按真实 type 拼 changedMap key；
+          // 缺失/写错 musicType 的新达标条目不再被 'SD' 兜底拼错 key 而漏沉底。
+          // 曲库里查不到任何同 ID 记录时才回退旧的 entry.musicType || 'SD'。
+          const music = resolvePlanMusic(entry, musicRawData, result.scores);
+          const type = music ? music.type : (entry.musicType || 'SD');
+          const key = getChartKey(entry.songId, type, entry.difficultyIndex);
           const change = changedMap.get(key);
           if (!change) continue;
           const before = change.previous?.achievement;

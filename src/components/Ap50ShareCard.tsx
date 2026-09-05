@@ -16,11 +16,10 @@ import type { MusicData, PlayerScore } from '../data/types';
 interface Props {
   rawData: MusicData[];
   scores: PlayerScore[];
-  serverRating: number | null;
   userName?: string;
 }
 
-export function Ap50ShareCard({ rawData, scores, serverRating, userName }: Props) {
+export function Ap50ShareCard({ rawData, scores, userName }: Props) {
   const ap50 = useMemo(() => computeAp50(rawData, scores), [rawData, scores]);
   const empties = Math.max(0, AP50_SIZE - ap50.entries.length);
 
@@ -39,19 +38,13 @@ export function Ap50ShareCard({ rawData, scores, serverRating, userName }: Props
 
       <View style={styles.poolsRow}>
         <View style={styles.poolChip}>
-          <Text style={styles.poolChipLabel}>AP（含 AP+）/ AP+</Text>
-          <Text style={styles.poolChipValue}>{ap50.totalCount} / {ap50.apPlusCount}</Text>
+          <Text style={styles.poolChipLabel}>AP</Text>
+          <Text style={styles.poolChipValue}>{ap50.totalCount}</Text>
         </View>
         <View style={styles.poolChip}>
-          <Text style={styles.poolChipLabel}>入榜</Text>
-          <Text style={styles.poolChipValue}>{ap50.entries.length}/{AP50_SIZE}</Text>
+          <Text style={styles.poolChipLabel}>AP+</Text>
+          <Text style={styles.poolChipValue}>{ap50.apPlusCount}</Text>
         </View>
-        {serverRating != null && (
-          <View style={styles.poolChip}>
-            <Text style={styles.poolChipLabel}>服务器 RA</Text>
-            <Text style={styles.poolChipValue}>{serverRating}</Text>
-          </View>
-        )}
       </View>
 
       <View style={styles.grid}>

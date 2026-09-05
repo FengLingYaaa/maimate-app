@@ -212,7 +212,6 @@ export default function B50Screen() {
             <Ap50ShareCard
               rawData={rawData}
               scores={scores}
-              serverRating={profile?.rating ?? null}
               userName={profile?.nickname ?? profile?.username}
             />
           ) : (
@@ -249,11 +248,6 @@ export default function B50Screen() {
                   <View style={styles.summaryCard}>
                     <Text style={styles.sideValue}>{b50.oldSum} <Text style={styles.sideSub}>/ 旧曲 35{b50.oldFull ? '' : '（未满）'}</Text></Text>
                   </View>
-                  {profile?.rating != null && (
-                    <View style={styles.summaryCard}>
-                      <Text style={styles.sideValue}>{profile.rating} <Text style={styles.sideSub}>/ 服务器 Rating</Text></Text>
-                    </View>
-                  )}
                 </View>
               </View>
             ) : screenMode === 'ap50' ? (
@@ -264,17 +258,11 @@ export default function B50Screen() {
                 </View>
                 <View style={styles.summarySide}>
                   <View style={styles.summaryCard}>
-                    <Text style={styles.sideValue}>{ap50.entries.length}<Text style={styles.sideSub}> / 50 谱面{ap50.entries.length < AP50_SIZE ? '（未满）' : ''}</Text></Text>
+                    <Text style={styles.sideValue}>{ap50.totalCount} <Text style={styles.sideSub}>/ AP</Text></Text>
                   </View>
                   <View style={styles.summaryCard}>
-                    <Text style={styles.sideValue}>AP <Text style={styles.sideSub}>（含 AP+ {ap50.apPlusCount}）</Text></Text>
-                    <Text style={styles.sideSub}>达成谱面共 {ap50.totalCount} 首</Text>
+                    <Text style={styles.sideValue}>{ap50.apPlusCount} <Text style={styles.sideSub}>/ AP+</Text></Text>
                   </View>
-                  {profile?.rating != null && (
-                    <View style={styles.summaryCard}>
-                      <Text style={styles.sideValue}>{profile.rating} <Text style={styles.sideSub}>/ 服务器 Rating</Text></Text>
-                    </View>
-                  )}
                 </View>
               </View>
             ) : (

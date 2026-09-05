@@ -16,7 +16,7 @@ import {
   PLATE_BITS,
 } from '../src/data/plates.ts';
 import { applyDragWithPinGroups, canDragPlanRows, compareByPinThenOrder, pinGroupOf } from '../src/data/plan-order.ts';
-import { migratePlanEntryIds, computeAchievedIds, normalizePlanEntries, reorderPlanEntriesById } from '../src/data/plan-entries.ts';
+import { migratePlanEntryIds, computeAchievedIds, normalizePlanEntries, reorderPlanEntriesById, resolvePlanMusic } from '../src/data/plan-entries.ts';
 import { computeB50, computeB50Gain, B35_SIZE, B15_SIZE } from '../src/data/b50.ts';
 import { computeFit50, sortFit50Entries } from '../src/data/fit50.ts';
 import { computeAp50, AP50_SIZE } from '../src/data/ap50.ts';
@@ -29,7 +29,7 @@ import { extractBilibiliVideoId, isBilibiliShortLink } from '../src/data/bilibil
 import { av2bv, bv2av } from '../src/data/bilibili-bvid.ts';
 import { computeAchievementLoss, JUDGMENT_KEYS } from '../src/data/achievement-loss.ts';
 import { generateFortune } from '../src/data/fortune.ts';
-import { matchesMusic } from '../src/data/music-list.ts';
+import { buildScoreIndex, getMusicScore, matchesMusic, sortMusicItems } from '../src/data/music-list.ts';
 import {
   getBilibiliCoverCacheFilename,
   getBilibiliCoverExtension,
@@ -194,6 +194,9 @@ near(loss.breakRows!.bonus.p2550.percent, 0.25 / 87);
 near(loss.breakRows!.total.g2000.percent, 5 * loss.tapGreatUnit + 0.6 / 87);
 near(loss.breakRows!.total.good.percent, 15 * loss.tapGreatUnit + 0.7 / 87);
 near(loss.breakRows!.total.miss.eqTapGreat, 25 + 94 / 87);
+// v1.17.1：等效容错口径补测——P·2550 掉 25% 的绝赞奖励份额：总损失 (0.25/87) 个百分点，
+// 折合等效 Tap(Great) = (0.25/87) / tapGreatUnit（实现公式为 base 0 + bonus 换算，无基础分损失）。
+near(loss.breakRows!.total.p2550.eqTapGreat, (0.25 / 87) / loss.tapGreatUnit);
 near(loss.totalsIfAllSame.miss.percent, 101.0);
 near(loss.totalsIfAllSame.g2000.percent, 20.6);
 const noBreak = computeAchievementLoss({ tap: 10, hold: 2, slide: 1, breaks: 0 });
@@ -388,6 +391,92 @@ assert.equal(normalizeSnapshotLimit('55'), 55);
   assert.equal(achievedNoTarget.size, 0, '未设目标不判达标');
 }
 
+// v1.17.1：计划条目 → 真实谱面解析统一口径（resolvePlanMusic 与 computeAchievedIds 共用同一规则）。
+// 场景：同 songId 同时存在 SD/DX 两条记录，历史条目 musicType 缺失或显式写错。
+{
+  const dualMusic = (id: string, type: 'SD' | 'DX'): import('../src/data/types.ts').MusicData => ({
+    id, title: `Dual ${id}`, type,
+    ds: [0, 0, 0, 0, 14], level: ['', '', '', '', '14'], cids: [1],
+    charts: [{ notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }],
+    basic_info: { title: `Dual ${id}`, artist: '', genre: '', bpm: 0, from: '', is_new: false, release_date: '' },
+  });
+  // 610/613 的 SD 记录刻意排在 DX 前：缺失 musicType 时「第一条有成绩记录」的归属可断言。
+  const dualRaw: import('../src/data/types.ts').MusicData[] = [
+    dualMusic('610', 'SD'), dualMusic('610', 'DX'),   // 双类型，两类型都有成绩
+    dualMusic('611', 'DX'),                           // DX-only
+    dualMusic('612', 'SD'),                           // SD-only
+    dualMusic('613', 'SD'), dualMusic('613', 'DX'),   // 双类型，只有 DX 有成绩
+    dualMusic('614', 'SD'), dualMusic('614', 'DX'),   // 双类型，完全无成绩
+    dualMusic('615', 'DX'),                           // DX-only，无成绩
+    dualMusic('616', 'SD'),                           // SD-only，无成绩
+  ];
+  const dualScore = (songId: string, type: 'SD' | 'DX', achievement: number): import('../src/data/types.ts').PlayerScore =>
+    ({ songId, type, difficultyIndex: 4, achievement, dxScore: 0, importedAt: 1 });
+  const dualScores: import('../src/data/types.ts').PlayerScore[] = [
+    dualScore('610', 'DX', 100.5), dualScore('610', 'SD', 95),
+    dualScore('611', 'DX', 100.5), dualScore('612', 'SD', 90),
+    dualScore('613', 'DX', 100.5),
+  ];
+  const dualEntry = (entryId: string, songId: string, musicType?: 'SD' | 'DX', targetScore = 100): import('../src/data/types.ts').PlanEntry => ({
+    entryId, songId, difficultyIndex: 4, musicType, targetScore,
+    addedAt: 1, order: 0, title: `T${entryId}` as unknown as string,
+  });
+
+  // resolvePlanMusic：显式 musicType 且该类型在对应难度有成绩 → 保持显式类型。
+  assert.equal(resolvePlanMusic(dualEntry('e-a1', '610', 'DX'), dualRaw, dualScores)?.type, 'DX', '显式 DX 有成绩 → 保持 DX');
+  assert.equal(resolvePlanMusic(dualEntry('e-u1', '610', 'SD'), dualRaw, dualScores)?.type, 'SD', '显式 SD 有成绩 → 保持 SD');
+  // 核心修复：显式 musicType='SD'（错误）且 SD 无对应难度成绩，实际 DX 成绩存在 → 解析为 DX。
+  assert.equal(resolvePlanMusic(dualEntry('e-a4', '613', 'SD'), dualRaw, dualScores)?.type, 'DX', '显式错误 SD + 实际 DX 成绩 → 解析为 DX');
+  // 显式类型在曲库中不存在（612 只有 SD 记录）→ 同样回退到另一类型有成绩的记录。
+  assert.equal(resolvePlanMusic(dualEntry('e-u5', '612', 'DX'), dualRaw, dualScores)?.type, 'SD', '显式 DX 记录缺失 → 回退另一类型有成绩的 SD');
+  // musicType 缺失：优先同 ID 中在对应难度有成绩的第一条记录（610 库内 SD 在前）。
+  assert.equal(resolvePlanMusic(dualEntry('e-u2', '610'), dualRaw, dualScores)?.type, 'SD', '缺失 type + 两类型都有成绩 → 取第一条有成绩记录');
+  assert.equal(resolvePlanMusic(dualEntry('e-a2', '611'), dualRaw, dualScores)?.type, 'DX', '缺失 type + 仅 DX 有成绩 → DX');
+  // 完全没有对应难度成绩 → 保留显式类型/第一记录用于显示。
+  assert.equal(resolvePlanMusic(dualEntry('e-u9', '614', 'SD'), dualRaw, dualScores)?.type, 'SD', '无成绩时保留显式 SD');
+  assert.equal(resolvePlanMusic(dualEntry('e-u10', '614', 'DX'), dualRaw, dualScores)?.type, 'DX', '无成绩时保留显式 DX');
+  assert.equal(resolvePlanMusic(dualEntry('e-u11', '614'), dualRaw, dualScores)?.type, 'SD', '无成绩时缺失 type 保留第一记录');
+  assert.equal(resolvePlanMusic(dualEntry('e-u15', '616'), dualRaw, dualScores)?.type, 'SD', '无成绩 DX-only 库同理保留第一记录');
+  assert.equal(resolvePlanMusic(dualEntry('e-a4', '613', 'SD'), dualRaw, dualScores)?.type, 'DX', '解析不依赖 targetScore 的高低');
+
+  // 22 条计划条目：4 条达标、18 条未达标——计数与具体达标集合都要断言。
+  const entries22 = [
+    // —— 达标 4 条 ——
+    dualEntry('e-a1', '610', 'DX'),                    // 显式 DX 且 DX 100.5 ≥ 100
+    dualEntry('e-a2', '611'),                          // 缺失 type，库里只有 DX 且达标
+    dualEntry('e-a3', '611', 'DX'),                    // 显式 DX 且达标
+    dualEntry('e-a4', '613', 'SD'),                    // 显式错误 SD，实际 DX 100.5 ≥ 100
+    // —— 未达标 18 条 ——
+    dualEntry('e-u1', '610', 'SD'),                    // 显式 SD 有成绩 95 < 100：保持显式类型判定，不得拿 DX 100.5 充数
+    dualEntry('e-u2', '610'),                          // 缺失 type 取第一条有成绩记录 SD 95，不把 DX 100.5 误算
+    dualEntry('e-u3', '610', 'DX', 100.6),             // 达成率 100.5 < 目标 100.6
+    dualEntry('e-u4', '612'),                          // 仅 SD 成绩 90 < 100
+    dualEntry('e-u5', '612', 'DX'),                    // 显式 DX 记录缺失回退 SD，90 < 100
+    dualEntry('e-u6', '613', 'DX', 101),               // 100.5 < 101
+    dualEntry('e-u7', '613', undefined, 101),          // 缺失 type 解析 DX，100.5 < 101
+    dualEntry('e-u8', '613', 'SD', 101),               // 显式错误 SD 回退 DX 真实成绩 100.5，仍 < 101
+    dualEntry('e-u9', '614', 'SD'),                    // 完全无成绩
+    dualEntry('e-u10', '614', 'DX'),                   // 完全无成绩
+    dualEntry('e-u11', '614'),                         // 完全无成绩
+    dualEntry('e-u12', '615', 'DX'),                   // DX-only 无成绩
+    dualEntry('e-u13', '615'),                         // DX-only 无成绩
+    dualEntry('e-u14', '616', 'SD'),                   // SD-only 无成绩
+    dualEntry('e-u15', '616'),                         // SD-only 无成绩
+    dualEntry('e-u16', '610', 'SD', 96),               // 95 < 96
+    dualEntry('e-u17', '611', 'DX', 100.9),            // 100.5 < 100.9
+    dualEntry('e-u18', '610', undefined, 96),          // 解析 SD 95 < 96
+  ];
+  assert.equal(entries22.length, 22, 'fixture 必须是 22 条');
+  const achieved22 = computeAchievedIds(entries22, dualScores, dualRaw);
+  assert.equal(entries22.length - achieved22.size, 18, '22 条中 18 条未达标');
+  assert.equal(achieved22.size, 4, '22 条计划中 4 条达标');
+  assert.deepEqual([...achieved22].sort(), ['e-a1', 'e-a2', 'e-a3', 'e-a4'], '达标集合只包含解析后真实谱面达标的条目');
+  assert.equal(achieved22.has('e-a4'), true, '显式错误 SD + 实际 DX 成绩达标 → 计入达标');
+  assert.equal(achieved22.has('e-u1'), false, '显式类型有成绩时不误算另一类型的超标成绩');
+  assert.equal(achieved22.has('e-u2'), false, '缺失 type 且两类型都有成绩时只比较解析出的真实谱面');
+  assert.equal(achieved22.has('e-u8'), false, '显式错误 SD 回退 DX 后仍按真实成绩与目标比较');
+}
+
 // v1.17.0：AP50 计数——AP 含 AP+ 总数 与 AP+ 数分开。
 {
   const rawMusic: import('../src/data/types.ts').MusicData[] = [
@@ -420,6 +509,65 @@ assert.equal(normalizeSnapshotLimit('55'), 55);
   // 802 上分且为正贡献 → 必须存在于 positive 且排在报告前部。
   const up = report.rows.find(row => row.songId === '802');
   assert.ok(positive.includes(up as NonNullable<typeof up>), '上分曲 802 计入正贡献组');
+}
+
+// v1.17.1：曲库「成绩高 → 低」排序——buildScoreIndex 索引查询 + sortMusicItems 排序。
+{
+  const sortSong = (id: string, title: string): import('../src/data/types.ts').MusicData => ({
+    id, title, type: 'DX',
+    ds: [0, 0, 0, 0, 0], level: ['12', '13', '14', '14+', '15'], cids: [],
+    charts: [],
+    basic_info: { title, artist: '', genre: '', bpm: 0, from: '', is_new: false, release_date: '' },
+  });
+  // v1.17.1：无成绩的两首刻意按标题倒序入列（a4 SortD 排在 a3 SortC 之前）——
+  // scoreDesc 的无成绩 tie-break 必须保留输入顺序（默认曲库顺序），不能被 compareTitles 按标题重排。
+  const sortRaw: import('../src/data/types.ts').MusicData[] = [
+    sortSong('a1', 'SortA'), sortSong('a2', 'SortB'), sortSong('a4', 'SortD'), sortSong('a3', 'SortC'),
+  ];
+  // Master(3)：99.5 / 100.5 / 无成绩（a3、a4 在该难度没有成绩）。
+  const sortScores: import('../src/data/types.ts').PlayerScore[] = [
+    { songId: 'a1', type: 'DX', difficultyIndex: 3, achievement: 99.5, dxScore: 0, importedAt: 1 },
+    { songId: 'a2', type: 'DX', difficultyIndex: 3, achievement: 100.5, dxScore: 0, importedAt: 1 },
+    // a3 只在 Expert(4) 有成绩：用来区分默认难度（Master）与显式难度的排序结果。
+    { songId: 'a3', type: 'DX', difficultyIndex: 4, achievement: 100.5, dxScore: 0, importedAt: 1 },
+  ];
+  const sortScoreIndex = buildScoreIndex(sortScores);
+  // 索引查询：songId+type+难度 命中；缺成绩、缺索引都返回 null；非有限值不入索引且不覆盖旧值。
+  assert.equal(getMusicScore(sortRaw[0], 3, sortScoreIndex), 99.5);
+  assert.equal(getMusicScore(sortRaw[2], 3, sortScoreIndex), null);
+  assert.equal(getMusicScore(sortRaw[0], 3), null);
+  const nanIndex = buildScoreIndex([
+    ...sortScores,
+    { songId: 'a1', type: 'DX', difficultyIndex: 3, achievement: NaN as unknown as number, dxScore: 0, importedAt: 2 },
+  ]);
+  assert.equal(getMusicScore(sortRaw[0], 3, nanIndex), 99.5, '非有限成绩不得覆盖索引');
+
+  const sortWith = (sort: import('../src/data/types.ts').SortOptions, scoreIndex?: import('../src/data/music-list.ts').ScoreIndex) =>
+    sortMusicItems([...sortRaw], sort, undefined, undefined, scoreIndex);
+  // 默认 difficultyIndex = Master(3)：100.5 → 99.5 从高到低；
+  // 无成绩的 a4/a3 仍按输入顺序排在有成绩之后（标题顺序应为 a3 在前，若被 compareTitles 重排会变成 a3 先出）。
+  assert.deepEqual(sortWith({ mode: 'scoreDesc' }, sortScoreIndex).map(music => music.id), ['a2', 'a1', 'a4', 'a3']);
+  // 同分 tie-break 同样保留输入顺序：a3/a4 同为 100.5，输入顺序 a4 在前。
+  const tieScoreIndex = buildScoreIndex([
+    { songId: 'a1', type: 'DX', difficultyIndex: 3, achievement: 99.5, dxScore: 0, importedAt: 1 },
+    { songId: 'a3', type: 'DX', difficultyIndex: 3, achievement: 100.5, dxScore: 0, importedAt: 1 },
+    { songId: 'a4', type: 'DX', difficultyIndex: 3, achievement: 100.5, dxScore: 0, importedAt: 1 },
+  ]);
+  assert.deepEqual(sortWith({ mode: 'scoreDesc' }, tieScoreIndex).map(music => music.id), ['a4', 'a3', 'a1', 'a2']);
+  // 显式 difficultyIndex = Expert(4)：只有 a3 有成绩 → 反超到第一，无成绩者仍按输入顺序排它在后。
+  assert.deepEqual(sortWith({ mode: 'scoreDesc', difficultyIndex: 4 }, sortScoreIndex).map(music => music.id), ['a3', 'a1', 'a2', 'a4']);
+
+  // v1.17.1：拟合定数排序（fitDesc）按指定难度取 fit_diff；无 fit 数据排末尾——别的难度有数据不算数。
+  const fitSortStats: import('../src/data/types.ts').ChartStatsMap = {
+    a1: [null, null, null, fitStats(14.0), null],
+    a2: [null, null, null, fitStats(13.2), null],
+    a3: [null, null, null, null, fitStats(15.9)],
+    a4: [null, null, null, null, null],
+  };
+  // 默认 Master(3)：a1 > a2；a3 虽在 Expert 有更高拟合定数，但按指定难度无数据 → 排末尾。
+  assert.deepEqual(sortMusicItems([...sortRaw], { mode: 'fitDesc' }, undefined, fitSortStats).map(music => music.id), ['a1', 'a2', 'a3', 'a4']);
+  // 指定 Expert(4)：a3 反超到第一，其余无 fit 数据按标题稳定排后。
+  assert.deepEqual(sortMusicItems([...sortRaw], { mode: 'fitDesc', difficultyIndex: 4 }, undefined, fitSortStats).map(music => music.id), ['a3', 'a1', 'a2', 'a4']);
 }
 
 console.log('Feature checks passed (deep links, Bilibili parsing, version groups, local plates, pins, fortune, fit50, snapshot battle)');

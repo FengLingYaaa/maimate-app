@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Colors, DifficultyColorMap, DifficultyLabels } from '../../../src/constants';
@@ -9,15 +9,22 @@ export default function SortSettings() {
   const router = useRouter();
   const current = useSettingsStore(s => s.settings.defaultSort);
   const updateSettings = useSettingsStore(s => s.updateSettings);
-  const isConstant = current.mode === 'constantAsc' || current.mode === 'constantDesc';
+  // v1.17.1：需要难度的排序模式——官方定数/拟合定数/成绩。
+  const needsDifficulty = current.mode === 'constantAsc' || current.mode === 'constantDesc'
+    || current.mode === 'fitAsc' || current.mode === 'fitDesc'
+    || current.mode === 'scoreDesc';
 
   const chooseMode = (mode: typeof current.mode) => {
+    const withDifficulty = mode === 'constantAsc' || mode === 'constantDesc'
+      || mode === 'fitAsc' || mode === 'fitDesc'
+      || mode === 'scoreDesc';
     void updateSettings({
-      defaultSort: mode === 'constantAsc' || mode === 'constantDesc'
+      // v1.17.1：选中需要难度的模式时保留现有难度，没有则默认 3（Master）。
+      defaultSort: withDifficulty
         ? { mode, difficultyIndex: current.difficultyIndex ?? 3 }
         : { mode },
     });
-    if (!((mode === 'constantAsc' || mode === 'constantDesc') && !isConstant)) router.back();
+    if (!(withDifficulty && !needsDifficulty)) router.back();
   };
 
   return (
@@ -32,9 +39,9 @@ export default function SortSettings() {
           </Pressable>
         ))}
       </View>
-      {isConstant && (
+      {needsDifficulty && (
         <View style={styles.card}>
-          <Text style={styles.subTitle}>定数排序难度</Text>
+          <Text style={styles.subTitle}>排序难度</Text>
           <View style={styles.chips}>
             {DifficultyLabels.map((label, index) => (
               <Pressable key={label} style={[styles.chip, current.difficultyIndex === index && { borderColor: DifficultyColorMap[index], backgroundColor: `${DifficultyColorMap[index]}22` }]} onPress={() => void updateSettings({ defaultSort: { ...current, difficultyIndex: index } })}>

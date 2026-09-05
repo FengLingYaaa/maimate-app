@@ -80,9 +80,9 @@ export function AchievementLossCard({ notes, defaultCollapsed = false }: Props) 
           {/* v1.16.9：音符类型列固定在左侧（不随横向滚动），仅判定数据列滚动。 */}
           <View style={styles.tableWrap}>
             <View style={styles.typeColumn}>
-              <View style={[styles.cell, styles.typeCell]}><Text style={styles.typeText}>音符</Text></View>
+              <View style={[styles.cell, styles.typeCell, styles.headCell]}><Text style={styles.typeText} numberOfLines={1}>音符</Text></View>
               {rows.map(row => (
-                <View key={row.label} style={[styles.cell, styles.typeCell]}><Text style={styles.typeText}>{row.label}</Text></View>
+                <View key={row.label} style={[styles.cell, styles.typeCell]}><Text style={styles.typeText} numberOfLines={1}>{row.label}</Text></View>
               ))}
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dataScroll}>
@@ -107,9 +107,16 @@ export function AchievementLossCard({ notes, defaultCollapsed = false }: Props) 
 
           {/* v1.15.2：等效容错 —— 101%→100.5% 的 0.5 个百分点可折合多少个 Tap(Great)，只依赖谱面，与成绩无关。 */}
           {result.tapGreatUnit > 0 && (
-            <Text style={styles.toleranceLine}>
-              等效容错 ≈ {Math.floor(0.5 / result.tapGreatUnit * 10) / 10} 个 Tap(Great)
-            </Text>
+            <>
+              <Text style={styles.toleranceLine}>
+                等效容错 ≈ {Math.floor(0.5 / result.tapGreatUnit * 10) / 10} 个 Tap(Great)
+              </Text>
+              {result.breakRows && (
+                <Text style={styles.toleranceLine}>
+                  每2550落≈{result.breakRows.total.p2550.eqTapGreat.toFixed(1)}Tap（Great）
+                </Text>
+              )}
+            </>
           )}
         </>
       )}
@@ -154,7 +161,8 @@ const styles = StyleSheet.create({
   dataScroll: { flex: 1 },
   cell: {
     width: 74,
-    paddingVertical: 6,
+    height: 32,
+    paddingVertical: 0,
     paddingHorizontal: 2,
     alignItems: 'center',
     justifyContent: 'center',

@@ -13,6 +13,8 @@
 5. 等待约 10~15 分钟，任务完成后进入该次运行页面
 6. 在 **Artifacts** 区域下载 `MaiMate-APK`
 
+> Artifact 内容与触发方式有关：tag（`v*`）构建的 Artifact 在原始 `app-release.apk` 之外，还包含命名副本 `MaiMate-v<版本>.apk`（如 `MaiMate-v1.17.1.apk`）和 `MaiMate-latest.apk`；手动触发（Run workflow）的 Artifact 仅含原始 `app-release.apk`。
+
 > GitHub 托管 runner 内存充足，不受本机 4GB 容器限制。
 
 ### 发布到个人下载站
@@ -24,7 +26,14 @@ git tag -a v1.3.0-alpha -m "MaiMate v1.3.0-alpha"
 git push origin v1.3.0-alpha
 ```
 
-工作流会完成 arm64 APK 云构建，并把产物以固定文件名 `MaiMate-latest.apk` 上传到同名 GitHub Release。随后更新 `landing/_worker.js` 中的 Release 地址，执行 `landing/deploy-download-site.sh` 部署 Cloudflare Pages/Worker；下载站不会把 42 MiB APK 直接上传到 Pages，而是由 Worker 转发 GitHub Release 资产。
+工作流会完成 arm64 APK 云构建，并把产物以两个文件名同时上传到该 tag 对应的 GitHub Release：
+
+- `MaiMate-v<版本>.apk`（如 `MaiMate-v1.17.1.apk`）：按 tag 留存的版本化命名
+- `MaiMate-latest.apk`：沿用原有固定下载名，现有 latest 直链继续可用
+
+随后更新 `landing/_worker.js` 中的 Release 地址，执行 `landing/deploy-download-site.sh` 部署 Cloudflare Pages/Worker；下载站不会把 42 MiB APK 直接上传到 Pages，而是由 Worker 转发 GitHub Release 资产。
+
+> 命名发生在云构建的发布阶段：无论本地还是 GitHub Actions，Gradle 的原始产物始终是 `app-release.apk`；`MaiMate-v<版本>.apk` / `MaiMate-latest.apk` 由 workflow 在上传 Release 与 Artifact 前复制改名生成。
 
 ## 方式二：本地构建（需要 Android 环境）
 
@@ -46,6 +55,8 @@ cd android
 ./gradlew assembleRelease
 # 产物: android/app/build/outputs/apk/release/app-release.apk
 ```
+
+> 本地 Gradle 原始产物保持 `app-release.apk` 不变；`MaiMate-v<版本>.apk` / `MaiMate-latest.apk` 等版本化命名由 GitHub workflow 在 Release/Artifact 发布阶段完成（见方式一）。
 
 ### 低内存容器（4GB）调优
 

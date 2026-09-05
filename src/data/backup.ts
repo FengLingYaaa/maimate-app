@@ -124,7 +124,7 @@ function normalizeSettings(input: unknown): AppSettings {
   const parsed = isRecord(input) ? input as Partial<AppSettings> : {};
   const sortMode = parsed.defaultSort?.mode;
   const defaultSort = {
-    mode: (sortMode === 'titleAsc' || sortMode === 'titleDesc' || sortMode === 'constantAsc' || sortMode === 'constantDesc' || sortMode === 'fitAsc' || sortMode === 'fitDesc' || sortMode === 'relevance')
+    mode: (sortMode === 'titleAsc' || sortMode === 'titleDesc' || sortMode === 'constantAsc' || sortMode === 'constantDesc' || sortMode === 'fitAsc' || sortMode === 'fitDesc' || sortMode === 'scoreDesc' || sortMode === 'relevance')
       ? sortMode
       : DEFAULT_SETTINGS.defaultSort.mode,
     difficultyIndex: finiteNumber(parsed.defaultSort?.difficultyIndex)

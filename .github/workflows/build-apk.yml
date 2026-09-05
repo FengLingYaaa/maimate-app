@@ -80,20 +80,27 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          apk_path="$(find android/app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)"
+          apk_path="$(find android/app/build/outputs/apk/release -maxdepth 1 -name '*.apk' ! -name 'MaiMate-*.apk' -print -quit)"
           if [[ -z "$apk_path" ]]; then
             echo 'No release APK found.' >&2
             exit 1
           fi
-          release_apk="${RUNNER_TEMP}/MaiMate-latest.apk"
-          cp "$apk_path" "$release_apk"
+          echo "MAIMATE_RELEASE_APK=$apk_path" >> "$GITHUB_ENV"
+          versioned_apk="${RUNNER_TEMP}/MaiMate-${GITHUB_REF_NAME}.apk"
+          latest_apk="${RUNNER_TEMP}/MaiMate-latest.apk"
+          cp "$apk_path" "$versioned_apk"
+          cp "$apk_path" "$latest_apk"
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "$release_apk" --clobber
+            gh release upload "$GITHUB_REF_NAME" "$versioned_apk" "$latest_apk" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" "$release_apk" \
+            gh release create "$GITHUB_REF_NAME" "$versioned_apk" "$latest_apk" \
               --title "$GITHUB_REF_NAME" \
               --generate-notes
           fi
+          # Also place named copies next to the original apk so the artifact step
+          # below uploads the versioned and latest filenames alongside it.
+          cp "$versioned_apk" "android/app/build/outputs/apk/release/MaiMate-${GITHUB_REF_NAME}.apk"
+          cp "$latest_apk" "android/app/build/outputs/apk/release/MaiMate-latest.apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
@@ -107,8 +114,13 @@ jobs:
 
       - name: Print APK checksum
         if: success()
-        working-directory: android
-        run: sha256sum app/build/outputs/apk/release/*.apk
+        shell: bash
+        run: |
+          if [[ -n "${MAIMATE_RELEASE_APK:-}" ]]; then
+            sha256sum "$MAIMATE_RELEASE_APK"
+          else
+            sha256sum android/app/build/outputs/apk/release/*.apk
+          fi
 
       - name: Show build summary
         if: success()
@@ -119,5 +131,9 @@ jobs:
           echo '- ABI: `arm64-v8a`' >> "$GITHUB_STEP_SUMMARY"
           echo '- Package: `cc.flya.maimate`' >> "$GITHUB_STEP_SUMMARY"
           echo '- Signing: debug keystore (internal testing)' >> "$GITHUB_STEP_SUMMARY"
-          echo '- SHA-256:' >> "$GITHUB_STEP_SUMMARY"
-          sha256sum android/app/build/outputs/apk/release/*.apk >> "$GITHUB_STEP_SUMMARY"
+          echo '- SHA-256 (original release APK):' >> "$GITHUB_STEP_SUMMARY"
+          if [[ -n "${MAIMATE_RELEASE_APK:-}" ]]; then
+            sha256sum "$MAIMATE_RELEASE_APK" >> "$GITHUB_STEP_SUMMARY"
+          else
+            sha256sum android/app/build/outputs/apk/release/*.apk >> "$GITHUB_STEP_SUMMARY"
+          fi

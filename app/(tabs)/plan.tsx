@@ -7,10 +7,11 @@ import { useRouter } from 'expo-router';
 import { FilterBar, PlanDragList, PlanProgressRing, type PlanDragRow } from '../../src/components';
 import { Colors, DifficultyColorMap, DifficultyLabels } from '../../src/constants';
 import { getChinaVersionOptions, getVersionOptions } from '../../src/data/version-catalog';
-import { getMusicSearchScore, getOfficialChartConstant, matchesMusic } from '../../src/data/music-list';
+import { buildScoreIndex, getFitChartConstant, getMusicScore, getMusicSearchScore, getOfficialChartConstant, matchesMusic } from '../../src/data/music-list';
+import type { ScoreIndex } from '../../src/data/music-list';
 import { canDragPlanRows } from '../../src/data/plan-order';
-import { computeAchievedIds } from '../../src/data/plan-entries';
-import type { FilterOptions, MusicData, PlanEntry, PlayerScore, SortOptions } from '../../src/data/types';
+import { computeAchievedIds, resolvePlanMusic } from '../../src/data/plan-entries';
+import type { ChartStatsMap, FilterOptions, MusicData, PlanEntry, PlayerScore, SortOptions } from '../../src/data/types';
 import { useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '../../src/store';
 import { planEntryKey } from '../../src/store/plan-store';
 
@@ -33,7 +34,13 @@ function matchesPlanRow(row: PlanRow, filters: FilterOptions): boolean {
   return matchesMusic(row.music, { ...filters, difficulty: row.entry.difficultyIndex });
 }
 
-function sortPlanRows(rows: PlanRow[], sort: SortOptions | undefined, query?: string): PlanRow[] {
+function sortPlanRows(
+  rows: PlanRow[],
+  sort: SortOptions | undefined,
+  query?: string,
+  chartStats?: ChartStatsMap,
+  scoreIndex?: ScoreIndex,
+): PlanRow[] {
   const mode = sort?.mode;
   if (!mode || mode === 'relevance') {
     if (!query?.trim()) return rows;
@@ -47,6 +54,35 @@ function sortPlanRows(rows: PlanRow[], sort: SortOptions | undefined, query?: st
     });
   }
   const difficultyIndex = sort?.difficultyIndex ?? 3;
+  // v1.17.1：同值/同样缺数据时保持原计划顺序（plannedRows 已按 entry.order 排好）。
+  const byPlanOrder = (left: PlanRow, right: PlanRow) => left.entry.order - right.entry.order;
+  // v1.17.1：拟合定数排序——按所选难度的 chart_stats fit_diff 排，无拟合数据排末尾。
+  if (mode === 'fitAsc' || mode === 'fitDesc') {
+    const descending = mode === 'fitDesc';
+    return rows.sort((left, right) => {
+      const fittedLeft = getFitChartConstant(left.music, difficultyIndex, chartStats);
+      const fittedRight = getFitChartConstant(right.music, difficultyIndex, chartStats);
+      if (fittedLeft === null || fittedRight === null) {
+        if (fittedLeft === fittedRight) return byPlanOrder(left, right);
+        return fittedLeft === null ? 1 : -1;
+      }
+      if (fittedLeft !== fittedRight) return descending ? fittedRight - fittedLeft : fittedLeft - fittedRight;
+      return byPlanOrder(left, right);
+    });
+  }
+  // v1.17.1：成绩排序——按所选难度的达成率高到低，无成绩条目排末尾。
+  if (mode === 'scoreDesc') {
+    return rows.sort((left, right) => {
+      const scoreLeft = getMusicScore(left.music, difficultyIndex, scoreIndex);
+      const scoreRight = getMusicScore(right.music, difficultyIndex, scoreIndex);
+      if (scoreLeft === null || scoreRight === null) {
+        if (scoreLeft === scoreRight) return byPlanOrder(left, right);
+        return scoreLeft === null ? 1 : -1;
+      }
+      if (scoreLeft !== scoreRight) return scoreRight - scoreLeft;
+      return byPlanOrder(left, right);
+    });
+  }
   const descending = mode === 'constantDesc';
   return rows.sort((left, right) => {
     const a = getOfficialChartConstant(left.music, difficultyIndex) ?? -1;
@@ -67,24 +103,29 @@ export default function PushPlan() {
   const reorderByIds = usePlanStore(s => s.reorderByIds);
   const clearAchievedTargets = usePlanStore(s => s.clearAchievedTargets);
   const rawData = useMusicStore(s => s.rawData);
+  const chartStats = useMusicStore(s => s.chartStats);
   const scores = useScoreStore(s => s.scores);
   const settings = useSettingsStore(s => s.settings);
+  // v1.17.1：本地成绩索引（songId+type+难度 → 达成率），成绩排序与排序成绩展示共用。
+  const scoreIndex = useMemo(() => buildScoreIndex(scores), [scores]);
   const [filters, setFilters] = useState<FilterOptions>({});
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [graveyardVisible, setGraveyardVisible] = useState(false);
   const plannedRows = useMemo(() => entries
     .map(entry => {
-      const music = rawData.find(item => item.id === entry.songId && (!entry.musicType || item.type === entry.musicType)) || rawData.find(item => item.id === entry.songId);
+      const music = resolvePlanMusic(entry, rawData, scores);
       return music ? { music, entry } : null;
     })
     .filter((item): item is PlanRow => item !== null)
-    .sort((left, right) => left.entry.order - right.entry.order), [entries, rawData]);
+    .sort((left, right) => left.entry.order - right.entry.order), [entries, rawData, scores]);
 
   const filteredRows = useMemo(() => {
     const rows = plannedRows.filter(row => matchesPlanRow(row, filters));
-    return sortPlanRows(rows, filters.sort, filters.titleSearch);
-  }, [plannedRows, filters]);
+    return sortPlanRows(rows, filters.sort, filters.titleSearch, chartStats, scoreIndex);
+  }, [plannedRows, filters, chartStats, scoreIndex]);
   const manualOrderView = canDragPlanRows(filters);
+  // v1.17.1：仅成绩排序（scoreDesc）时向卡片下发排序难度（默认 Master=3），用于显示排序成绩行。
+  const scoreSortDifficultyIndex = filters.sort?.mode === 'scoreDesc' ? (filters.sort?.difficultyIndex ?? 3) : undefined;
 
   const genres = useMemo(() => [...new Set(plannedRows.map(row => row.music.basic_info.genre))].sort(), [plannedRows]);
   const versionOptions = useMemo(() => getVersionOptions(plannedRows.map(row => row.music)), [plannedRows]);
@@ -112,6 +153,12 @@ export default function PushPlan() {
   }, [plannedRows]);
   const getScore = useCallback((music: MusicData, entry: PlanEntry): PlayerScore | undefined => scores.find(score => score.songId === music.id && score.difficultyIndex === entry.difficultyIndex && score.type === music.type), [scores]);
 
+  // v1.17.1：排序成绩展示用——先经 scoreIndex O(1) 判定该难度有无成绩，再取完整成绩对象给卡片。
+  const getSortScore = useCallback((music: MusicData, difficultyIndex: number): PlayerScore | undefined => {
+    if (getMusicScore(music, difficultyIndex, scoreIndex) === null) return undefined;
+    return scores.find(score => score.songId === music.id && score.type === music.type && score.difficultyIndex === difficultyIndex);
+  }, [scoreIndex, scores]);
+
   // 移除走自定义确认控件（不再使用系统 Alert），移除后曲目进入「推歌英灵殿」。
   const handleRemove = useCallback((row: PlanRow) => {
     setConfirmRequest({
@@ -132,10 +179,12 @@ export default function PushPlan() {
     });
   }, [bulkRemoveEntries, entries]);
 
+  // v1.17.1：英灵殿行解析改用统一口径 resolvePlanMusic（同 ID 双类型按成绩归属），
+  // 并把 scores 纳入依赖——成绩同步后立即重解析，类型缺失/写错的条目也归属到真实谱面。
   const graveyardRows = useMemo(() => graveyard.map(item => ({
     ...item,
-    music: rawData.find(m => m.id === item.entry.songId && (!item.entry.musicType || m.type === item.entry.musicType)) || rawData.find(m => m.id === item.entry.songId),
-  })), [graveyard, rawData]);
+    music: resolvePlanMusic(item.entry, rawData, scores),
+  })), [graveyard, rawData, scores]);
 
   // v1.12.0：已达标条目（当前达成率 ≥ 目标），用于「清除已达标目标」按钮；与抽歌页共用判定口径。
   const achievedEntryIds = useMemo(
@@ -299,6 +348,8 @@ export default function PushPlan() {
           allSongs={rawData}
           allScores={scores}
           getScore={getScore}
+          scoreSortDifficultyIndex={scoreSortDifficultyIndex}
+          getSortScore={getSortScore}
           onOpen={row => router.push({ pathname: '/song/[id]' as any, params: { id: row.music.id, type: row.music.type, difficultyIndex: String(row.entry.difficultyIndex), source: 'plan' } })}
           onRemove={entryId => {
             const row = displayRows.find(item => item.entry.entryId === entryId);

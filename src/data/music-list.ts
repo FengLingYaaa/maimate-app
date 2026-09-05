@@ -5,7 +5,7 @@
  * 因此连续切换分类、SD/DX、版本和搜索条件不会互相污染。
  */
 
-import type { FilterOptions, MusicData, ChartData, SortOptions, ChartStatsMap } from './types';
+import type { FilterOptions, MusicData, ChartData, SortOptions, ChartStatsMap, PlayerScore } from './types';
 import { getChinaVersionName, isBanquetGenre } from '../constants/game';
 import { expandVersionSelection } from './version-catalog';
 import { getSearchTitles } from './song-aliases';
@@ -256,6 +256,29 @@ function compareNullableConstants(left: number | null, right: number | null, des
   return descending ? right - left : left - right;
 }
 
+/** v1.17.1：按歌曲/谱面查询本地成绩，成绩索引由调用方复用。 */
+export type ScoreIndex = Map<string, number>;
+
+export function scoreIndexKey(songId: string, type: 'SD' | 'DX', difficultyIndex: number): string {
+  return `${type}:${songId}:${difficultyIndex}`;
+}
+
+export function buildScoreIndex(scores: PlayerScore[]): ScoreIndex {
+  const index: ScoreIndex = new Map();
+  for (const score of scores) {
+    if (Number.isFinite(score.achievement)) {
+      index.set(scoreIndexKey(score.songId, score.type, score.difficultyIndex), score.achievement);
+    }
+  }
+  return index;
+}
+
+/** 读取指定歌曲/类型/难度的本地成绩；没有成绩返回 null。 */
+export function getMusicScore(music: MusicData, difficultyIndex: number, scoreIndex?: ScoreIndex): number | null {
+  const value = scoreIndex?.get(scoreIndexKey(music.id, music.type, difficultyIndex));
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
 function compareTitles(left: MusicData, right: MusicData, descending: boolean): number {
   const titleResult = left.title.localeCompare(right.title);
   if (titleResult !== 0) return descending ? -titleResult : titleResult;
@@ -268,6 +291,7 @@ export function sortMusicItems(
   sort: SortOptions | undefined,
   query?: string,
   chartStatsMap?: ChartStatsMap,
+  scoreIndex?: ScoreIndex,
 ): MusicData[] {
   const mode = sort?.mode || (query?.trim() ? 'relevance' : null);
   if (!mode || mode === 'relevance') {
@@ -296,6 +320,23 @@ export function sortMusicItems(
       return fitResult !== 0 ? fitResult : compareTitles(left, right, false);
     });
   }
+
+  if (mode === 'scoreDesc') {
+    // v1.17.1：同分/无成绩的 tie-break 保留传入数组的原始顺序（默认曲库顺序）——
+    // 不再用 compareTitles 按标题重排，否则无成绩项在曲库里会被标题打乱自然顺序。
+    const originalOrder = new Map<MusicData, number>();
+    items.forEach((item, index) => originalOrder.set(item, index));
+    return items.sort((left, right) => {
+      const scoreResult = compareNullableConstants(
+        getMusicScore(left, difficultyIndex, scoreIndex),
+        getMusicScore(right, difficultyIndex, scoreIndex),
+        true,
+      );
+      if (scoreResult !== 0) return scoreResult;
+      return (originalOrder.get(left) ?? 0) - (originalOrder.get(right) ?? 0);
+    });
+  }
+
   const descending = mode === 'constantDesc';
   return items.sort((left, right) => {
     const constantResult = compareNullableConstants(
@@ -337,9 +378,9 @@ export class MusicList {
     return shuffled.slice(0, Math.min(n, shuffled.length));
   }
 
-  filter(opts: FilterOptions, chartStatsMap?: ChartStatsMap): MusicList {
+  filter(opts: FilterOptions, chartStatsMap?: ChartStatsMap, scoreIndex?: ScoreIndex): MusicList {
     const result = this.items.filter(music => matchesMusic(music, opts));
-    return new MusicList(sortMusicItems(result, opts.sort, opts.titleSearch, chartStatsMap));
+    return new MusicList(sortMusicItems(result, opts.sort, opts.titleSearch, chartStatsMap, scoreIndex));
   }
 
   sortById(asc = true): MusicList {

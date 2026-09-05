@@ -15,6 +15,10 @@ interface Props {
   allSongs: MusicData[];
   allScores: PlayerScore[];
   importedScore?: PlayerScore;
+  /** v1.17.1：成绩（scoreDesc）排序启用时为排序难度索引；卡片显示该难度的排序成绩行。 */
+  scoreSortDifficultyIndex?: number;
+  /** v1.17.1：按歌曲+难度查询排序用完整成绩（无成绩返回 undefined）；应与 scoreSortDifficultyIndex 同时传入。 */
+  getSortScore?: (music: MusicData, difficultyIndex: number) => PlayerScore | undefined;
   showChinaVersion: boolean;
   showProjectedRating: boolean;
   onPress: () => void;
@@ -23,7 +27,7 @@ interface Props {
   onTarget: (score: number | null) => void;
 }
 
-export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, allSongs, allScores, importedScore, showChinaVersion, showProjectedRating, onPress, onLongPress, onRemove, onTarget }: Props) {
+export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, allSongs, allScores, importedScore, scoreSortDifficultyIndex, getSortScore, showChinaVersion, showProjectedRating, onPress, onLongPress, onRemove, onTarget }: Props) {
   const officialConstant = getOfficialChartConstant(music, entry.difficultyIndex);
   const targetRating = entry.targetScore === undefined ? null : calculateRating(officialConstant ?? undefined, entry.targetScore);
   // v1.12.0：达成目标后 B50 总分增量（重算口径），无目标不显示。
@@ -39,6 +43,13 @@ export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, 
   // v1.14.0：保留达标判定与「还差」字段，进度条已移除。
   const current = importedScore?.achievement ?? 0;
   const achieved = entry.targetScore !== undefined && current >= entry.targetScore;
+  // v1.17.1：成绩排序（scoreDesc）时在当前成绩行外补充「排序成绩」行；排序难度与
+  // 条目难度相同时「当前成绩」行已覆盖该难度成绩（有无成绩均已有提示），跳过避免重复。
+  const showSortScoreRow = scoreSortDifficultyIndex !== undefined && scoreSortDifficultyIndex !== entry.difficultyIndex;
+  const sortDifficultyLabel = scoreSortDifficultyIndex === undefined
+    ? ''
+    : DifficultyLabels[scoreSortDifficultyIndex] || `难度 ${scoreSortDifficultyIndex}`;
+  const sortScore = showSortScoreRow ? getSortScore?.(music, scoreSortDifficultyIndex) : undefined;
   const chooseTarget = (score: number | null) => {
     onTarget(score);
     setEditingTarget(false);
@@ -87,6 +98,11 @@ export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, 
         {importedScore ? (
           <Text style={styles.scoreText}>当前成绩：{formatAchievement(importedScore.achievement)} · DX {importedScore.dxScore}{importedScore.fc ? ` · ${formatClearStatus(importedScore.fc)}` : ''}{importedScore.fs ? ` · ${formatClearStatus(importedScore.fs)}` : ''}{importedScore.serverRating === undefined ? '' : ` · RA ${importedScore.serverRating}`}</Text>
         ) : <Text style={styles.scoreMuted}>当前成绩：尚未导入或没有匹配的成绩</Text>}
+        {showSortScoreRow && (
+          <Text style={sortScore ? styles.sortScoreText : styles.scoreMuted}>
+            排序成绩（{sortDifficultyLabel}）：{sortScore ? formatAchievement(sortScore.achievement) : '—'}
+          </Text>
+        )}
         {entry.targetScore !== undefined && achieved && (
           <Text style={[styles.progressText, styles.progressTextDone]}>已达标 ✓</Text>
         )}
@@ -132,5 +148,7 @@ const styles = StyleSheet.create({
   warning: { fontSize: 10, lineHeight: 14, color: Colors.functional.warning },
   scoreText: { fontSize: 11, lineHeight: 16, color: Colors.functional.success },
   scoreMuted: { fontSize: 11, color: Colors.text.muted },
+  // v1.17.1：排序成绩行（排序难度与条目难度不同且有成绩时），与绿色「当前成绩」行区分。
+  sortScoreText: { fontSize: 11, lineHeight: 16, color: Colors.accent.secondary },
   note: { fontSize: 11, color: Colors.text.secondary },
 });

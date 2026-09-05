@@ -9,7 +9,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useMusicStore, useScoreStore, useSettingsStore } from '../../src/store';
 import { SongCard, FilterBar, TitleRecognizer } from '../../src/components';
 import { Colors } from '../../src/constants';
-import { getMatchingDifficultyIndices, getFitChartConstant, getMusicSearchScore, MusicList } from '../../src/data/music-list';
+import { getMatchingDifficultyIndices, getFitChartConstant, getMusicSearchScore, MusicList, buildScoreIndex, getMusicScore } from '../../src/data/music-list';
 import { getChinaVersionOptions, getVersionOptions } from '../../src/data/version-catalog';
 import { computeB50 } from '../../src/data/b50';
 import type { FilterOptions, MusicData } from '../../src/data/types';
@@ -40,6 +40,9 @@ export default function SongBrowser() {
   const settingsLoaded = useSettingsStore(s => s.loaded);
   const scores = useScoreStore(s => s.scores);
 
+  // v1.17.1：本地成绩索引（songId+type+难度 → 达成率），筛选排序与卡片成绩展示共用。
+  const scoreIndex = useMemo(() => buildScoreIndex(scores), [scores]);
+
   // v1.12.0：曲库行 B50 徽标（songId → 池内最高排名，取该曲在榜内最好的一个谱面）。
   const b50BadgeBySong = useMemo(() => {
     if (scores.length === 0) return null;
@@ -56,9 +59,20 @@ export default function SongBrowser() {
 
   useEffect(() => {
     if (settingsLoaded && settings.defaultSort.mode !== 'relevance' && filters.sort === undefined) {
-      applyFilters({ ...filters, sort: settings.defaultSort });
+      applyFilters({ ...filters, sort: settings.defaultSort }, scoreIndex);
     }
-  }, [settingsLoaded, settings.defaultSort, filters, applyFilters]);
+  }, [settingsLoaded, settings.defaultSort, filters, applyFilters, scoreIndex]);
+
+  // v1.17.1：成绩排序（scoreDesc）下，同步成绩使 scoreIndex 更新时必须立即重排，
+  // 否则同步成绩后排序不刷新。此 effect 只依赖排序模式与 scoreIndex——
+  // applyFilters 会写入新的 filters 对象，若把 filters 放进依赖会无限循环；
+  // 这里改用 getState 读取最新筛选条件，依赖不变时不会重复执行。
+  const sortMode = filters.sort?.mode;
+  const isScoreSort = sortMode === 'scoreDesc';
+  useEffect(() => {
+    if (!isScoreSort) return;
+    applyFilters(useMusicStore.getState().filters, scoreIndex);
+  }, [isScoreSort, scoreIndex, applyFilters]);
 
   useFocusEffect(useCallback(() => {
     if (restoreTitleRecognizerOnFocus.current) {
@@ -73,14 +87,14 @@ export default function SongBrowser() {
 
   const loadAllSongs = useCallback(() => {
     // 用默认排序（ID 序）加载全曲：若已有筛选则按当前筛选加载。
-    applyFilters(filters);
+    applyFilters(filters, scoreIndex);
     setLibraryLoaded(true);
-  }, [applyFilters, filters]);
+  }, [applyFilters, filters, scoreIndex]);
 
   const handleApply = useCallback((next: FilterOptions) => {
-    applyFilters(next);
+    applyFilters(next, scoreIndex);
     setLibraryLoaded(true);
-  }, [applyFilters]);
+  }, [applyFilters, scoreIndex]);
 
   const genres = useMemo(() => [...new Set(rawData.map(m => m.basic_info.genre))].sort(), [rawData]);
   const versionOptions = useMemo(() => getVersionOptions(rawData), [rawData]);
@@ -106,8 +120,8 @@ export default function SongBrowser() {
 
   // v1.16.8：确认式搜索走 store 分片路径（评分+过滤一趟完成，进度条真实推进）。
   const runSearch = useCallback((nextFilters: FilterOptions, onProgress: (done: number, total: number) => void) => {
-    return applyFiltersChunked(nextFilters, onProgress);
-  }, [applyFiltersChunked]);
+    return applyFiltersChunked(nextFilters, onProgress, scoreIndex);
+  }, [applyFiltersChunked, scoreIndex]);
 
   const handleSongPress = useCallback((music: MusicData) => {
     router.push({ pathname: '/song/[id]' as any, params: { id: music.id, type: music.type, source: 'library' } });
@@ -117,8 +131,9 @@ export default function SongBrowser() {
     router.push({ pathname: '/song/[id]' as any, params: { id: music.id, type: music.type, source: 'library' } });
   }, [router]);
 
-  const isFitSort = filters.sort?.mode === 'fitAsc' || filters.sort?.mode === 'fitDesc';
-  const sortDifficultyIndex = filters.sort?.mode === 'constantAsc' || filters.sort?.mode === 'constantDesc' || isFitSort
+  const isFitSort = sortMode === 'fitAsc' || sortMode === 'fitDesc';
+  // v1.17.1：成绩排序同样按单难度展示并高亮；未指定难度时默认 3（Master）。
+  const sortDifficultyIndex = sortMode === 'constantAsc' || sortMode === 'constantDesc' || isFitSort || isScoreSort
     ? (filters.sort?.difficultyIndex ?? 3)
     : undefined;
   // v1.16.0：拟合定数排序时，行内徽章旁标注该难度拟合定数。
@@ -126,6 +141,11 @@ export default function SongBrowser() {
     if (!isFitSort) return null;
     return getFitChartConstant(music, index, chartStats);
   }, [isFitSort, chartStats]);
+  // v1.17.1：成绩排序时，行内徽章旁标注选中难度的本机达成率（无成绩显示 —）。
+  const getScoreForDifficulty = useCallback((music: MusicData) => (index: number) => {
+    if (!isScoreSort) return null;
+    return getMusicScore(music, index, scoreIndex);
+  }, [isScoreSort, scoreIndex]);
   const hasChartHighlightFilter = Boolean(
     filters.charter?.trim()
       || filters.difficulty !== undefined
@@ -186,6 +206,8 @@ export default function SongBrowser() {
                 highlightedDifficulties={highlighted.size > 0 ? [...highlighted] : undefined}
                 b50Badge={b50BadgeBySong?.get(item.id) ?? null}
                 fitDiffForIndex={fitDiffForIndex(item)}
+                scoreDifficultyIndex={isScoreSort ? sortDifficultyIndex : undefined}
+                scoreForDifficulty={isScoreSort ? getScoreForDifficulty(item) : undefined}
               />
             </View>
           );

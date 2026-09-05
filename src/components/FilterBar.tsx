@@ -66,6 +66,31 @@ function toggleValue<T extends string | number>(
   return [...values, value];
 }
 
+/**
+ * v1.17.1：需要指定难度的排序模式——官方定数、拟合定数与成绩排序；
+ * 这些模式都保存 difficultyIndex（未设置时回退当前单难度筛选，再回退 3=Master）。
+ */
+const SORT_MODES_WITH_DIFFICULTY: ReadonlySet<NonNullable<FilterOptions['sort']>['mode']> = new Set([
+  'constantAsc',
+  'constantDesc',
+  'fitAsc',
+  'fitDesc',
+  'scoreDesc',
+]);
+
+function sortHintText(mode: NonNullable<FilterOptions['sort']>['mode']): string {
+  switch (mode) {
+    case 'fitAsc':
+    case 'fitDesc':
+      return '按拟合定数排序使用的难度（无拟合数据的谱面排在末尾）';
+    case 'scoreDesc':
+      // v1.17.1：成绩排序提示。
+      return '按该难度成绩从高到低，无成绩排末尾';
+    default:
+      return '按官方定数排序使用的难度（列表会高亮该难度）';
+  }
+}
+
 export function FilterBar({
   filters,
   onApply,
@@ -201,13 +226,21 @@ export function FilterBar({
     update({ ...localFilters, [key]: value || undefined });
   };
 
+  /** v1.17.1：难度兜底链——现有 sort.difficultyIndex → 当前单难度筛选 → 3（Master）。 */
+  const resolveSortDifficulty = (): number => {
+    const sortDifficulty = localFilters.sort?.difficultyIndex;
+    if (typeof sortDifficulty === 'number' && Number.isInteger(sortDifficulty)) return sortDifficulty;
+    const difficulty = localFilters.difficulty;
+    if (typeof difficulty === 'number') return difficulty;
+    if (Array.isArray(difficulty) && difficulty.length === 1) return difficulty[0];
+    return 3;
+  };
+
   const setSortMode = (mode: NonNullable<FilterOptions['sort']>['mode']) => {
-    const difficultyIndex = localFilters.sort?.difficultyIndex
-      ?? (typeof localFilters.difficulty === 'number' ? localFilters.difficulty : 3);
     update({
       ...localFilters,
-      sort: mode === 'constantAsc' || mode === 'constantDesc'
-        ? { mode, difficultyIndex }
+      sort: SORT_MODES_WITH_DIFFICULTY.has(mode)
+        ? { mode, difficultyIndex: resolveSortDifficulty() }
         : { mode },
     });
   };
@@ -341,7 +374,7 @@ export function FilterBar({
     if (filters.sort && filters.sort.mode !== 'relevance') {
       const labels: Record<string, string> = {
         titleAsc: 'A→Z', titleDesc: 'Z→A', constantAsc: '定数↑', constantDesc: '定数↓',
-        fitAsc: '拟合定数↑', fitDesc: '拟合定数↓',
+        fitAsc: '拟合定数↑', fitDesc: '拟合定数↓', scoreDesc: '成绩↓',
       };
       chips.push({
         key: 'sort',
@@ -486,6 +519,7 @@ export function FilterBar({
                   ['constantDesc', '定数高→低'],
                   ['fitAsc', '拟合定数低→高'],
                   ['fitDesc', '拟合定数高→低'],
+                  ['scoreDesc', '成绩高→低'],
                 ].map(([mode, label]) => {
                   const active = localFilters.sort?.mode === mode || (!localFilters.sort && mode === 'relevance');
                   return (
@@ -495,13 +529,10 @@ export function FilterBar({
                   );
                 })}
               </View>
-              {(localFilters.sort?.mode === 'constantAsc' || localFilters.sort?.mode === 'constantDesc'
-                || localFilters.sort?.mode === 'fitAsc' || localFilters.sort?.mode === 'fitDesc') && (
+              {localFilters.sort?.mode !== undefined && SORT_MODES_WITH_DIFFICULTY.has(localFilters.sort.mode) && (
                 <>
                   <Text style={styles.sortHint}>
-                    {localFilters.sort?.mode === 'fitAsc' || localFilters.sort?.mode === 'fitDesc'
-                      ? '按拟合定数排序使用的难度（无拟合数据的谱面排在末尾）'
-                      : '按官方定数排序使用的难度（列表会高亮该难度）'}
+                    {sortHintText(localFilters.sort.mode)}
                   </Text>
                   <View style={styles.chipRow}>
                     {DifficultyLabels.map((label, index) => {

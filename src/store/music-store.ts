@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import { MusicData, FilterOptions, ChartStatsMap } from '../data/types';
 import { MusicList, matchesMusic, sortMusicItems } from '../data/music-list';
+import type { ScoreIndex } from '../data/music-list';
 import { getCacheTimestamp, getMusicDataWithStatus } from '../api/prober';
 import {
   getChartStatsCacheTimestamp,
@@ -22,6 +23,8 @@ interface MusicStore {
   cacheTimestamp: number | null;
   musicList: MusicList;
   filters: FilterOptions;
+  /** v1.17.1：内存态——当前筛选生效的本机成绩索引；后台/统计重建 musicList 时复用，避免冷启动或刷新后成绩排序丢失。 */
+  activeScoreIndex?: ScoreIndex;
   chartStats: ChartStatsMap;
   chartStatsLoading: boolean;
   chartStatsUpdating: boolean;
@@ -30,9 +33,9 @@ interface MusicStore {
 
   loadData: (forceRefresh?: boolean) => Promise<void>;
   loadChartStats: (forceRefresh?: boolean) => Promise<void>;
-  applyFilters: (filters: FilterOptions) => void;
+  applyFilters: (filters: FilterOptions, scoreIndex?: ScoreIndex) => void;
   /** v1.16.8：分片应用筛选（评分+过滤一趟完成），进度回调给 UI 进度条。 */
-  applyFiltersChunked: (filters: FilterOptions, onProgress?: (done: number, total: number) => void) => Promise<number>;
+  applyFiltersChunked: (filters: FilterOptions, onProgress?: (done: number, total: number) => void, scoreIndex?: ScoreIndex) => Promise<number>;
   clearFilters: () => void;
   getFullList: () => MusicList;
 }
@@ -49,9 +52,9 @@ function hasFilters(filters: FilterOptions): boolean {
   });
 }
 
-function createMusicList(data: MusicData[], filters: FilterOptions, chartStats?: ChartStatsMap): MusicList {
+function createMusicList(data: MusicData[], filters: FilterOptions, chartStats?: ChartStatsMap, scoreIndex?: ScoreIndex): MusicList {
   return hasFilters(filters)
-    ? new MusicList(data).filter(filters, chartStats)
+    ? new MusicList(data).filter(filters, chartStats, scoreIndex)
     : new MusicList(data);
 }
 
@@ -72,6 +75,7 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
   cacheTimestamp: null,
   musicList: new MusicList([]),
   filters: {},
+  activeScoreIndex: undefined,
   chartStats: {},
   chartStatsLoading: false,
   chartStatsUpdating: false,
@@ -93,11 +97,15 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
 
       // 强制刷新继续保留原有行为；自动缓存读取和后台更新使用当前筛选条件。
       const nextFilters = forceRefresh ? {} : get().filters;
+      // v1.17.1：重建 musicList 时带上当前 chartStats 与记忆的成绩索引，保证冷启动/后台更新后拟合排序与成绩排序不走样；
+      // 强制刷新清空筛选时顺带清空索引（下次 applyFilters 会重新写入）。
+      const nextActiveScoreIndex = forceRefresh ? undefined : get().activeScoreIndex;
       const hasBackgroundRefresh = result.backgroundRefresh !== null;
       set({
         rawData: result.data,
-        musicList: createMusicList(result.data, nextFilters),
+        musicList: createMusicList(result.data, nextFilters, get().chartStats, nextActiveScoreIndex),
         filters: nextFilters,
+        activeScoreIndex: nextActiveScoreIndex,
         loading: false,
         cacheTimestamp: result.cacheTimestamp,
         musicDataUpdating: hasBackgroundRefresh,
@@ -115,9 +123,10 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
             if (requestId !== musicLoadSequence) return;
 
             const currentFilters = get().filters;
+            // v1.17.1：后台刷新重建 musicList 时同样带上最新 chartStats 与成绩索引。
             set({
               rawData: data,
-              musicList: createMusicList(data, currentFilters),
+              musicList: createMusicList(data, currentFilters, get().chartStats, get().activeScoreIndex),
               loading: false,
               cacheTimestamp: timestamp ?? Date.now(),
               musicDataUpdating: false,
@@ -165,8 +174,15 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
       if (requestId !== chartStatsLoadSequence) return;
 
       const hasBackgroundRefresh = result.backgroundRefresh !== null;
+      // v1.17.1：统计首次可用后，若当前已有筛选中的列表（rawData/filters 存在），
+      // 用最新 chartStats + 记忆的成绩索引重建 musicList，拟合定数排序立即生效。
+      const current = get();
+      const nextMusicList = current.rawData.length > 0 && hasFilters(current.filters)
+        ? createMusicList(current.rawData, current.filters, result.data, current.activeScoreIndex)
+        : current.musicList;
       set({
         chartStats: result.data,
+        musicList: nextMusicList,
         chartStatsLoading: false,
         chartStatsUpdating: hasBackgroundRefresh,
         chartStatsCacheTimestamp: result.cacheTimestamp,
@@ -180,8 +196,14 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
             const timestamp = await getChartStatsCacheTimestamp();
             if (requestId !== chartStatsLoadSequence) return;
 
+            // v1.17.1：后台统计更新同样按当前筛选重建列表，保证拟合/成绩排序拿到最新拟合定数。
+            const current = get();
+            const nextMusicList = current.rawData.length > 0 && hasFilters(current.filters)
+              ? createMusicList(current.rawData, current.filters, chartStats, current.activeScoreIndex)
+              : current.musicList;
             set({
               chartStats,
+              musicList: nextMusicList,
               chartStatsLoading: false,
               chartStatsUpdating: false,
               chartStatsCacheTimestamp: timestamp ?? Date.now(),
@@ -210,13 +232,14 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
     }
   },
 
-  applyFilters: (filters: FilterOptions) => {
+  applyFilters: (filters: FilterOptions, scoreIndex?: ScoreIndex) => {
     const { rawData, chartStats } = get();
     // v1.16.0：带 chartStats 供拟合定数排序使用。
-    set({ musicList: createMusicList(rawData, filters, chartStats), filters });
+    // v1.17.1：记住本轮筛选使用的成绩索引，后续重建 musicList（冷启动/后台刷新/统计加载完成）时复用。
+    set({ musicList: createMusicList(rawData, filters, chartStats, scoreIndex), filters, activeScoreIndex: scoreIndex });
   },
 
-  applyFiltersChunked: async (filters, onProgress) => {
+  applyFiltersChunked: async (filters, onProgress, scoreIndex) => {
     const { rawData, chartStats } = get();
     const total = rawData.length;
     // v1.16.8：评分+过滤一趟完成（v1.16.7 是评分一遍、applyFilters 再过滤一遍的双遍），
@@ -233,8 +256,9 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
       // 进度条要等全部算完才出现。setTimeout(0) 是宏任务，能让 UI 真实刷新。
       await new Promise<void>(resolve => setTimeout(resolve, 0));
     }
-    const sorted = sortMusicItems(matched, filters.sort, filters.titleSearch, chartStats);
-    set({ musicList: new MusicList(sorted), filters });
+    const sorted = sortMusicItems(matched, filters.sort, filters.titleSearch, chartStats, scoreIndex);
+    // v1.17.1：分片路径同样记住本轮成绩索引。
+    set({ musicList: new MusicList(sorted), filters, activeScoreIndex: scoreIndex });
     return matched.length;
   },
 

@@ -20,7 +20,7 @@ import {
   type DayRecord,
   type DrawMode as StoreDrawMode,
 } from '../../src/data/plan-draw-history';
-import { computeAchievedIds } from '../../src/data/plan-entries';
+import { computeAchievedIds, resolvePlanMusic } from '../../src/data/plan-entries';
 import type { DrawCandidate, FilterOptions, PlanEntry, PlayerScore } from '../../src/data/types';
 
 type DrawMode = StoreDrawMode;
@@ -79,17 +79,16 @@ export default function RandomPicker() {
   const achievedPlanIds = useMemo(() => computeAchievedIds(planEntries, scores, rawData), [planEntries, scores, rawData]);
 
   const planCandidates = useMemo<DrawCandidate[]>(() => {
-    const byChart = new Map(rawData.map(music => [`${music.type}:${music.id}`, music]));
     return planEntries
       .slice()
       .sort((left, right) => left.order - right.order)
       .flatMap(entry => {
         if (!includeAchieved && achievedPlanIds.has(entry.entryId)) return [];
-        const music = byChart.get(`${entry.musicType || 'SD'}:${entry.songId}`) || rawData.find(item => item.id === entry.songId);
+        const music = resolvePlanMusic(entry, rawData, scores);
         if (!music || entry.difficultyIndex < 0 || entry.difficultyIndex >= music.charts.length) return [];
         return [{ music, difficultyIndex: entry.difficultyIndex, planEntry: entry }];
       });
-  }, [achievedPlanIds, includeAchieved, planEntries, rawData]);
+  }, [achievedPlanIds, includeAchieved, planEntries, rawData, scores]);
 
   const candidates = useMemo<DrawCandidate[]>(() => {
     if (mode === 'plan') return planCandidates;

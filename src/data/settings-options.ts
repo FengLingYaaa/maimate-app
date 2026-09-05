@@ -12,6 +12,10 @@ export const SORT_OPTIONS: Array<{ mode: SortMode; label: string }> = [
   { mode: 'titleDesc', label: '歌曲名 Z → A' },
   { mode: 'constantAsc', label: '官方定数低 → 高' },
   { mode: 'constantDesc', label: '官方定数高 → 低' },
+  // v1.17.1：拟合定数与成绩排序。
+  { mode: 'fitAsc', label: '拟合定数低 → 高' },
+  { mode: 'fitDesc', label: '拟合定数高 → 低' },
+  { mode: 'scoreDesc', label: '成绩高 → 低' },
 ];
 
 export function getSortLabel(mode: SortMode): string {
