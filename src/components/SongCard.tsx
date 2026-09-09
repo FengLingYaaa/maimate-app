@@ -8,9 +8,9 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Colors } from '../constants';
 import { DifficultyBadge } from './DifficultyBadge';
 import { CoverImage } from './CoverImage';
+import { ScoreValue } from './ScoreValue';
 import { getChinaVersionName } from '../constants/game';
-import { formatAchievement } from '../data/rating';
-import type { MusicData } from '../data/types';
+import type { MusicData, PlayerScore } from '../data/types';
 
 interface Props {
   music: MusicData;
@@ -27,8 +27,8 @@ interface Props {
   fitDiffForIndex?: (index: number) => number | null;
   /** v1.17.1：成绩（scoreDesc）排序启用时为选中难度索引；仅该难度旁显示成绩。 */
   scoreDifficultyIndex?: number;
-  /** v1.17.1：成绩排序启用时，按难度返回本机达成率（无成绩 null），徽章旁标注。 */
-  scoreForDifficulty?: (index: number) => number | null;
+  /** v1.17.2：成绩排序启用时，按难度返回完整本机成绩（无成绩 null），徽章旁标注。 */
+  scoreForDifficulty?: (index: number) => PlayerScore | null;
 }
 
 export const SongCard = memo(function SongCard({
@@ -100,11 +100,7 @@ export const SongCard = memo(function SongCard({
                   highlighted={highlightedDifficulties?.includes(index) ?? selectedDifficultyIndex !== undefined}
                 />
                 {fitDiff !== null && <Text style={styles.fitDiffText}>{fitDiff.toFixed(2)}</Text>}
-                {showScore && (
-                  <Text style={styles.scoreText} numberOfLines={1}>
-                    {score !== null ? `成绩 ${formatAchievement(score)}` : '成绩 —'}
-                  </Text>
-                )}
+                {showScore && <ScoreValue score={score} style={styles.scoreValue} />}
               </View>
             );
           })}
@@ -205,12 +201,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Colors.accent.secondary,
   },
-  scoreText: {
-    // v1.17.1：小字号并允许单行收缩，避免长达成率文本（成绩 100.5%）把卡片撑溢出。
-    fontSize: 9,
-    fontWeight: '800',
-    color: Colors.accent.primary,
-    flexShrink: 1,
+  scoreValue: {
+    // v1.17.2：数值和状态紧凑排列，避免长达成率把卡片撑溢出。
+    maxWidth: 76,
   },
   missingDifficulty: {
     fontSize: 10,

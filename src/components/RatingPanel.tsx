@@ -108,7 +108,7 @@ export function RatingPanel({ ds, fitDiff, loading = false, defaultCollapsed = f
           <View style={styles.currentRow}>
             <View style={styles.currentBox}>
               <Text style={styles.currentLabel}>官方 DX Rating</Text>
-              <Text style={styles.currentValue}>{official ?? '—'}</Text>
+              <Text style={[styles.currentValue, styles.officialValue]}>{official ?? '—'}</Text>
             </View>
             <View style={styles.currentBox}>
               <Text style={styles.currentLabel}>拟合 Rating</Text>
@@ -125,7 +125,7 @@ export function RatingPanel({ ds, fitDiff, loading = false, defaultCollapsed = f
               {checkpoints.map(row => (
                 <View key={row.rate} style={styles.tableRow}>
                   <Text style={styles.cell}>{row.rate.toFixed(1)}%</Text>
-                  <Text style={styles.cell}>{row.official ?? '—'}</Text>
+                  <Text style={[styles.cell, styles.officialValue]}>{row.official ?? '—'}</Text>
                   <Text style={[styles.cell, styles.fittedValue]}>{row.fitted ?? '—'}</Text>
                 </View>
               ))}
@@ -226,6 +226,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: 20,
     fontWeight: '800',
+    color: Colors.accent.primary,
+  },
+  officialValue: {
     color: Colors.accent.primary,
   },
   fittedValue: {

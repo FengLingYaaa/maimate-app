@@ -1,9 +1,9 @@
 import type { AppSettings, DetailBoardConfig, DetailBoardId } from './types';
 
-/** 详情页板块默认顺序与折叠：Rating 预估 / 完成率损失默认收起。 */
+/** v1.17.2：详情页四个板块默认全部展开，用户的已有配置仍由 mergeDetailBoards 保留。 */
 export const DEFAULT_DETAIL_BOARDS: Record<DetailBoardId, DetailBoardConfig> = {
-  rating: { order: 0, collapsed: true },
-  achievement: { order: 1, collapsed: true },
+  rating: { order: 0, collapsed: false },
+  achievement: { order: 1, collapsed: false },
   bilibili: { order: 2, collapsed: false },
   platform: { order: 3, collapsed: false },
 };

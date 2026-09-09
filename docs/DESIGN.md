@@ -1,9 +1,9 @@
 # MaiMate（舞萌伴侣）项目设计案
 
 > 文档性质：项目事实基线、产品设计、工程约束和持续变更记录。
-> 最后更新：2026-09-05
-> 当前版本：`v1.17.1`
-> 当前状态：Phase A-F 与 v1.16.0–v1.17.1 各轮用户反馈迭代均已实现并云构建发布；v1.17.1（第十七轮用户反馈）功能提交、tag、云构建 run `33950192118` 与 Release（版本化 APK + latest 并存）已完成，落地页已同步部署（见变更记录）；真机验收仍待 Android 设备。
+> 最后更新：2026-09-06
+> 当前版本：`v1.17.2`
+> 当前状态：v1.17.2（第十八轮用户反馈）代码与官网静态素材已在本地实现，尚未提交、云构建、创建 Release 或部署落地页；Android 真机验收仍待设备。v1.17.1 的已发布 APK 与公网部署证据继续保留在下方历史记录中。
 > GitHub：<https://github.com/FengLingYaaa/maimate-app>
 
 这份文档的目标不是只描述“理想中的产品”，而是让人类或新对话中的智能体能够回答：
@@ -88,7 +88,7 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 
 ---
 
-## 3. 当前事实状态（2026-08-26）
+## 3. 当前事实状态（2026-09-06）
 
 ### 3.1 仓库、发布和包信息
 
@@ -96,15 +96,16 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 |---|---|
 | App 仓库 | `FengLingYaaa/maimate-app` |
 | 当前分支 | `main` |
-| 当前提交 | v1.17.0 功能主体（前一代 `163c250` 为 v1.16.9 收尾） |
-| 当前标签 | v1.17.0 待推送（构建结果见发布补记） |
+| 当前提交 | v1.17.1 发布收尾之后的 v1.17.2 本地未提交改动 |
+| 当前标签 | `v1.17.1` 已发布；v1.17.2 尚未创建 tag |
 | Android applicationId | `cc.flya.maimate` |
-| App 版本 | `1.17.0`（Android versionCode `36`） |
+| App 版本 | `1.17.2`（Android versionCode `38`） |
 | 下载站 | <https://maimate.flya.ccwu.cc/>（Cloudflare Pages 直传项目 `maimate-landing`） |
 | 稳定 APK 地址 | <https://maimate.flya.ccwu.cc/MaiMate-latest.apk> |
 | APK 来源 | GitHub Release 资产 `MaiMate-latest.apk`；v1.7.0 起 Pages `_worker.js` 改为代理 `releases/latest/download/MaiMate-latest.apk`（自动跟随最新 Release） |
 | 最新 Release APK SHA-256（v1.15.1） | `75c1debd58af7b7401da72d9264eb2387e834527b044f680b5e06dc88a16c89c`（CI「Print APK checksum」步骤输出） |
 | 最新 Release APK 大小 | 62,552,316 bytes（59.6 MB） |
+| 下载站同步状态 | v1.17.2 官网静态素材已在 `.landing-deploy/` 本地更新，尚未执行 Cloudflare 部署；公网仍以 v1.17.1 发布证据为准 |
 | 下载站同步状态 | 已部署：v1.15.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | 下载站同步状态 | 已部署：v1.14.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
 | 下载站同步状态 | 已部署：v1.11.0 SHA/大小已回填并经 wrangler 部署 Pages，线上校验落地页与 `/MaiMate-latest.apk` |
@@ -124,9 +125,9 @@ MaiMate 是一款面向 MaimaiDX（舞萌DX）街机玩家的手机辅助 App：
 | 推分计划 | 已完成基础版本 | 添加、删除、目标分数和本地持久化；详情页支持自定义目标，顺序/备注字段仍兼容旧数据 |
 | 随机抽歌 | 已完成基础版本，v1.7.0 调整 | 推分计划、全曲、按条件三种模式；结果与动画目标一致；v1.7.0 起「按条件」模式抽选时自动收起条件面板并显示展开/收起切换按钮，避免结果卡被抽选按钮挤压遮挡 |
 | 歌曲详情 | 已完成基础版本 | 定数、等级、Note 分布、谱师、封面、Rating 预估；v1.7.0 修复定数信息行过长时把右侧 Total Notes 挤出屏幕的问题（信息块 `minWidth: 0` 弹性收缩） |
-| Rating 预估 | Phase1 已完成，v1.9.0 可折叠 | 使用完整 Diving-Fish 系数表；官方定数与 fit_diff 严格分开；宴会場不计算官方 Rating；v1.9.0 起默认折叠，收起摘要显示「定数 · 100.5% → Rating」，详情页板块可配置默认折叠 |
+| Rating 预估 | Phase1 已完成，v1.9.0 可折叠 | 使用完整 Diving-Fish 系数表；官方定数与 fit_diff 严格分开；宴会場不计算官方 Rating；v1.17.2 起新默认全部展开（已有用户设置保留），详情页板块仍可配置默认折叠 |
 | 版本显示 | Phase1 已完成 | 保留 Diving-Fish 原始 `from`，并提供舞萌DX/年份国区展示名 |
-| 曲库排序 | Phase2 已完成 | 歌曲名升/降序与选定难度官方定数升/降序；缺失定数末尾并高亮排序难度 |
+| 曲库排序 | Phase2 已完成，v1.17.1–v1.17.2 增强 | 歌曲名、官方定数、拟合定数与本机成绩排序；成绩排序按指定难度（默认 Master），卡片直接显示达成率并标注 FC/AP 状态 |
 | 推分计划目标 | Phase2 已完成 | 只展示条目选定难度；支持目标达成率、目标 Rating 和导入成绩 |
 | 自定义推分弹窗/Toast | 已完成 | 不使用 Android 原生确认弹窗 |
 | 更新/下载入口 | 已完成 | 曲库页可打开下载站 |
@@ -1087,3 +1088,15 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 
 - 用户反馈与处置：① 曲库与推分计划新增「成绩高 → 低」排序——按选中难度的本机达成率排序，无成绩排末尾，排序难度未指定时默认 Master（`app/(tabs)/index.tsx`、`app/(tabs)/plan.tsx`、`app/(tabs)/settings/sort.tsx`、`src/store/music-store.ts`、`src/components/FilterBar.tsx`）；② 成绩 / 官方定数 / 拟合定数排序支持指定难度，未选时默认 Master，曲库卡片在选中难度旁标注本机成绩（`src/components/SongCard.tsx`、`src/data/music-list.ts`）；③ P1/P2 排序重建修复——推分计划条目解析与排序维度按真实谱面重建（`src/data/plan-entries.ts`：新增按真实成绩所在谱面的 SD/DX 类型解析索引，`chartKeyOf` 以 `(songId, 真实type, 难度)` 为成绩键、WeakMap 按数组身份缓存索引），计划卡片新增「排序成绩」行，条目难度与排序难度不同时也能一眼看到用于排序的本机达成率（`src/components/PlanEntryCard.tsx`、`PlanDragList.tsx`）；④ 抽歌「已达目标」判定修复——计划条目 SD/DX 类型缺失或写错时按真实成绩所在谱面解析，达标计数不再偏大（`app/(tabs)/random.tsx` 与计划共用同一 `plan-entries` 解析口径）；⑤ AP50 统计拆成「AP」「AP+」两项分别展示，详情页与分享卡同步（`app/b50.tsx`、`src/components/Ap50ShareCard.tsx`）；⑥ B50 / AP50 页面去掉「服务器 RA」干扰信息，聚焦本页数据；⑦ 完成率损失卡更新「每 2550 落 ≈ N Tap（Great）」等效容错提示（P·2550 判定档，`src/components/AchievementLossCard.tsx`）；⑧ 完成率损失表格新增分割线并统一行高，判定列滚动更易读；⑨ 云构建/下载站改为版本化 APK 文件名 `MaiMate-v1.17.1.apk` 与 `MaiMate-latest.apk` 并存（`.github/workflows/build-apk.yml`、`docs/BUILD.md`），便于区分历史版本。更新日志浮层补 1.17.1 条目（`src/data/changelog.ts`）；feature-check 增补成绩排序与真实谱面解析用例（`scripts/feature-check.ts`）。
 - 回归与版本：八组门禁全绿（lint / test:routes / test:features / test:phase-af / test:rating / test:backup / test:update / test:match）；`expo-doctor` 21/21；`expo export --platform android` 通过；`app.json` 升 `1.17.1`/versionCode `37`。发布补记（当日）：功能提交 `2e37da31c4f58f45a24d45855e9220a59fec826b`（25 文件 +742/−227）；附注标签 `v1.17.1` 已推送。云构建 run `33950192118` 一次成功。Release 为 <https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.17.1>；资产 `MaiMate-v1.17.1.apk` 与 `MaiMate-latest.apk` 均为 `62,375,776` bytes（59.5 MB），SHA-256 `82175e12004f505a731c8521378a5259fbbd32cc52b259d8b890b723a3e2a7a1`（GitHub digest 与本地下载资产复算一致）。落地页更新 v1.17.1 文案、日志与 SHA 后经 wrangler 部署 Pages（deployment `8b68ae6a.maimate-landing.pages.dev`，deployment ID `8b68ae6a-d652-49a1-80fe-9d72cbf90ee0`，production）；线上校验：落地页 <https://maimate.flya.ccwu.cc/> 200 且含 v1.17.1 与新 SHA、下载按钮 latest 直链保留，版本化 Release URL 与 latest URL 均 302→200 / content-length `62,375,776` 与资产一致（latest 资产完整下载复算 SHA 与版本化资产一致）。等待用户真机验收（成绩排序与默认 Master、计划卡「排序成绩」行、抽歌达标计数不再偏大、AP50 双项统计、B50/AP50 去服务器 RA、每 2550 落等效容错、损失表对齐、版本化 APK 直链与 latest 并存）。
+
+### v1.17.2（2026-09-06，第十八轮用户反馈；本地实施）
+
+- 用户目标：成绩排序只显示数值并在旁标注 FC/FC+/AP/AP+ 颜色；官方 DX Rating 使用粉色；官网简洁化并使用真实图标、把更新日志移到次级页面；厘清 covers 缓存归属；详情页四板块默认展开；曲库新增回到顶部按钮。
+- 实际修改：新增 `src/components/ScoreValue.tsx`，`SongCard` 与 `PlanEntryCard` 的排序成绩改为数值 + 清谱状态；`RatingPanel` 官方值改为粉色；`CoverImage` 的 `preferFull` 改用 `resolveCoverCacheUriFull`；新增 `src/data/storage-paths.ts` 并修正 `storage-usage.ts` 的 covers/thumbs/full 统计与其它缓存排除；详情板块默认配置改为全部展开；曲库 `FlatList` 增加安全区感知的回顶按钮。
+- 官网修改：重写 `.landing-deploy/index.html`，新增 `.landing-deploy/changelog.html`，复制应用图标到 `.landing-deploy/icon.png`；首页保持 GitHub latest 下载直链，完整更新日志移到次级页面。
+- 版本修改：`package.json`、`package-lock.json`、`app.json` 升至 `1.17.2` / Android versionCode `38`；`src/data/changelog.ts` 已追加 v1.17.2。
+- covers 口径：`cache/covers/` 是 MaiMate 曲绘缓存根目录，其中 `thumbs/` 为列表缩略图、`full/` 为详情原图；整个 covers 目录只计入曲绘缓存，不应重复计入其它缓存。当前详情页原图缓存调用已修正。
+- 状态：代码与静态官网素材已修改；尚未执行提交、tag、GitHub Actions、APK 构建或 Cloudflare 部署；Android 真机验收待设备。
+- 验证证据：`npm run lint`、`test:routes`、`test:features`、`test:phase-af`、`test:rating`、`test:backup`、`test:update`、`test:match`、`npx expo-doctor`（21/21）、`npx expo export --platform android --no-bytecode`、`git diff --check` 均通过；Expo 补丁依赖已对齐到 expo 57.0.21 / expo-router 57.0.20。
+- 人类需要确认：是否继续创建提交、触发 v1.17.2 云构建并部署下载站；未获得明确发布指示前不执行外部发布。
+- 下一步：完成本地验证，读回变更文件并根据测试结果修正问题。

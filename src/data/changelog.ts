@@ -11,6 +11,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.17.2',
+    date: '2026-09-06',
+    highlights: [
+      '成绩排序直接显示达成率数值；FC / FC+ 使用绿色，AP / AP+ 使用橙色，不再显示多余的「成绩」前缀',
+      'DX Rating 预估中，官方定数对应的 DX Rating 统一使用粉色，拟合 Rating 保持独立颜色',
+      '详情页四个可收起板块默认全部展开，已有用户的手动设置继续保留',
+      '曲绘缓存 covers/thumbs 与 covers/full 只计入曲绘缓存，不再重复计入其它缓存；详情页原图使用 full 缓存',
+      '曲库下滑后新增右下角「↑ 顶部」悬浮按钮，官网首页改为简洁布局并使用应用真实图标',
+      '完整更新日志移到官网次级页面，APK 下载直链保持不变',
+    ],
+  },
+  {
     version: '1.17.1',
     date: '2026-09-05',
     highlights: [

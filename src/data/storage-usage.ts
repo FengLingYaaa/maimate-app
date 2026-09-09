@@ -12,6 +12,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { File, Directory } from 'expo-file-system';
 import { clearCoverCache } from './cover-cache';
 import { clearCoverFullLru } from './cover-lru';
+import { isCacheDirectoryNamed, isCoversCacheDirectory } from './storage-paths';
+export { isCacheDirectoryNamed, isCoversCacheDirectory } from './storage-paths';
 
 export interface StorageBreakdown {
   /** 成绩与计划数据（AsyncStorage 全量）字节。 */
@@ -90,9 +92,8 @@ function measureCovers(coversUri: string): { bytes: number; count: number; thumb
         const sub = measureDirectoryWithFileApi(item.uri);
         result.bytes += sub.bytes;
         result.count += sub.count;
-        const name = item.name || '';
-        if (name === 'thumbs') result.thumbCount = sub.count;
-        else if (name === 'full') result.fullCount = sub.count;
+        if (isCacheDirectoryNamed(item.uri, 'thumbs')) result.thumbCount = sub.count;
+        else if (isCacheDirectoryNamed(item.uri, 'full')) result.fullCount = sub.count;
       }
     }
     return result;
@@ -102,15 +103,15 @@ function measureCovers(coversUri: string): { bytes: number; count: number; thumb
 }
 
 /** cache 根目录一级子项里 covers 之外的字节与明细。 */
-function measureOtherCache(cacheUri: string, coversDirName: string): { bytes: number; items: Array<{ name: string; bytes: number }> } {
+function measureOtherCache(cacheUri: string): { bytes: number; items: Array<{ name: string; bytes: number }> } {
   try {
     const cacheDir = new Directory(cacheUri);
     if (!cacheDir.exists) return { bytes: 0, items: [] };
     let bytes = 0;
     const items: Array<{ name: string; bytes: number }> = [];
     for (const item of cacheDir.list()) {
-      // v1.16.7：用 URI 后缀判定（部分平台上 name 可能带路径成分，等值比较曾漏判 covers）。
-      if (item.uri.endsWith(`/${coversDirName}`)) continue;
+      // v1.17.2：整个 covers 根目录归入曲绘缓存，不能重复计入其它缓存。
+      if (isCoversCacheDirectory(item.uri)) continue;
       const size = item instanceof File ? item.size : item instanceof Directory ? item.size ?? 0 : 0;
       if (size > 0) items.push({ name: item.name || item.uri.split('/').filter(Boolean).pop() || item.uri, bytes: size });
       bytes += size;
@@ -127,7 +128,7 @@ export async function measureStorageBreakdown(): Promise<StorageBreakdown> {
   const dataBytes = await measureAsyncStorage();
   const cacheUri = FileSystem.cacheDirectory;
   const cover = cacheUri ? measureCovers(`${cacheUri}covers/`) : { bytes: 0, count: 0, thumbCount: 0, fullCount: 0 };
-  const other = cacheUri ? measureOtherCache(cacheUri, 'covers') : { bytes: 0, items: [] as Array<{ name: string; bytes: number }> };
+  const other = cacheUri ? measureOtherCache(cacheUri) : { bytes: 0, items: [] as Array<{ name: string; bytes: number }> };
   return { dataBytes, coverBytes: cover.bytes, coverCount: cover.count, coverThumbCount: cover.thumbCount, coverFullCount: cover.fullCount, otherBytes: other.bytes, otherItems: other.items };
 }
 
@@ -150,8 +151,8 @@ export async function clearOtherCache(): Promise<boolean> {
     const cacheDir = new Directory(cacheUri);
     if (!cacheDir.exists) return false;
     for (const item of cacheDir.list()) {
-      // v1.16.7：URI 后缀判定，避免误删 covers。
-      if (item.uri.endsWith('/covers')) continue;
+      // v1.17.2：URI 分类排除整个 covers 根目录，清理其它缓存不会误删曲绘。
+      if (isCoversCacheDirectory(item.uri)) continue;
       try {
         item.delete();
         removed = true;

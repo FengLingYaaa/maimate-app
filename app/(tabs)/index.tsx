@@ -6,13 +6,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMusicStore, useScoreStore, useSettingsStore } from '../../src/store';
 import { SongCard, FilterBar, TitleRecognizer } from '../../src/components';
 import { Colors } from '../../src/constants';
-import { getMatchingDifficultyIndices, getFitChartConstant, getMusicSearchScore, MusicList, buildScoreIndex, getMusicScore } from '../../src/data/music-list';
+import { getMatchingDifficultyIndices, getFitChartConstant, getMusicSearchScore, MusicList, buildScoreIndex } from '../../src/data/music-list';
 import { getChinaVersionOptions, getVersionOptions } from '../../src/data/version-catalog';
 import { computeB50 } from '../../src/data/b50';
 import type { FilterOptions, MusicData } from '../../src/data/types';
+import { LIST_BOTTOM_INSET } from '../../src/constants/layout';
 
 function formatCacheTime(timestamp: number | null): string {
   if (!timestamp) return '尚未同步';
@@ -21,6 +23,9 @@ function formatCacheTime(timestamp: number | null): string {
 
 export default function SongBrowser() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const libraryListRef = useRef<FlatList<MusicData>>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const [titleRecognizerVisible, setTitleRecognizerVisible] = useState(false);
   const restoreTitleRecognizerOnFocus = useRef(false);
   // v1.17.0：曲库默认不加载全曲，首屏只保留搜索/筛选栏与「加载全曲」按钮，
@@ -96,6 +101,14 @@ export default function SongBrowser() {
     setLibraryLoaded(true);
   }, [applyFilters, scoreIndex]);
 
+  const handleLibraryScroll = useCallback((event: { nativeEvent: { contentOffset: { y: number } } }) => {
+    setShowScrollTop(event.nativeEvent.contentOffset.y > 240);
+  }, []);
+
+  const scrollLibraryToTop = useCallback(() => {
+    libraryListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
+
   const genres = useMemo(() => [...new Set(rawData.map(m => m.basic_info.genre))].sort(), [rawData]);
   const versionOptions = useMemo(() => getVersionOptions(rawData), [rawData]);
   const chinaVersionOptions = useMemo(() => getChinaVersionOptions(rawData), [rawData]);
@@ -141,11 +154,11 @@ export default function SongBrowser() {
     if (!isFitSort) return null;
     return getFitChartConstant(music, index, chartStats);
   }, [isFitSort, chartStats]);
-  // v1.17.1：成绩排序时，行内徽章旁标注选中难度的本机达成率（无成绩显示 —）。
+  // v1.17.2：成绩排序时，行内徽章旁直接展示数值和 FC/AP 状态（无成绩显示 —）。
   const getScoreForDifficulty = useCallback((music: MusicData) => (index: number) => {
     if (!isScoreSort) return null;
-    return getMusicScore(music, index, scoreIndex);
-  }, [isScoreSort, scoreIndex]);
+    return scores.find(score => score.songId === music.id && score.type === music.type && score.difficultyIndex === index) ?? null;
+  }, [isScoreSort, scores]);
   const hasChartHighlightFilter = Boolean(
     filters.charter?.trim()
       || filters.difficulty !== undefined
@@ -190,6 +203,7 @@ export default function SongBrowser() {
 
       {/* 歌曲列表 */}
       <FlatList
+        ref={libraryListRef}
         data={displaySongs}
         keyExtractor={item => `${item.id}-${item.type}`}
         renderItem={({ item }) => {
@@ -212,7 +226,7 @@ export default function SongBrowser() {
             </View>
           );
         }}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: LIST_BOTTOM_INSET + insets.bottom }]}
         ListEmptyComponent={
           !libraryLoaded ? (
             <View style={styles.empty}>
@@ -231,10 +245,22 @@ export default function SongBrowser() {
           )
         }
         onEndReachedThreshold={0.5}
+        onScroll={handleLibraryScroll}
+        scrollEventThrottle={64}
         removeClippedSubviews={true}
         maxToRenderPerBatch={20}
         windowSize={10}
       />
+
+      {libraryLoaded && displaySongs.length > 0 && showScrollTop && (
+        <Pressable
+          style={[styles.scrollTopButton, { bottom: 12 + insets.bottom }]}
+          onPress={scrollLibraryToTop}
+          accessibilityLabel="回到曲库顶部"
+        >
+          <Text style={styles.scrollTopButtonText}>↑ 顶部</Text>
+        </Pressable>
+      )}
 
       <TitleRecognizer
         visible={titleRecognizerVisible}
@@ -307,6 +333,20 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     paddingBottom: 80,
   },
+  scrollTopButton: {
+    position: 'absolute',
+    right: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 22,
+    backgroundColor: Colors.accent.primary,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+  },
+  scrollTopButtonText: { fontSize: 12, fontWeight: '900', color: '#fff' },
   empty: {
     alignItems: 'center',
     paddingTop: 80,

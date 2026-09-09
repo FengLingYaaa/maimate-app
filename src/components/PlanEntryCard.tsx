@@ -6,6 +6,7 @@ import { formatClearStatus } from '../data/status-labels';
 import { getOfficialChartConstant } from '../data/music-list';
 import { computeB50Gain } from '../data/b50';
 import { CoverImage } from './CoverImage';
+import { ScoreValue } from './ScoreValue';
 import type { MusicData, PlanEntry, PlayerScore } from '../data/types';
 
 interface Props {
@@ -99,9 +100,10 @@ export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, 
           <Text style={styles.scoreText}>当前成绩：{formatAchievement(importedScore.achievement)} · DX {importedScore.dxScore}{importedScore.fc ? ` · ${formatClearStatus(importedScore.fc)}` : ''}{importedScore.fs ? ` · ${formatClearStatus(importedScore.fs)}` : ''}{importedScore.serverRating === undefined ? '' : ` · RA ${importedScore.serverRating}`}</Text>
         ) : <Text style={styles.scoreMuted}>当前成绩：尚未导入或没有匹配的成绩</Text>}
         {showSortScoreRow && (
-          <Text style={sortScore ? styles.sortScoreText : styles.scoreMuted}>
-            排序成绩（{sortDifficultyLabel}）：{sortScore ? formatAchievement(sortScore.achievement) : '—'}
-          </Text>
+          <View style={styles.sortScoreRow}>
+            <Text style={styles.sortScoreLabel}>{sortDifficultyLabel}</Text>
+            <ScoreValue score={sortScore} style={styles.sortScoreValue} />
+          </View>
         )}
         {entry.targetScore !== undefined && achieved && (
           <Text style={[styles.progressText, styles.progressTextDone]}>已达标 ✓</Text>
@@ -148,7 +150,9 @@ const styles = StyleSheet.create({
   warning: { fontSize: 10, lineHeight: 14, color: Colors.functional.warning },
   scoreText: { fontSize: 11, lineHeight: 16, color: Colors.functional.success },
   scoreMuted: { fontSize: 11, color: Colors.text.muted },
-  // v1.17.1：排序成绩行（排序难度与条目难度不同且有成绩时），与绿色「当前成绩」行区分。
-  sortScoreText: { fontSize: 11, lineHeight: 16, color: Colors.accent.secondary },
+  // v1.17.2：排序行只保留难度标签、成绩数值和 FC/AP 状态。
+  sortScoreRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sortScoreLabel: { fontSize: 10.5, lineHeight: 16, color: Colors.accent.secondary, fontWeight: '700' },
+  sortScoreValue: { flexShrink: 1 },
   note: { fontSize: 11, color: Colors.text.secondary },
 });

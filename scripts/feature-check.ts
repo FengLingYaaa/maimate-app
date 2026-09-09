@@ -21,7 +21,7 @@ import { computeB50, computeB50Gain, B35_SIZE, B15_SIZE } from '../src/data/b50.
 import { computeFit50, sortFit50Entries } from '../src/data/fit50.ts';
 import { computeAp50, AP50_SIZE } from '../src/data/ap50.ts';
 import { buildSnapshotBattleReport } from '../src/data/snapshot-battle.ts';
-import { normalizeSnapshotLimit } from '../src/data/settings-defaults.ts';
+import { DEFAULT_DETAIL_BOARDS, normalizeSnapshotLimit } from '../src/data/settings-defaults.ts';
 import { getCoverCacheFilename, isCoverCacheFileForSong } from '../src/data/cover-cache-names.ts';
 import { buildScoresCsv, CSV_HEADER } from '../src/data/scores-csv-core.ts';
 import { getBilibiliVideoAppUrls } from '../src/data/bilibili-search.ts';
@@ -30,6 +30,7 @@ import { av2bv, bv2av } from '../src/data/bilibili-bvid.ts';
 import { computeAchievementLoss, JUDGMENT_KEYS } from '../src/data/achievement-loss.ts';
 import { generateFortune } from '../src/data/fortune.ts';
 import { buildScoreIndex, getMusicScore, matchesMusic, sortMusicItems } from '../src/data/music-list.ts';
+import { isCacheDirectoryNamed, isCoversCacheDirectory } from '../src/data/storage-paths.ts';
 import {
   getBilibiliCoverCacheFilename,
   getBilibiliCoverExtension,
@@ -304,6 +305,13 @@ assert.notEqual(coverNameA, coverNameB);
 assert.equal(isCoverCacheFileForSong(coverNameA, '123'), true);
 assert.equal(isCoverCacheFileForSong(coverNameA, '456'), false);
 
+// v1.17.2：covers 根目录及其分级子目录归入曲绘缓存，不能计入其它缓存。
+assert.equal(isCoversCacheDirectory('file:///data/cache/covers'), true);
+assert.equal(isCoversCacheDirectory('file:///data/cache/covers/'), true);
+assert.equal(isCoversCacheDirectory('file:///data/cache/not-covers'), false);
+assert.equal(isCacheDirectoryNamed('file:///data/cache/covers/thumbs', 'thumbs'), true);
+assert.equal(isCacheDirectoryNamed('file:///data/cache/covers/full/', 'full'), true);
+
 // v1.12.0：CSV 导出（RFC 4180 转义 + 表头）。
 const csv = buildScoresCsv([{
   songId: '1', title: 'Song, "1"', type: 'DX', difficultyIndex: 4, ds: 14.5, level: '14+',
@@ -373,6 +381,12 @@ assert.equal(normalizeSnapshotLimit(0), 1);
 assert.equal(normalizeSnapshotLimit(5000), 1000);
 assert.equal(normalizeSnapshotLimit(37.9), 38);
 assert.equal(normalizeSnapshotLimit('55'), 55);
+
+// v1.17.2：详情页四个板块的新默认值全部为展开；已有设置由 mergeDetailBoards 另行保留。
+assert.equal(DEFAULT_DETAIL_BOARDS.rating.collapsed, false);
+assert.equal(DEFAULT_DETAIL_BOARDS.achievement.collapsed, false);
+assert.equal(DEFAULT_DETAIL_BOARDS.bilibili.collapsed, false);
+assert.equal(DEFAULT_DETAIL_BOARDS.platform.collapsed, false);
 
 // v1.17.0：抽歌/计划「已达目标」判定按真实 SD/DX type（DX 曲条目 musicType 缺失时仍判对）。
 {

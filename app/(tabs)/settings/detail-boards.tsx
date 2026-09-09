@@ -35,7 +35,7 @@ export default function DetailBoardsSettings() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: '详情页板块', headerStyle: { backgroundColor: Colors.bg.primary }, headerTintColor: Colors.text.primary }} />
-      <Text style={styles.hint}>控制歌曲详情页各板块的上下顺序与默认展开/折叠。折叠只影响打开详情页时的初始状态，点标题仍可随时展开。</Text>
+      <Text style={styles.hint}>控制歌曲详情页各板块的上下顺序与默认展开/折叠。v1.17.2 起四个板块默认展开；这里的设置只影响打开详情页时的初始状态，点标题仍可随时切换。</Text>
 
       <View style={styles.card}>
         {orderedIds.map((id, index) => (
@@ -62,7 +62,7 @@ export default function DetailBoardsSettings() {
         ))}
       </View>
 
-      <Text style={styles.footNote}>默认折叠的两个板块（Rating 预估、完成率损失）在收起时仍会显示一行关键摘要。</Text>
+      <Text style={styles.footNote}>已有用户的手动设置会保留；切换开关后，下一次打开歌曲详情页按这里的初始状态显示。</Text>
     </View>
   );
 }

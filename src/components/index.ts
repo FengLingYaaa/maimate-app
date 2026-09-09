@@ -1,6 +1,7 @@
 export { DifficultyBadge } from './DifficultyBadge';
 export { NoteBar } from './NoteBar';
 export { SongCard } from './SongCard';
+export { ScoreValue } from './ScoreValue';
 export { CoverImage } from './CoverImage';
 export { FilterBar } from './FilterBar';
 export { RangeSlider } from './RangeSlider';

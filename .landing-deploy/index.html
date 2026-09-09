@@ -1,641 +1,82 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>MaiMate 舞萌伴侣</title>
-  <meta name="description" content="MaiMate 舞萌伴侣 — MaimaiDX 手机辅助APP | 推分计划 · 随机抽歌 · 谱面查询">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0f0f1a">
+  <meta name="description" content="MaiMate 舞萌伴侣：为 MaimaiDX 玩家准备的曲库、推分计划与练习工具。">
+  <title>MaiMate · 舞萌伴侣</title>
   <style>
-    :root {
-      --bg: #0f0f1a;
-      --bg-card: #1a1a2e;
-      --bg-card2: #252540;
-      --text: #f0e6ff;
-      --text2: #9888b0;
-      --text3: #5a4a6e;
-      --accent: #ff6b9d;
-      --accent2: #c44dff;
-      --cyan: #00d4ff;
-      --border: rgba(240,230,255,0.12);
-      --success: #3dd68c;
-      --warn: #f0b429;
-    }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, 'PingFang SC', 'Noto Sans SC', 'Segoe UI', sans-serif;
-      line-height: 1.6;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .container { max-width: 480px; width: 100%; padding: 20px 16px 40px; }
-
-    /* Hero */
-    .hero {
-      text-align: center;
-      padding: 32px 0 20px;
-    }
-    .hero-icon {
-      width: 100px;
-      height: 100px;
-      border-radius: 24px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 52px;
-      margin: 0 auto 16px;
-      box-shadow: 0 8px 32px rgba(255,107,157,0.25);
-    }
-    .hero h1 {
-      font-size: 28px;
-      font-weight: 800;
-      background: linear-gradient(135deg, var(--accent), var(--cyan));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .hero .subtitle {
-      font-size: 15px;
-      color: var(--text2);
-      margin-top: 4px;
-      font-weight: 500;
-    }
-
-    /* Badge row */
-    .badges {
-      display: flex;
-      gap: 8px;
-      justify-content: center;
-      margin-top: 12px;
-      flex-wrap: wrap;
-    }
-    .badge {
-      font-size: 11px;
-      padding: 4px 10px;
-      border-radius: 20px;
-      border: 1px solid var(--border);
-      color: var(--text2);
-      font-weight: 600;
-    }
-    .badge.active {
-      background: rgba(255,107,157,0.15);
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-
-    /* Download card */
-    .download-card {
-      background: var(--bg-card);
-      border-radius: 16px;
-      padding: 20px;
-      margin-top: 20px;
-      border: 1px solid var(--border);
-      text-align: center;
-    }
-    .download-card h3 {
-      font-size: 16px;
-      margin-bottom: 4px;
-    }
-    .download-card .info {
-      font-size: 13px;
-      color: var(--text2);
-      margin-bottom: 16px;
-    }
-    .download-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      color: #fff;
-      padding: 14px 32px;
-      border-radius: 14px;
-      font-size: 16px;
-      font-weight: 700;
-      text-decoration: none;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .download-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 24px rgba(255,107,157,0.35);
-    }
-    .download-btn.disabled {
-      opacity: 0.5;
-      pointer-events: none;
-    }
-    .download-hint {
-      font-size: 11px;
-      color: var(--text3);
-      margin-top: 12px;
-    }
-    .size-badge {
-      display: inline-block;
-      background: var(--bg-card2);
-      border-radius: 8px;
-      padding: 4px 10px;
-      font-size: 12px;
-      color: var(--text2);
-      margin-top: 8px;
-    }
-
-    /* Feature grid */
-    .features {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-top: 20px;
-    }
-    .feature {
-      background: var(--bg-card);
-      border-radius: 14px;
-      padding: 16px;
-      border: 1px solid var(--border);
-    }
-    .feature .icon { font-size: 28px; margin-bottom: 8px; }
-    .feature .title { font-size: 14px; font-weight: 700; }
-    .feature .desc { font-size: 12px; color: var(--text2); margin-top: 4px; }
-
-    /* Version log */
-    .changelog {
-      margin-top: 20px;
-    }
-    .changelog h3 {
-      font-size: 14px;
-      color: var(--text2);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 8px;
-    }
-    .changelog .entry {
-      background: var(--bg-card);
-      border-radius: 10px;
-      padding: 12px 14px;
-      margin-bottom: 8px;
-      border: 1px solid var(--border);
-    }
-    .changelog .version {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--accent);
-    }
-    .changelog .date {
-      font-size: 11px;
-      color: var(--text3);
-      margin-left: 8px;
-    }
-    .changelog ul {
-      margin-top: 6px;
-      padding-left: 18px;
-      font-size: 13px;
-      color: var(--text2);
-    }
-    .changelog li { margin-bottom: 2px; }
-
-    /* QR code */
-    .qr-section {
-      text-align: center;
-      margin-top: 20px;
-    }
-    .qr-section p {
-      font-size: 12px;
-      color: var(--text3);
-      margin-top: 8px;
-    }
-
-    /* Footer */
-    footer {
-      text-align: center;
-      margin-top: 32px;
-      padding-top: 16px;
-      border-top: 1px solid var(--border);
-    }
-    footer p {
-      font-size: 11px;
-      color: var(--text3);
-      line-height: 1.8;
-    }
-    footer a {
-      color: var(--cyan);
-      text-decoration: none;
-    }
-    footer a:hover { text-decoration: underline; }
-
-    /* Responsive */
-    @media (max-width: 360px) {
-      .features { grid-template-columns: 1fr; }
-    }
+    :root { --bg:#0f0f1a; --card:#1a1a2e; --card2:#252540; --text:#f0e6ff; --muted:#9888b0; --dim:#5a4a6e; --pink:#ff6b9d; --purple:#c44dff; --cyan:#00d4ff; --border:rgba(240,230,255,.13); }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:radial-gradient(circle at 50% -10%,#292044 0,#0f0f1a 42rem); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans SC",sans-serif; }
+    a { color:inherit; }
+    .page { width:min(100% - 32px,520px); margin:0 auto; padding:30px 0 42px; }
+    .hero { text-align:center; padding:12px 0 20px; }
+    .icon { display:block; width:88px; height:88px; margin:0 auto 16px; border-radius:22px; box-shadow:0 12px 36px rgba(255,107,157,.22); }
+    h1 { margin:0; font-size:32px; letter-spacing:.02em; background:linear-gradient(120deg,var(--pink),var(--purple),var(--cyan)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+    .tagline { margin:6px 0 0; color:var(--muted); font-size:14px; }
+    .hero-links { display:flex; justify-content:center; gap:8px; margin-top:16px; flex-wrap:wrap; }
+    .pill { padding:6px 11px; border:1px solid var(--border); border-radius:999px; color:var(--muted); font-size:11px; text-decoration:none; }
+    .pill:hover { border-color:var(--pink); color:var(--pink); }
+    .card { margin-top:14px; padding:18px; background:rgba(26,26,46,.9); border:1px solid var(--border); border-radius:18px; }
+    .download { text-align:center; }
+    .eyebrow { color:var(--cyan); font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    h2 { margin:5px 0 7px; font-size:18px; }
+    .copy { margin:0; color:var(--muted); font-size:13px; line-height:1.7; }
+    .download-btn { display:inline-flex; margin-top:16px; padding:12px 22px; border-radius:12px; background:linear-gradient(120deg,var(--pink),var(--purple)); color:#fff; text-decoration:none; font-weight:800; font-size:14px; box-shadow:0 8px 24px rgba(255,107,157,.2); }
+    .download-btn:hover { transform:translateY(-1px); }
+    .download-meta { margin:12px 0 0; color:var(--dim); font-size:11px; line-height:1.7; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .feature { padding:14px; background:var(--card2); border-radius:13px; }
+    .feature strong { display:block; font-size:13px; }
+    .feature span { display:block; margin-top:4px; color:var(--muted); font-size:11px; line-height:1.55; }
+    .release { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .release p { margin:5px 0 0; color:var(--muted); font-size:12px; line-height:1.6; }
+    .release a { flex:none; color:var(--pink); font-size:12px; font-weight:800; text-decoration:none; }
+    footer { padding-top:24px; color:var(--dim); text-align:center; font-size:11px; line-height:1.8; }
+    footer a { color:var(--cyan); text-decoration:none; }
+    @media (max-width:380px) { .page { width:min(100% - 24px,520px); } .grid { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
-  <div class="container">
-    <!-- Hero -->
-    <div class="hero">
-      <div class="hero-icon">🎵</div>
+  <main class="page">
+    <header class="hero">
+      <img class="icon" src="./icon.png" alt="MaiMate 应用图标">
       <h1>MaiMate</h1>
-      <p class="subtitle">舞萌伴侣 · MaimaiDX 手机辅助</p>
-      <div class="badges">
-        <span class="badge active">📋 推分计划</span>
-        <span class="badge">🎲 随机抽歌</span>
-        <span class="badge">🎵 谱面查询</span>
-        <span class="badge">⚡ 离线可用</span>
-      </div>
-    </div>
+      <p class="tagline">舞萌伴侣 · 让下一首练什么更简单</p>
+      <nav class="hero-links" aria-label="站内链接">
+        <a class="pill" href="./changelog.html">更新日志</a>
+        <a class="pill" href="https://github.com/FengLingYaaa/maimate-app" target="_blank" rel="noreferrer">GitHub</a>
+      </nav>
+    </header>
 
-    <!-- Download -->
-    <div class="download-card">
-      <h3>📦 下载 MaiMate</h3>
-      <p class="info">当前版本：v1.17.1（Android arm64 内测）</p>
-      <a href="https://github.com/FengLingYaaa/maimate-app/releases/latest/download/MaiMate-latest.apk" class="download-btn" id="dlBtn">
-        ⬇️ 下载 APK（GitHub 直链）
-      </a>
-      <p class="download-hint" id="downloadHint">
-        直接连接 GitHub Releases 下载，无需等待检测
-      </p>
-      <span class="size-badge" id="apkSize">Android · arm64-v8a · 59.5 MB（62,375,776 bytes） · debug 签名</span>
-       <p class="download-hint">SHA-256：<code id="apkSha">82175e12004f505a731c8521378a5259fbbd32cc52b259d8b890b723a3e2a7a1</code></p>
-    </div>
+    <section class="card download">
+      <div class="eyebrow">Android arm64 · 内测版</div>
+      <h2>下载 MaiMate v1.17.2</h2>
+      <p class="copy">曲库、推分计划、随机抽歌、Rating 估算和 OCR 识别，优先在本机保存你的练习上下文。</p>
+      <a class="download-btn" href="https://github.com/FengLingYaaa/maimate-app/releases/latest/download/MaiMate-latest.apk">下载 APK</a>
+      <p class="download-meta">GitHub Release 直链 · 包名 cc.flya.maimate · debug 签名内测包<br>版本化 APK：MaiMate-v1.17.2.apk（发布后与 latest 并存）</p>
+    </section>
 
-    <!-- Features -->
-    <div class="features">
-      <div class="feature">
-        <div class="icon">🎵</div>
-        <div class="title">曲目浏览器</div>
-        <div class="desc">10维筛选：分类/难度/定数/版本/曲师/谱师...</div>
+    <section class="card">
+      <div class="grid">
+        <div class="feature"><strong>曲库查询</strong><span>按难度、定数、版本、谱师和成绩筛选歌曲。</span></div>
+        <div class="feature"><strong>推分计划</strong><span>记录目标、成绩和练习顺序，机厅内快速选歌。</span></div>
+        <div class="feature"><strong>随机抽歌</strong><span>从全曲、计划或条件池中抽取下一首练习曲。</span></div>
+        <div class="feature"><strong>离线优先</strong><span>曲库、计划和本机成绩在设备上保存，网络只负责更新。</span></div>
       </div>
-      <div class="feature">
-        <div class="icon">📋</div>
-        <div class="title">推分计划</div>
-        <div class="desc">标记练习目标，有序排序，机厅不再迷茫</div>
-      </div>
-      <div class="feature">
-        <div class="icon">🎲</div>
-        <div class="title">滚筒抽歌</div>
-        <div class="desc">模拟洗衣机滚筒，按条件随机抽选练习曲</div>
-      </div>
-      <div class="feature">
-        <div class="icon">⚡</div>
-        <div class="title">离线可用</div>
-        <div class="desc">曲库本地缓存，机厅地下信号差也不怕</div>
-      </div>
-    </div>
+    </section>
 
-    <!-- Changelog -->
-    <div class="changelog">
-      <h3>📝 更新日志</h3>
-      <div class="entry">
-        <span class="version">v1.17.1 · Android 内测</span><span class="date">2026-09-05</span>
-        <ul>
-          <li>曲库与推分计划新增「成绩高 → 低」排序：按选中难度的本机达成率排，无成绩排末尾，默认 Master。</li>
-          <li>成绩 / 官方定数 / 拟合定数排序支持指定难度，未选时默认 Master；曲库卡片在选中难度旁标注本机成绩。</li>
-          <li>推分计划卡片新增「排序成绩」行：条目难度与排序难度不同时也能一眼看到用于排序的本机达成率。</li>
-          <li>抽歌「已达目标」判定修复：计划条目 SD/DX 类型缺失或写错时按真实成绩所在谱面解析，达标计数不再偏大。</li>
-          <li>AP50 统计拆成「AP」「AP+」两项分别展示，详情页与分享卡同步。</li>
-          <li>B50 / AP50 页面去掉「服务器 RA」干扰信息，聚焦本页数据。</li>
-          <li>完成率损失卡更新「每 2550 落 ≈ N Tap（Great）」等效容错提示。</li>
-          <li>完成率损失表格新增分割线并统一行高，判定列滚动更易读。</li>
-          <li>下载站提供版本化 APK 文件名（MaiMate-v1.17.1.apk），与 latest 并存便于区分历史版本。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.17.0 · Android 内测</span><span class="date">2026-09-04</span>
-        <ul>
-          <li>抽歌「不含已达标」计数修复：达标判定按真实 SD/DX 谱面，计划与抽歌口径统一（此前 DX 曲易漏判）。</li>
-          <li>曲库首屏不再加载全曲，改为居中「加载全曲」按钮，点击或搜索/筛选后才加载，启动更轻快。</li>
-          <li>搜索提速：预归一化标题/曲师/谱师缓存并去重，反复检索不重复计算。</li>
-          <li>AP50 明细：汇总显示「AP（含 AP+）N / AP+ M」，榜单与分享卡同步。</li>
-          <li>快照推分战报：有 RA 加分（提升 B50）的曲目置顶排序。</li>
-          <li>推分计划：把「全部 / 已达标 / 未达标」筛选移到进度环右侧，填补空白。</li>
-          <li>清除搜索后进度条不再残留。</li>
-          <li>信息查询页 B50 入口描述补充 AP50；空位统一显示「-」。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.16.9 · Android 内测</span><span class="date">2026-09-03</span>
-        <ul>
-          <li>新增 AP50 榜单：达成 AP / AP+ 的谱面按 RA 取前 50，未满留空位，支持分享卡。</li>
-          <li>识别匹配大修：单字符差异（α→a、0→O）与粘连行都能命中；《39》等纯数字短曲名不再被误屏蔽。</li>
-          <li>搜索纯数字四级规则：ID 精确 > 标题精确（《39》可搜到）> ID 前缀 > 短数字子串，搜「1」不再出噪音。</li>
-          <li>搜索体验：按钮内转圈 + 进度条立即出现，占位文案缩短不再换行。</li>
-          <li>完成率损失表：音符类型列固定，横向滚动只动数据列。</li>
-          <li>曲绘缓存统计修复：缩略图 / 原图分列显示真实张数（此前恒为 0）。</li>
-          <li>成绩状态显示规范化：fcp→FC+、app→AP+、fsd→FDX。</li>
-          <li>战报推分去掉「RA（B50）」冗余后缀，直接显示 RA。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.16.8 · Android 内测</span><span class="date">2026-08-30</span>
-        <ul>
-          <li>曲绘分级缓存：列表用低清缩略图，详情页大图按需加载原图（LRU 上限 80 张），曲绘总体积有硬上限。</li>
-          <li>曲绘不再写入系统图片缓存，「其它缓存」恢复干净并新增明细子项，可一键清理。</li>
-          <li>纯数字搜索短路：搜 ID 秒出结果且无噪音；搜索评分+过滤一趟分片完成，新增真实进度条，卡顿移除。</li>
-          <li>成绩图噪音行过滤：BREAK/PERFECT/百分比等 UI 文字不再干扰识别，《Break!Break!Break!》等真曲名不受影响。</li>
-          <li>修复：识别中删除图片不再出现迟到结果复活。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.16.7 · Android 内测</span><span class="date">2026-09-02</span>
-        <ul>
-          <li>歌曲详情页新增数字 ID 展示。</li>
-          <li>修复：曲绘缓存不再被误统计进「其它缓存」。</li>
-          <li>导出成绩 CSV 独立页面，与数据备份同款「仅保存 / 保存并分享」。</li>
-          <li>识别重构为增量匹配：删除单张图不再全量重扫，卡顿根因移除；原始文字默认折叠。</li>
-          <li>搜索改为确认式：按「搜索」按钮后才检索，显示匹配进度。</li>
-          <li>快照对比战报行可点击跳转详情页，返回回到快照页。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.16.6 · Android 内测</span><span class="date">2026-08-29</span>
-        <ul>
-          <li>修复：战报 RA（B50）只在为正时显示，不再出现 +0。</li>
-          <li>修复：存储占用统计——曲绘缓存改用新 File API，新增「其它缓存」分项与清理。</li>
-          <li>搜索支持按歌曲 ID：输入纯数字直接按 ID 匹配。</li>
-          <li>导出 CSV / 备份 JSON：可选「仅保存到所选目录」或「保存并分享」。</li>
-          <li>移除音乐/音频相关权限申请，APK 不再包含任何音频权限。</li>
-          <li>三种抽歌模式均有独立历史记录与「今日不重复优先」，计数改为按次数。</li>
-          <li>拍照识别：修复删图按钮、放宽缺字母匹配、结果上限提升到 12 首。</li>
-          <li>清空推分计划大幅提速。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.16.5 · Android 内测</span><span class="date">2026-08-29</span>
-        <ul>
-          <li>性能：修复推分计划滑动与「到底」跳转卡顿、闪退（B50 计算加缓存 + 列表渲染优化）。</li>
-          <li>修复：战报对比改为显示该曲成绩对 DX Rating 总分的真实影响（B50 总分差）。</li>
-          <li>搜索历史：长按进入管理模式，右上角 × 删单条，行尾可一键清空。</li>
-          <li>新增：设置页「存储占用」——应用本体/成绩数据/曲绘缓存分项展示并可清理。</li>
-          <li>修复：今日舞萌运势曲绘改为正方形完整展示，不再裁切。</li>
-          <li>移除：成绩曲线板块（v1.16.4 试验功能下线）。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.16.4 · Android 内测</span><span class="date">2026-08-29</span>
-        <ul>
-          <li>修复：快照管理页新增标题与返回键，文字不再被手机上边栏遮挡。</li>
-          <li>修复：战报对比中 B50 榜内曲目现在正确显示 +N RA（B50）。</li>
-          <li>搜索历史支持长按删除单条记录（曲库/计划/牌子通用）。</li>
-          <li>歌曲详情新增「成绩曲线」：从本地快照回看这条谱面的达成率变化。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.16.3 · Android 内测</span><span class="date">2026-08-29</span>
-        <ul>
-          <li>快照管理独立成顶级页面，彻底修复跳转到设置页的问题。</li>
-          <li>战报对比的 RA 数值改为「对 B50 的影响」：仅 B50 榜内谱面显示 +N RA（B50）。</li>
-          <li>推分计划「到底部」悬浮按钮移到真正的右下角。</li>
-          <li>计划卡片已设目标的条目隐藏「点击重新选择」，卡片更紧凑。</li>
-          <li>新增计划查漏：提醒计划中还没有成绩记录的曲目，可展开查看并直达详情。</li>
-          <li>下载站改为 GitHub 直链，去掉「检查下载地址」检测步骤。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.16.2 · Android 内测</span><span class="date">2026-08-29</span>
-        <ul>
-          <li>曲库拟合定数标注改为两位小数、去掉 fit 前缀，难度更易保持一行。</li>
-          <li>推分计划新增右下角「到底部」悬浮按钮，已在底部时自动隐藏。</li>
-          <li>成绩同步后，新达标的曲目自动移到推分计划最下侧（设置中可关闭）。</li>
-          <li>从计划抽歌默认排除已达标曲目，并优先抽取今天没抽过的谱面。</li>
-          <li>新增抽歌历史：回看最近 7 天每天抽了哪些谱面。</li>
-          <li>牌子页一键导入后可一键为全部新谱面设置 100% 目标。</li>
-          <li>移除 nb50「榜外还有…」提示板块。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.16.1 · Android 内测</span><span class="date">2026-08-28</span>
-        <ul>
-          <li>修复：设置页次级页面（快照管理、检查更新等）无法进入的问题。</li>
-          <li>修复：推分计划环形进度条不显示进度。</li>
-          <li>搜索历史按页面分开记忆，曲库与计划互不干扰。</li>
-          <li>新增 nb50 挤榜提示：榜满时显示距挤掉第 50 名还差多少单谱 Rating。</li>
-          <li>新增版本更新日志浮层：升级后首次启动展示当版更新内容。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.16.0 · Android 内测</span><span class="date">2026-08-28</span>
-        <ul>
-          <li>全新应用图标：八色分段街机环，致敬 maimai 机台（含 Android 13 主题图标）。</li>
-          <li>曲库新增「拟合定数」排序（高→低 / 低→高），启用时难度徽章旁标注拟合定数。</li>
-          <li>推分计划进度环重做：环形进度条按完成比例填充并变色。</li>
-          <li>推分战报汇总加入「DX Rating」变化值（页面与分享卡同步）。</li>
-          <li>B50 / nb50 总览默认网格展示；nb50 全面替换 FIT50 简写。</li>
-          <li>修复：切走再切回设置页误入快照管理；保存相册的废弃 API 告警。</li>
-          <li>按反馈移除牌子页分享功能。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.15.2 · Android 内测</span><span class="date">2026-08-28</span>
-        <ul>
-          <li>分享卡片一行 5 个修复（上一版仍为 4 个）；歌曲详情分享预览不再错位、存相册恢复可用。</li>
-          <li>试做「推分战报」与「牌子完成度」分享卡：战报可从快照对比直接生成图片，牌子页按当前筛选出完成度卡片。</li>
-          <li>完成率损失板块「等效容错」改为固定口径：101%→100.5% 可折合的 Tap(Great) 数，无成绩也显示。</li>
-          <li>曲库新增搜索历史（最近 5 条，点击复用）。</li>
-          <li>推分战报精简为「新增 / 上分 / 服务器 RA」；推分计划卡片删去「还差…」行。</li>
-          <li>下载站 APK 改为 GitHub 直链跳转，下载更快更稳。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.15.1 · Android 内测</span><span class="date">2026-08-28</span>
-        <ul>
-          <li>新增「信息查询」底部入口（🔎）：牌子查询、今日运势、B50 总览、快照管理聚合一处，底栏更清爽。</li>
-          <li>拟合 50 入口修复：B50 总览顶栏下方新增「B50 / 拟合50」切换（上一版切换按钮未渲染出来）。</li>
-          <li>分享卡片修复为每行 5 个，预览支持上下滚动查看完整卡片；卡片曲绘左上角展示歌曲 ID。</li>
-          <li>完成率损失板块新增「等效容错」：至多几个 Tap 打 Great 仍能保持 100.5% 以上。</li>
-          <li>存相册权限请求改为「仅添加照片」模式（iOS），减少权限疑虑；移除推分计划「缺口优先」排序。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.15.0 · Android 内测</span><span class="date">2026-08-28</span>
-        <ul>
-          <li>新增「拟合 50」：按拟合定数计算 Rating 的全库单榜，B50 总览一键切换；支持列表/网格、按 Rating 或按拟合定数排序、长按多选入计划。</li>
-          <li>分享卡片改为表格布局：旧曲 35 在上、新曲 15 在下，每格难度色外框 + 定数 + Rating + 完成率底纹；拟合 50 同款全 50 格卡片。</li>
-          <li>快照对比升级「推分战报」：逐曲展示曲绘、曲名、难度与 ±Rating，汇总本次更新推了多少分。</li>
-          <li>快照保留数量默认提升到 20 次，设置页可调（最多 1000 次，调高会提示存储占用）。</li>
-          <li>推分计划新增「缺口优先」排序（目标 Rating 差距大者优先）；网格完成率新增底纹进度条。</li>
-          <li>修复：B50 顶栏与状态栏重合、新曲/旧曲切换按钮消失、计划底部残余遮挡；歌曲详情页点曲绘可看大图；界面精简两处冗余说明。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.14.0 · Android 内测</span><span class="date">2026-08-28</span>
-        <ul>
-          <li>查分分享卡片全面升级：生成前可预览大图，支持一键保存到相册（自动建立 MaiMate 相簿）；修复进详情页误触分享、B50 分享无反应两个问题。</li>
-          <li>B50 网格：完成率三档着色（≥100.5 金 / ≥100 绿）；正榜与同分曲目之间加分隔条；长按进入多选模式批量加入推分计划（已在计划中的默认打钩）。</li>
-          <li>推分计划：修复最后一首被底部栏遮挡；进度环改为「达标 x/y」，平均完成率不再虚报 100%；卡片精简为达标标识与「还差**」一行。</li>
-          <li>设置页红点修复：有新版本时会正确点亮（此前会被静默标记为已读）。</li>
-          <li>牌子查询难度直接标注定数（如 MS 14.4）；曲库长曲名不再把 B15/B35 徽标顶出屏幕。</li>
-          <li>新增快照对比：任选两份快照查看记录数、服务器 RA 与逐谱面成绩变化。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.13.0 · Android 内测</span><span class="date">2026-08-28</span>
-        <ul>
-          <li>B50 总览新增图标模式：每行 5 首曲绘，难度色边框、左下定数、右下 Rating、正下方完成率，与列表模式一键切换；长按曲绘快捷加入推分计划。</li>
-          <li>修复：B50 页不再受曲库筛选影响（此前筛选曲目后 B50 只显示筛选结果）。</li>
-          <li>新增查分分享卡片：B50 总览卡与单曲成绩卡一键生成图片分享（带曲绘与难度色徽章）。</li>
-          <li>推分计划进度闭环：页面顶部平均进度环与达标统计，新增「已达标/未达标」过滤；每张卡片显示当前→目标的进度条。</li>
-          <li>牌子查询按 Master 定数从大到小排布；筛选与展开状态本地记忆，下次进入保持；「一键加入 14+」表述改为「一键加入 14 以上谱面」。</li>
-          <li>新增快照管理：设置内查看并删除本地成绩快照。</li>
-          <li>曲库徽标区分 B15/B35；修复推分计划最后一首被下边栏遮挡（列表底部留白加大）。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.12.0 · Android 内测</span><span class="date">2026-08-27</span>
-        <ul>
-          <li>推分计划移除置顶/置底：所有曲目一个分组，长按直接拖拽，不再有分组限制。</li>
-          <li>B50 总览重做：新曲 TOP15 / 旧曲 TOP35 分页切换，每首标注难度并按难度颜色染色；删除走势折线图。</li>
-          <li>B50 各池末尾展示与最后一名同 Rating 的未入榜曲目（提示条隔开），冲榜目标一目了然。</li>
-          <li>推分计划目标 Rating 右侧新增「（+N）」：显示达成目标后可为 B50 增加的总分（按完整重算口径）。</li>
-          <li>曲库列表显示 B50 徽标：在榜曲目显示「B50 #池内排名」。</li>
-          <li>新增「导出成绩 CSV」：设置内一键导出全部成绩为 CSV，方便电脑分析。</li>
-          <li>推分计划新增「清已达」：一键批量清除已达成目标的分数，曲目保留。</li>
-          <li>删除曲库页「更新 / 下载」按钮：更新请前往「设置 → 检查更新」。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.11.0 · Android 内测</span><span class="date">2026-08-27</span>
-        <ul>
-          <li>新增「B50 总览」：按 Diving-Fish 口径本地估算旧曲 B35 + 新曲 B15，总分/两池合计/官方 Rating 对照一目了然，50 首明细含曲绘、定数与单谱 Rating。</li>
-          <li>B50 页内新增成绩趋势折线图：基于本地同步快照绘制本地估算（实线）与服务器 RA（虚线）双线走势。</li>
-          <li>曲绘本地缓存：首次加载后封面落盘，之后离线也可显示；下载失败自动回退在线加载。</li>
-          <li>更新红点：有新版本时设置 Tab 亮起红点，进入更新页即熄灭；应用启动后静默检查（24 小时节流，不打扰）。</li>
-          <li>推分计划禁止跨组拖拽：置顶/普通/置底组之间不再互换，组内拖拽不受影响；删除曲目下方拖拽提示文字。</li>
-          <li>牌子查询默认聚焦 Master/ReMaster：Basic/Advanced/Expert 收起，可一键展开。</li>
-          <li>完成率损失表按判定着色：P 判定橙色、G 判定粉色、Good 绿色、Miss 保持灰色。</li>
-          <li>检查更新页删除 GitHub Releases 说明文字。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.10.0 · Android 内测</span><span class="date">2026-08-27</span>
-        <ul>
-          <li>推分计划拖拽彻底重写：改用持久 entryId 作为唯一身份，首次加载自动迁移旧数据，拖拽结束原子提交全量顺序，连续拖拽不再串位。</li>
-          <li>修复计划列表最下侧曲目目标达成率被底部栏遮挡：列表底部按安全区 + 标签栏高度留白。</li>
-          <li>音乐平台搜索跳转前自动复制「曲名+曲师」到剪贴板，客户端未预填时直接粘贴即可；网易云新增多条搜索深链候选。</li>
-          <li>牌子查询改为单一滚动列表：完成度总计随页面下滑滚动，曲目旁新增曲绘，删除顶部提示行。</li>
-          <li>完成率损失表删除 CP 列（CP 永不失完成率）；设置页删除重复的「牌子查询」入口（牌子已是底部 Tab）。</li>
-          <li>新增「数据备份与恢复」：导出完整备份为 JSON（计划/成绩/快照/B 站链接/设置/运势种子），可随时选择文件恢复，Diving-Fish Token 永不写入备份。</li>
-          <li>新增「检查更新」：应用内查询 GitHub Releases 最新版本并跳转下载站。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.9.0 · Android 内测</span><span class="date">2026-08-26</span>
-        <ul>
-          <li>B 站视频深链重做：BV 号本地转 av 后优先 bilibili://video/&lt;av&gt;，绕过 Android 包可见性误判（不再依赖 canOpenURL 预判），多候选逐个尝试。</li>
-          <li>修复推分计划拖拽串位根因：重排不再按陈旧顺序字段重算，连续拖拽互不干扰。</li>
-          <li>完成率损失改单音符口径：Tap/Hold/Slide/Touch 与 Break 统一按单个音符展示损失，标题去掉「试算」、删除规则脚注。</li>
-          <li>DX Rating 预估默认折叠：收起时显示「定数 · 100.5% → Rating」摘要，点击展开。</li>
-          <li>详情页板块顺序与默认折叠可在设置中配置（Rating 预估 / 完成率损失 / B 站搜索 / 音乐平台搜索）。</li>
-          <li>牌子查询版本筛选默认收起为单行摘要，总计汇总保持展开且分难度明细可滚动，不再挤占曲目列表。</li>
-          <li>音乐平台设置页新增「试开当前平台搜索」真机诊断按钮。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.8.0 · Android 内测</span><span class="date">2026-08-26</span>
-        <ul>
-          <li>B 站短链直进应用：b23.tv 分享链接打开时自动解析成视频并拉起 bilibili 客户端（结果缓存），长链识别扩展到手机版页面与 bvid/avid 参数；已存视频面板新增「深链诊断」。</li>
-          <li>音乐平台搜索默认优先打开应用（实验，可关闭）：逐个尝试网易云/QQ/酷狗客户端搜索深链，失败自动回退带关键词的网页结果页。</li>
-          <li>歌曲详情返回不再固定落在推分计划：导航重构后从哪里进入就回到哪里。</li>
-          <li>修复推分计划连续拖拽串位：调整一首后再长按另一首，不再错改上一首的位置。</li>
-          <li>修复牌子查询筛选按钮初始无字的问题。</li>
-          <li>新增「完成率损失试算」：按谱面 Note 分布计算单音符各判定损失的达成率与等效 Great·Tap 数，Break 含基础分与奖励分合计。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.7.0 · Android 内测</span><span class="date">2026-08-26</span>
-        <ul>
-          <li>推分计划新增「推歌英灵殿」：移除曲目进入英灵殿并记录时间，可复原或强制删除；移除确认改为应用内自定义弹窗。</li>
-          <li>计划支持置顶/置底标记：同组之间拖拽调动，新添加曲目插入置顶组下方第一首。</li>
-          <li>牌子查询重做：进入即显示内容、按难度分别统计 FC/SSS/FS/AP、同曲多难度合并展示、一键把当前筛选中 14+ 谱面加入计划并支持一键撤回。</li>
-          <li>牌子查询版本维度拆分：原始版本只保留旧世代，DX 代归属由国区年份维度承担，组合筛选不再必然为空。</li>
-          <li>今日舞萌运势不再推荐宴会場谱面；筛选栏全面改版，清除键内嵌搜索框内并可逐项移除活动筛选。</li>
-          <li>音乐平台跳转直达 HTTPS 搜索结果页；Bilibili 已保存视频优先客户端深链打开。</li>
-          <li>随机抽歌「按条件」抽选时自动收起条件面板；详情页定数行不再挤出 Total Notes。</li>
-          <li>无独立数据的 PLUS 代次并入母版本标签，移除无曲目数据的 ALL FiNALE。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.6.6 · Android 内测</span><span class="date">2026-08-20</span>
-        <ul>
-          <li>Bilibili 与音乐平台优先尝试打开已安装应用，失败时自动回退 HTTPS 网页。</li>
-          <li>支持粘贴 Bilibili 分享文本，并按单条主动保存链接解析标题和封面到本地缓存。</li>
-          <li>日服原始版本与中国区版本独立筛选；推分计划支持搜索、目标摘要、拖拽和左滑置顶/置底。</li>
-          <li>新增本地牌子查询：FC、SSS、FS DX、AP；无成绩时保持空状态，不上传成绩。</li>
-          <li>补齐 Bilibili 封面 HTTPS 缓存、保存视频的应用优先打开，并保留目标 Rating 显示设置。</li>
-          <li>修复歌曲详情和设置子页面的 Stack 导航，并清理编辑视频链接后遗留的旧封面缓存。</li>
-          <li>修复筛选视图拖拽导致的计划顺序错乱，恢复重启后卡在元数据加载状态的问题，并补齐基础舞萌DX牌子版本组。</li>
-          <li>为从设置进入的本地牌子查询页补充可见返回按钮，避免根 Tab 路由缺少导航返回入口。</li>
-          <li>将设置主页面、音乐平台、排序、牌子查询和歌曲详情真正收拢到嵌套 Stack，避免子页面被注册为无返回头的根 Tab。</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.5.0-alpha · Phase A-F</span><span class="date">2026-08-20</span>
-        <ul>
-          <li>独立歌曲别名层、PLUS/国区版本筛选和宴会場同名普通曲绘回退</li>
-          <li>只读成绩同步快照与变化记录；本地 Bilibili 视频链接支持备注、标签、编辑和删除</li>
-          <li>推分计划 100/100.5 快捷目标、计划来源返回、连续多图 OCR 与稳定运势曲绘</li>
-          <li>网易云、QQ 音乐、酷狗 HTTPS 搜索入口；不抓取第三方视频或音乐内容</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.4.0-alpha · Phase 1-4</span><span class="date">2026-08-19</span>
-        <ul>
-          <li>修正完整 Diving-Fish DX Rating 系数表，宴会場显示无详细定数并区分拟合参考</li>
-          <li>新增原始/国区版本名、歌曲名和选定难度定数排序，推分计划只展示选定难度</li>
-          <li>新增目标达成率/目标 Rating、今日舞萌运势、SecureStore 只读成绩导入和个人设置</li>
-          <li>OCR 候选匹配结果置于原始识别文字之前，保留相机识别与快速加入流程</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v1.1.0-alpha · Phase 1-2</span><span class="date">2026-08-18</span>
-        <ul>
-          <li>曲库缓存超过 12 小时后后台同步 Diving-Fish API，并保留离线缓存</li>
-          <li>随机结果支持点击查看详情，新增顺时针曲绘多次切换动画</li>
-          <li>优化版本展开、谱师高亮、Rating、定数滑条和推分计划弹窗</li>
-          <li>应用内增加更新/下载入口</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">P0-P6 内测构建</span><span class="date">2026-08-18</span>
-        <ul>
-          <li>修复分类、SD/DX、版本和清空筛选问题</li>
-          <li>新增曲师、谱师、模糊搜索和 0～15 定数滑条</li>
-          <li>新增推分计划默认抽选和与结果绑定的滚筒动画</li>
-          <li>新增拟合定数、官方/拟合 DX Rating</li>
-        </ul>
-      </div>
-      <div class="entry">
-        <span class="version">v0.1.0-alpha</span><span class="date">2026-08-16</span>
-        <ul>
-          <li>🎉 项目初始化，脚手架搭建</li>
-          <li>曲目浏览器 + 10维筛选引擎</li>
-          <li>谱面详情页（note分布可视化）</li>
-          <li>随机抽歌 + 滚筒旋转动画</li>
-          <li>推分计划管理（标记/排序）</li>
-          <li>霓虹舞伴暗色主题</li>
-        </ul>
-      </div>
-    </div>
+    <section class="card release">
+      <div><div class="eyebrow">Latest</div><h2>v1.17.2</h2><p>成绩排序显示优化、详情页默认展开、曲绘缓存归属修正、曲库回到顶部和官网视觉重做。</p></div>
+      <a href="./changelog.html">查看全部 →</a>
+    </section>
 
-    <!-- QR -->
-    <div class="qr-section" id="qrSection" style="display:none;">
-      <p>📱 扫码安装（APK 发布后自动显示）</p>
-    </div>
-
-    <!-- Footer -->
     <footer>
-      <p>
-        数据来源：<a href="https://maimai.diving-fish.com" target="_blank">Diving-Fish 舞萌DX查分器</a> (MIT)
-      </p>
-      <p>
-        开源：<a href="https://github.com/FengLingYaaa/maimate-app" target="_blank">GitHub</a>
-        · 联系：<a href="https://github.com/FengLingYaaa" target="_blank">FengLingYaaa</a>
-      </p>
-      <p style="margin-top:8px;">
-        本应用与华立科技、SEGA 等公司无任何关系。<br>
-        注册商标所有权归相关品牌所有。曲目数据仅供推分指导参考。
-      </p>
+      <div>数据来源：<a href="https://maimai.diving-fish.com" target="_blank" rel="noreferrer">Diving-Fish 舞萌DX查分器</a>（MIT）</div>
+      <div><a href="https://github.com/FengLingYaaa/maimate-app" target="_blank" rel="noreferrer">开源项目</a> · MaiMate 与 SEGA/华立科技无关</div>
     </footer>
-  </div>
-
+  </main>
 </body>
 </html>

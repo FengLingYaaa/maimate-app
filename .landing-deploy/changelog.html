@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0f0f1a">
+  <title>MaiMate · 更新日志</title>
+  <style>
+    :root { --bg:#0f0f1a; --card:#1a1a2e; --text:#f0e6ff; --muted:#9888b0; --dim:#5a4a6e; --pink:#ff6b9d; --purple:#c44dff; --cyan:#00d4ff; --border:rgba(240,230,255,.13); }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:radial-gradient(circle at 50% -10%,#292044 0,#0f0f1a 42rem); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans SC",sans-serif; }
+    a { color:inherit; }
+    .page { width:min(100% - 32px,620px); margin:0 auto; padding:28px 0 42px; }
+    .top { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; }
+    .brand { display:flex; align-items:center; gap:10px; text-decoration:none; }
+    .brand img { width:38px; height:38px; border-radius:11px; }
+    .brand strong { font-size:18px; }
+    .back { color:var(--pink); font-size:12px; font-weight:800; text-decoration:none; }
+    h1 { margin:0; font-size:25px; }
+    .intro { margin:6px 0 20px; color:var(--muted); font-size:13px; line-height:1.7; }
+    .entry { margin-top:12px; padding:16px 17px; background:rgba(26,26,46,.92); border:1px solid var(--border); border-radius:16px; }
+    .entry-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+    .version { color:var(--pink); font-size:15px; font-weight:900; }
+    .date { color:var(--dim); font-size:11px; }
+    ul { margin:10px 0 0; padding-left:20px; color:var(--muted); font-size:12.5px; line-height:1.75; }
+    .download { display:inline-block; margin-top:18px; padding:10px 16px; border-radius:10px; background:linear-gradient(120deg,var(--pink),var(--purple)); color:#fff; font-size:12px; font-weight:800; text-decoration:none; }
+    footer { margin-top:28px; color:var(--dim); text-align:center; font-size:11px; line-height:1.8; }
+    footer a { color:var(--cyan); text-decoration:none; }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="top">
+      <a class="brand" href="./"><img src="./icon.png" alt="MaiMate 图标"><strong>MaiMate</strong></a>
+      <a class="back" href="./">返回首页</a>
+    </div>
+    <h1>更新日志</h1>
+    <p class="intro">这里记录 MaiMate 的主要版本变化。应用内也会在新版本首次启动时展示当版摘要。</p>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.17.2</span><span class="date">2026-09-06</span></div>
+      <ul>
+        <li>成绩排序直接显示达成率数值；FC/FC+ 使用绿色，AP/AP+ 使用橙色。</li>
+        <li>DX Rating 预估中，官方定数对应的 Rating 统一使用粉色。</li>
+        <li>详情页四个可收起板块默认全部展开，已有用户的自定义设置继续保留。</li>
+        <li>修正曲绘缓存归属：covers/thumbs 与 covers/full 只计入曲绘缓存，不再重复计入其它缓存。</li>
+        <li>详情页原图真正使用 full 缓存；曲库下滑后可使用右下角按钮回到顶部。</li>
+        <li>官网首页改为简洁布局，使用应用真实图标；完整更新日志移至本页面。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.17.1</span><span class="date">2026-09-05</span></div>
+      <ul>
+        <li>曲库与推分计划新增成绩高 → 低排序，未指定难度时默认 Master。</li>
+        <li>成绩、官方定数、拟合定数排序支持指定难度；计划卡新增排序成绩行。</li>
+        <li>修复抽歌和计划的真实 SD/DX 谱面达标判定。</li>
+        <li>AP50 拆分 AP 与 AP+ 统计；B50/AP50 页面移除服务器 RA 干扰信息。</li>
+        <li>下载站支持版本化 APK 文件名与 latest 并存。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.17.0</span><span class="date">2026-09-04</span></div>
+      <ul>
+        <li>修复抽歌不含已达标模式的计数，计划和抽歌统一真实 SD/DX 判定。</li>
+        <li>曲库首屏改为懒加载，点击加载全曲或搜索/筛选后再展示列表。</li>
+        <li>优化标题、曲师和谱师搜索的预归一化缓存与战报排序。</li>
+        <li>新增 AP50 汇总计数、信息查询入口说明和计划筛选布局修正。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.16.9</span><span class="date">2026-09-03</span></div>
+      <ul>
+        <li>新增 AP50 榜单与分享卡，支持 AP/AP+ 谱面按 Rating 排名。</li>
+        <li>纯数字搜索改为 ID 精确、标题精确、ID 前缀和短数字子串四级规则。</li>
+        <li>识别匹配支持单字符差异、粘连行和《39》等纯数字短曲名。</li>
+        <li>曲绘缓存统计区分缩略图与原图，成绩状态统一显示 FC+/AP+/FDX 等标签。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.16.8</span><span class="date">2026-08-30</span></div>
+      <ul>
+        <li>曲绘分级缓存：列表使用缩略图，详情页按需使用原图并受 LRU 上限控制。</li>
+        <li>修复曲绘进入系统图片缓存的问题，增加其它缓存明细和清理。</li>
+        <li>搜索改为分片处理并显示真实进度，识别中删除图片不再复活迟到结果。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.16.7</span><span class="date">2026-09-02</span></div>
+      <ul>
+        <li>详情页新增歌曲数字 ID，CSV 导出独立成设置子页面。</li>
+        <li>识别改为增量匹配，原始识别文字默认折叠。</li>
+        <li>搜索改为确认式触发并显示匹配进度，快照对比行可跳转详情。</li>
+      </ul>
+    </article>
+
+    <a class="download" href="https://github.com/FengLingYaaa/maimate-app/releases/latest/download/MaiMate-latest.apk">下载最新 APK</a>
+    <footer>数据来源：<a href="https://maimai.diving-fish.com" target="_blank" rel="noreferrer">Diving-Fish 舞萌DX查分器</a>（MIT）<br><a href="https://github.com/FengLingYaaa/maimate-app" target="_blank" rel="noreferrer">GitHub 开源项目</a></footer>
+  </main>
+</body>
+</html>
