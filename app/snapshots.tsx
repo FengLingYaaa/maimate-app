@@ -13,6 +13,7 @@ import { CoverImage } from '../src/components/CoverImage';
 import { ShareCardOverlay } from '../src/components/ShareCardOverlay';
 import { BattleReportShareCard } from '../src/components/BattleReportShareCard';
 import { buildSnapshotBattleReport } from '../src/data/snapshot-battle';
+import { onlyServerRaImprovements } from '../src/data/server-ra';
 import { shareCardFileName } from '../src/data/share-card';
 import { useMusicStore, useScoreStore, useSettingsStore } from '../src/store';
 import type { MusicData, ScoreSnapshot } from '../src/data/types';
@@ -29,11 +30,16 @@ export default function SnapshotsPage() {
   const [comparison, setComparison] = useState<{ base: ScoreSnapshot; target: ScoreSnapshot } | null>(null);
   // v1.15.2：战报分享卡预览开关。
   const [shareVisible, setShareVisible] = useState(false);
+  const [shareOnlyServerRa, setShareOnlyServerRa] = useState(false);
 
   const report = useMemo(() => {
     if (!comparison) return null;
     return buildSnapshotBattleReport(comparison.base, comparison.target, rawData);
   }, [comparison, rawData]);
+  const serverRaRows = useMemo(
+    () => report ? onlyServerRaImprovements(report.rows) : [],
+    [report],
+  );
 
   const confirmDelete = (snapshotId: string, syncedAt: number) => {
     Alert.alert(
@@ -88,7 +94,11 @@ export default function SnapshotsPage() {
             report={report}
             rawData={rawData}
             onClose={() => setComparison(null)}
-            onShare={() => setShareVisible(true)}
+            onShare={(onlyServerRa) => {
+              setShareOnlyServerRa(onlyServerRa);
+              setShareVisible(true);
+            }}
+            serverRaImprovementCount={serverRaRows.length}
           />
         )}
         {compareBase && (
@@ -132,6 +142,7 @@ export default function SnapshotsPage() {
               target={comparison.target}
               rawData={rawData}
               userName={profile?.nickname ?? profile?.username}
+              onlyServerRaImprovements={shareOnlyServerRa}
             />
           )}
         />
@@ -141,15 +152,31 @@ export default function SnapshotsPage() {
 }
 
 /** 推分战报卡片：汇总条 + 逐曲战报行（曲绘/曲名/难度/达成率变化/±Rating）。 */
-function BattleReportCard({ base, target, report, rawData, onClose, onShare }: {
+function BattleReportCard({ base, target, report, rawData, onClose, onShare, serverRaImprovementCount }: {
   base: ScoreSnapshot;
   target: ScoreSnapshot;
   report: ReturnType<typeof buildSnapshotBattleReport>;
   rawData: MusicData[];
   onClose: () => void;
-  onShare: () => void;
+  onShare: (onlyServerRaImprovements: boolean) => void;
+  serverRaImprovementCount: number;
 }) {
   const router = useRouter();
+  const shareChoices = () => Alert.alert(
+    '分享推分战报',
+    `服务器 RA 有明确提升的曲目：${serverRaImprovementCount} 首。只分享此类曲目时，不会用本地 B50 估算代替服务器数据。`,
+    [
+      { text: '取消', style: 'cancel' },
+      { text: '全部成绩变化', onPress: () => onShare(false) },
+      {
+        text: '仅服务器 RA 提升',
+        onPress: () => {
+          if (serverRaImprovementCount > 0) onShare(true);
+          else Alert.alert('没有可分享的曲目', '这两份快照中没有服务器单曲 RA 明确上升的曲目。');
+        },
+      },
+    ],
+  );
   const raDelta = base.serverRating != null && target.serverRating != null
     ? target.serverRating - base.serverRating
     : null;
@@ -158,7 +185,7 @@ function BattleReportCard({ base, target, report, rawData, onClose, onShare }: {
       <View style={styles.compareHeader}>
         <Text style={styles.compareTitle}>推分战报</Text>
         <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
-          <Pressable hitSlop={8} onPress={onShare}>
+          <Pressable hitSlop={8} onPress={shareChoices}>
             <Text style={styles.compareShareText}>分享战报</Text>
           </Pressable>
           <Pressable hitSlop={8} onPress={onClose}>
@@ -176,7 +203,11 @@ function BattleReportCard({ base, target, report, rawData, onClose, onShare }: {
         </View>
         <View style={styles.summaryChip}>
           <Text style={styles.summaryChipValue}>{report.changedCount}</Text>
-          <Text style={styles.summaryChipLabel}>上分</Text>
+          <Text style={styles.summaryChipLabel}>达成率有变化</Text>
+        </View>
+        <View style={styles.summaryChip}>
+          <Text style={styles.summaryChipValue}>{report.serverRaOnlyCount}</Text>
+          <Text style={styles.summaryChipLabel}>服务器 RA 更新</Text>
         </View>
         {raDelta !== null && (
           <View style={styles.summaryChip}>
@@ -186,7 +217,7 @@ function BattleReportCard({ base, target, report, rawData, onClose, onShare }: {
         )}
       </View>
       <Text style={styles.compareSummary}>
-        记录 {base.recordCount} → {target.recordCount}
+        记录 {base.recordCount} → {target.recordCount} · 服务器提升曲目 {serverRaImprovementCount} 首
       </Text>
       {report.rows.filter(row => row.kind !== 'removed').length === 0 ? (
         <Text style={styles.compareEmpty}>两份快照之间成绩没有变化</Text>
@@ -226,10 +257,11 @@ function BattleReportCard({ base, target, report, rawData, onClose, onShare }: {
                   {row.before === null ? '—' : `${row.before.toFixed(4)}%`}
                   {' → '}
                   {row.after === null ? '—' : `${row.after.toFixed(4)}%`}
+                  {row.serverRaDelta !== null && row.serverRaDelta > 0 && (
+                    <Text style={styles.ratingDeltaText}>  +{row.serverRaDelta} server RA</Text>
+                  )}
                   {row.b50Delta !== null && row.b50Delta > 0 && (
-                    <Text style={styles.ratingDeltaText}>
-                      {row.b50Delta >= 0 ? `  +${row.b50Delta}` : `  ${row.b50Delta}`} RA
-                    </Text>
+                    <Text style={styles.localB50DeltaText}>  +{row.b50Delta} B50</Text>
                   )}
                 </Text>
               </View>
@@ -282,5 +314,6 @@ const styles = StyleSheet.create({
   battleTitle: { flex: 1, fontSize: 12, fontWeight: '700', color: Colors.text.primary },
   battleDiff: { fontSize: 9.5, fontWeight: '800' },
   battleValue: { fontSize: 10.5, color: Colors.text.secondary },
-  ratingDeltaText: { fontWeight: '900', color: Colors.accent.primary },
+  ratingDeltaText: { fontWeight: '900', color: Colors.functional.success },
+  localB50DeltaText: { fontWeight: '800', color: Colors.accent.primary },
 });

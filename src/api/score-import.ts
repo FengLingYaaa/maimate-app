@@ -1,13 +1,15 @@
 import * as SecureStore from 'expo-secure-store';
 import type { PlayerProfile, PlayerScore } from '../data/types';
+import { optionalFiniteNumber } from '../data/score-import-fields';
 import { PROBER_API_BASE } from '../constants/game';
 
 const TOKEN_KEY = 'maimate_diving_fish_import_token';
+// The official login_or_token_required decorator accepts Import-Token on /player/validate.
 const VALIDATE_URL = `${PROBER_API_BASE}/player/validate`;
 const RECORDS_URL = `${PROBER_API_BASE}/player/records`;
 
 export class ScoreImportError extends Error {
-  readonly kind: 'invalid-token' | 'network' | 'invalid-response';
+  readonly kind: 'invalid-token' | 'forbidden' | 'network' | 'invalid-response';
 
   constructor(kind: ScoreImportError['kind'], message: string) {
     super(message);
@@ -64,11 +66,22 @@ async function requestJson(url: string, token: string): Promise<unknown> {
     throw new ScoreImportError('network', '无法连接 Diving-Fish，请检查网络后重试');
   }
 
-  if (response.status === 400 || response.status === 401 || response.status === 403) {
-    throw new ScoreImportError('invalid-token', 'Token 无效或已失效');
+  if (response.status === 400 || response.status === 401) {
+    const body = await response.clone().json().catch(() => null) as { message?: unknown } | null;
+    const message = typeof body?.message === 'string' ? body.message : '';
+    if (/导入token有误|import.?token.*invalid|invalid.*import.?token/i.test(message)) {
+      throw new ScoreImportError('invalid-token', 'Diving-Fish 拒绝了 Import-Token（HTTP 400）。请确认粘贴的是当前账号生成的“成绩导入 Token”；如果刚刚重新生成，请改用最新的 Token。');
+    }
+    if (response.status === 401) {
+      throw new ScoreImportError('invalid-token', `Diving-Fish 返回 HTTP 401${message ? `：${message}` : ''}。请确认使用的是成绩导入 Import-Token。`);
+    }
+    throw new ScoreImportError('invalid-response', `Diving-Fish 返回 HTTP ${response.status}${message ? `：${message}` : ''}`);
+  }
+  if (response.status === 403) {
+    throw new ScoreImportError('forbidden', 'Diving-Fish 返回 403，当前服务策略拒绝了此请求；这不一定表示 Token 错误。请使用应用内“诊断成绩连接”检查端点，并稍后重试或联系 Diving-Fish。');
   }
   if (!response.ok) {
-    throw new ScoreImportError('network', 'Diving-Fish 暂时无法响应，请稍后重试');
+    throw new ScoreImportError('network', `Diving-Fish 暂时无法响应（HTTP ${response.status}），请稍后重试`);
   }
 
   try {
@@ -81,13 +94,16 @@ async function requestJson(url: string, token: string): Promise<unknown> {
 export async function validateImportToken(value: string): Promise<void> {
   const token = normalizeToken(value);
   if (!token) throw new ScoreImportError('invalid-token', '请输入有效的 Token');
+  // `/player/validate` uses Diving-Fish's login-or-token auth decorator and
+  // confirms Import-Token validity without downloading the player's full records.
+  // Only persist the proposed token in SecureStore after this succeeds.
   const payload = await requestJson(VALIDATE_URL, token);
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    throw new ScoreImportError('invalid-response', 'Token 验证结果无法识别');
+    throw new ScoreImportError('invalid-response', '成绩 Token 验证响应无法识别');
   }
-  const body = payload as { message?: unknown; valid?: unknown };
-  if (body.valid === false || (typeof body.message === 'string' && /invalid|error|fail/i.test(body.message))) {
-    throw new ScoreImportError('invalid-token', 'Token 无效或已失效');
+  const body = payload as { username?: unknown; login_type?: unknown; message?: unknown };
+  if (body.message !== 'ok' || typeof body.username !== 'string' || !body.username.trim()) {
+    throw new ScoreImportError('invalid-response', 'Diving-Fish 验证响应缺少有效账户信息，接口格式可能已变更。');
   }
 }
 
@@ -123,10 +139,10 @@ function normalizeRecord(value: unknown, importedAt: number): PlayerScore | null
   const songId = String(record.song_id ?? '');
   const type = record.type === 'SD' || record.type === 'DX' ? record.type : null;
   const difficultyIndex = Number(record.level_index);
-  const achievement = Number(record.achievements);
-  const dxScore = Number(record.dxScore);
+  const achievement = optionalFiniteNumber(record.achievements);
+  const dxScore = optionalFiniteNumber(record.dxScore);
   if (!songId || !type || !Number.isInteger(difficultyIndex) || difficultyIndex < 0) return null;
-  if (!Number.isFinite(achievement) || !Number.isFinite(dxScore)) return null;
+  if (achievement === undefined || dxScore === undefined) return null;
 
   return {
     songId,
@@ -135,13 +151,13 @@ function normalizeRecord(value: unknown, importedAt: number): PlayerScore | null
     achievement,
     dxScore,
     title: typeof record.title === 'string' ? record.title : undefined,
-    ds: Number.isFinite(Number(record.ds)) ? Number(record.ds) : undefined,
+    ds: optionalFiniteNumber(record.ds),
     level: typeof record.level === 'string' ? record.level : undefined,
     levelLabel: typeof record.level_label === 'string' ? record.level_label : undefined,
     rate: typeof record.rate === 'string' ? record.rate : undefined,
     fc: typeof record.fc === 'string' && record.fc ? record.fc : undefined,
     fs: typeof record.fs === 'string' && record.fs ? record.fs : undefined,
-    serverRating: Number.isFinite(Number(record.ra)) ? Number(record.ra) : undefined,
+    serverRating: optionalFiniteNumber(record.ra),
     importedAt,
   };
 }
@@ -176,8 +192,8 @@ export async function fetchImportedScores(value: string): Promise<ImportedScores
   const profile: PlayerProfile = {
     username: typeof body.username === 'string' ? body.username : undefined,
     nickname: typeof body.nickname === 'string' ? body.nickname : undefined,
-    rating: Number.isFinite(Number(body.rating)) ? Number(body.rating) : undefined,
-    additionalRating: Number.isFinite(Number(body.additional_rating)) ? Number(body.additional_rating) : undefined,
+    rating: optionalFiniteNumber(body.rating),
+    additionalRating: optionalFiniteNumber(body.additional_rating),
     plate: typeof body.plate === 'string' ? body.plate : undefined,
   };
 

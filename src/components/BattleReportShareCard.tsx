@@ -9,6 +9,7 @@ import { Colors, DifficultyColorMap, DifficultyLabels } from '../constants';
 import { CoverImage } from './CoverImage';
 import type { MusicData } from '../data/types';
 import type { SnapshotBattleReport } from '../data/snapshot-battle';
+import { onlyServerRaImprovements, sumServerRaIncreases } from '../data/server-ra';
 
 interface Row {
   chartKey: string;
@@ -20,6 +21,9 @@ interface Row {
   after: number | null;
   ratingDelta: number | null;
   kind: 'added' | 'removed' | 'changed';
+  b50Delta?: number | null;
+  serverRaDelta: number | null;
+  achievementChanged: boolean;
 }
 
 interface Props {
@@ -28,10 +32,12 @@ interface Props {
   target: { syncedAt: number; serverRating?: number | null };
   rawData: MusicData[];
   userName?: string;
+  onlyServerRaImprovements?: boolean;
 }
 
-export function BattleReportShareCard({ report, base, target, rawData, userName }: Props) {
-  const rows = report.rows.filter(row => row.kind !== 'removed');
+export function BattleReportShareCard({ report, base, target, rawData, userName, onlyServerRaImprovements: onlyImprovements = false }: Props) {
+  const changedRows = report.rows.filter(row => row.kind !== 'removed');
+  const rows = onlyImprovements ? onlyServerRaImprovements(changedRows) : changedRows;
   const raDelta = base.serverRating != null && target.serverRating != null
     ? target.serverRating - base.serverRating
     : null;
@@ -39,7 +45,7 @@ export function BattleReportShareCard({ report, base, target, rawData, userName 
     <View style={styles.card}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.appName}>MaiMate · 推分战报</Text>
+          <Text style={styles.appName}>MaiMate · 推分战报{onlyImprovements ? '（仅服务器 RA 提升）' : ''}</Text>
           {!!userName && <Text style={styles.userName}>{userName}</Text>}
         </View>
       </View>
@@ -48,21 +54,30 @@ export function BattleReportShareCard({ report, base, target, rawData, userName 
       </Text>
       <View style={styles.chipsRow}>
         <View style={styles.chip}>
-          <Text style={styles.chipValue}>{report.addedCount}</Text>
+          <Text style={styles.chipValue}>{onlyImprovements ? rows.filter(row => row.kind === 'added').length : report.addedCount}</Text>
           <Text style={styles.chipLabel}>新增</Text>
         </View>
         <View style={styles.chip}>
-          <Text style={styles.chipValue}>{report.changedCount}</Text>
-          <Text style={styles.chipLabel}>上分</Text>
+          <Text style={styles.chipValue}>{onlyImprovements ? rows.filter(row => row.kind === 'changed' && row.achievementChanged).length : report.changedCount}</Text>
+          <Text style={styles.chipLabel}>达成率变化</Text>
         </View>
-        {raDelta !== null && (
+        <View style={styles.chip}>
+          <Text style={styles.chipValue}>{rows.filter(row => row.kind === 'changed' && !row.achievementChanged).length}</Text>
+          <Text style={styles.chipLabel}>RA 更新</Text>
+        </View>
+        {onlyImprovements ? (
+          <View style={styles.chip}>
+            <Text style={styles.chipValue}>+{sumServerRaIncreases(rows)}</Text>
+            <Text style={styles.chipLabel}>单曲服务器 RA 合计</Text>
+          </View>
+        ) : raDelta !== null ? (
           <View style={styles.chip}>
             <Text style={styles.chipValue}>{raDelta >= 0 ? `+${raDelta}` : `${raDelta}`}</Text>
             <Text style={styles.chipLabel}>DX Rating</Text>
           </View>
-        )}
+        ) : null}
       </View>
-      {rows.length === 0 && <Text style={styles.emptyText}>两份快照之间成绩没有变化</Text>}
+      {rows.length === 0 && <Text style={styles.emptyText}>{onlyImprovements ? '两份快照中没有服务器 RA 提升的曲目' : '两份快照之间成绩没有变化'}</Text>}
       {rows.map(row => {
         const music = rawData.find(candidate => candidate.id === row.songId && candidate.type === row.musicType);
         const diffColor = DifficultyColorMap[row.difficultyIndex] || Colors.accent.secondary;
@@ -84,13 +99,15 @@ export function BattleReportShareCard({ report, base, target, rawData, userName 
                 </Text>
               </View>
               <Text style={styles.battleValue}>
-                {row.kind === 'added' ? '新增 ' : ''}{row.before === null ? '—' : `${row.before.toFixed(4)}%`}
+                {row.kind === 'added' ? '新增 ' : row.achievementChanged ? '达成率变化 ' : '成绩记录 '}
+                {row.before === null ? '—' : `${row.before.toFixed(4)}%`}
                 {' → '}
                 {row.after === null ? '—' : `${row.after.toFixed(4)}%`}
-                {row.b50Delta !== null && row.b50Delta > 0 && (
-                  <Text style={styles.raDelta}>
-                    {row.b50Delta >= 0 ? `  +${row.b50Delta}` : `  ${row.b50Delta}`} RA
-                  </Text>
+                {row.serverRaDelta !== null && row.serverRaDelta > 0 && (
+                  <Text style={styles.raDelta}>  +{row.serverRaDelta} server RA</Text>
+                )}
+                {!onlyImprovements && row.b50Delta !== null && row.b50Delta > 0 && (
+                  <Text style={styles.b50Delta}>  +{row.b50Delta} local B50</Text>
                 )}
               </Text>
             </View>
@@ -126,6 +143,7 @@ const styles = StyleSheet.create({
   battleTitle: { flex: 1, fontSize: 11.5, fontWeight: '700', color: '#f0e6ff' },
   battleDiff: { fontSize: 9.5, fontWeight: '800' },
   battleValue: { fontSize: 10, color: '#c8bce0' },
-  raDelta: { fontWeight: '900', color: '#ffd166' },
+  raDelta: { fontWeight: '900', color: '#3dd68c' },
+  b50Delta: { fontWeight: '800', color: '#ff6b9d' },
   footer: { fontSize: 8, color: '#5a4a6e', textAlign: 'center', marginTop: 2 },
 });

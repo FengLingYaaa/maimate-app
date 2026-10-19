@@ -6,6 +6,7 @@
 import type { MusicData, PlayerScore, ScoreSnapshot } from './types';
 import { calculateRating } from './rating';
 import { computeB50 } from './b50';
+import { serverRaIncrease } from './server-ra';
 
 export interface SnapshotBattleRow {
   chartKey: string;
@@ -21,8 +22,12 @@ export interface SnapshotBattleRow {
   ratingDelta: number | null;
   /** 单谱 Rating 绝对值（新快照的）。 */
   afterRating: number | null;
-  /** v1.16.5：该曲成绩单独对 B50 总分的影响（B50 总分差）；0 或不适用为 null（UI 不显示）。 */
+  /** 本地估算：该谱面对 B50 总分的实际影响，不是服务器单谱 RA。 */
   b50Delta: number | null;
+  /** 服务端字段 records[].ra 的快照差值；无法判定时为 null。 */
+  serverRaDelta: number | null;
+  /** 成绩率是否变化，用于区分“达成率改进”与仅服务器计分变化。 */
+  achievementChanged: boolean;
   kind: 'added' | 'removed' | 'changed';
 }
 
@@ -32,6 +37,8 @@ export interface SnapshotBattleReport {
   addedCount: number;
   /** 上分谱面数（达成率变化且非新增）。 */
   changedCount: number;
+  /** 达成率未变化、但服务端单谱 RA 字段变化的谱面数。 */
+  serverRaOnlyCount: number;
   /** 移除谱面数。 */
   removedCount: number;
   /** 总 Rating 变化（新增+上分+移除合计）。 */
@@ -71,6 +78,7 @@ export function buildSnapshotBattleReport(
   const rows: SnapshotBattleRow[] = [];
   let addedCount = 0;
   let changedCount = 0;
+  let serverRaOnlyCount = 0;
   let removedCount = 0;
   let totalRatingDelta = 0;
 
@@ -79,12 +87,14 @@ export function buildSnapshotBattleReport(
     const before = baseMap.get(key) ?? null;
     const after = targetMap.get(key) ?? null;
     if (before && after) {
-      if (before.achievement === after.achievement) continue;
+      const reportedServerRaDelta = serverRaIncrease(before, after);
+      if (before.achievement === after.achievement && (reportedServerRaDelta === null || reportedServerRaDelta === 0)) continue;
       const beforeRating = ratingOf(musicByKey, before);
       const afterRating = ratingOf(musicByKey, after);
       const ratingDelta = beforeRating !== null && afterRating !== null ? afterRating - beforeRating : null;
       if (ratingDelta !== null) totalRatingDelta += ratingDelta;
-      changedCount += 1;
+      if (before.achievement !== after.achievement) changedCount += 1;
+      else serverRaOnlyCount += 1;
       const music = musicByKey.get(`${after.songId}:${after.type}`);
       rows.push({
         chartKey: key,
@@ -97,6 +107,8 @@ export function buildSnapshotBattleReport(
         ratingDelta,
         afterRating,
         b50Delta: b50ImpactOf(key, before),
+        serverRaDelta: serverRaIncrease(before, after),
+        achievementChanged: before.achievement !== after.achievement,
         kind: 'changed',
       });
     } else if (after) {
@@ -115,6 +127,8 @@ export function buildSnapshotBattleReport(
         ratingDelta: afterRating,
         afterRating,
         b50Delta: b50ImpactOf(key, null),
+        serverRaDelta: serverRaIncrease(null, after),
+        achievementChanged: true,
         kind: 'added',
       });
     } else {
@@ -133,6 +147,8 @@ export function buildSnapshotBattleReport(
         ratingDelta: beforeRating !== null ? -beforeRating : null,
         afterRating: null,
         b50Delta: null,
+        serverRaDelta: null,
+        achievementChanged: true,
         kind: 'removed',
       });
     }
@@ -144,5 +160,5 @@ export function buildSnapshotBattleReport(
     Number((right.b50Delta ?? 0) > 0) - Number((left.b50Delta ?? 0) > 0)
     || (right.b50Delta ?? 0) - (left.b50Delta ?? 0)
     || (right.ratingDelta ?? 0) - (left.ratingDelta ?? 0));
-  return { rows, addedCount, changedCount, removedCount, totalRatingDelta };
+  return { rows, addedCount, changedCount, serverRaOnlyCount, removedCount, totalRatingDelta };
 }

@@ -31,6 +31,10 @@ import { computeAchievementLoss, JUDGMENT_KEYS } from '../src/data/achievement-l
 import { generateFortune } from '../src/data/fortune.ts';
 import { buildScoreIndex, getMusicScore, matchesMusic, sortMusicItems } from '../src/data/music-list.ts';
 import { isCacheDirectoryNamed, isCoversCacheDirectory } from '../src/data/storage-paths.ts';
+import { onlyServerRaImprovements, serverRaIncrease, sumServerRaIncreases } from '../src/data/server-ra.ts';
+import { optionalFiniteNumber } from '../src/data/score-import-fields.ts';
+import { classifyScoreImportDiagnostic, SCORE_IMPORT_DIAGNOSTIC_ENDPOINTS } from '../src/data/score-import-diagnostics.ts';
+import { findNewlyAchievedPlanEntryIds, moveNewlyAchievedEntriesToEnd } from '../src/data/plan-auto-sink.ts';
 import {
   getBilibiliCoverCacheFilename,
   getBilibiliCoverExtension,
@@ -352,27 +356,78 @@ assert.equal(fitSorted[0].fitDiff, 14.9);
 const battleMusic: import('../src/data/types.ts').MusicData[] = [
   { id: '801', title: 'BattleA', type: 'DX', ds: [0, 0, 0, 0, 14.0], level: ['', '', '', '', '14'], cids: [1], charts: [{ notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }], basic_info: { title: 'BattleA', artist: '', genre: '', bpm: 0, from: '', is_new: true, release_date: '' } },
   { id: '802', title: 'BattleB', type: 'SD', ds: [0, 0, 0, 0, 13.0], level: ['', '', '', '', '13'], cids: [2], charts: [{ notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }], basic_info: { title: 'BattleB', artist: '', genre: '', bpm: 0, from: '', is_new: false, release_date: '' } },
+  { id: '804', title: 'BattleC', type: 'DX', ds: [0, 0, 0, 0, 12.0], level: ['', '', '', '', '12'], cids: [4], charts: [{ notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }, { notes: [], charter: '' }], basic_info: { title: 'BattleC', artist: '', genre: '', bpm: 0, from: '', is_new: false, release_date: '' } },
 ];
-const mkScore = (songId: string, type: 'SD' | 'DX', achievement: number): import('../src/data/types.ts').PlayerScore => ({
-  songId, type, difficultyIndex: 4, achievement, dxScore: 0, importedAt: 1,
+const mkScore = (songId: string, type: 'SD' | 'DX', achievement: number, serverRating?: number): import('../src/data/types.ts').PlayerScore => ({
+  songId, type, difficultyIndex: 4, achievement, dxScore: 0, importedAt: 1, serverRating,
 });
 const baseSnapshot = {
-  id: 'snap-base', syncedAt: 1000, recordCount: 2, serverRating: 1000,
-  scores: [mkScore('801', 'DX', 100.5), mkScore('802', 'SD', 100)],
+  id: 'snap-base', syncedAt: 1000, recordCount: 3, serverRating: 1000,
+  scores: [mkScore('801', 'DX', 100.5, 300), mkScore('802', 'SD', 100, 250), mkScore('804', 'DX', 90, 100)],
 };
 const targetSnapshot = {
-  id: 'snap-target', syncedAt: 2000, recordCount: 3, serverRating: 1010,
-  scores: [mkScore('801', 'DX', 100.5), mkScore('802', 'SD', 100.5), mkScore('803' in battleMusic ? '801' : '803', 'DX' as const, 99)],
+  id: 'snap-target', syncedAt: 2000, recordCount: 4, serverRating: 1010,
+  scores: [mkScore('801', 'DX', 100.5, 300), mkScore('802', 'SD', 100.5, 265), mkScore('804', 'DX', 90, 105), mkScore('803' in battleMusic ? '801' : '803', 'DX' as const, 99, 10)],
 };
 const report = buildSnapshotBattleReport(baseSnapshot, targetSnapshot, battleMusic);
 // 上分：802 100→100.5（13.0×21.6=280.8→280 → 13.0×1.005×22.4=292.824→292，+12）；新增 803 不在库 → Rating 记 null，不计总分。
 assert.equal(report.changedCount, 1);
+assert.equal(report.serverRaOnlyCount, 1);
 assert.equal(report.addedCount, 1);
 assert.equal(report.removedCount, 0);
+assert.equal(report.rows.some(row => row.songId === '804' && row.achievementChanged === false && row.serverRaDelta === 5), true, 'preserve a server RA-only improvement even if achievement percent is unchanged');
 const changedRow = report.rows.find(row => row.songId === '802');
 assert.ok(changedRow);
 assert.equal(changedRow.ratingDelta, 12);
+assert.equal(changedRow.serverRaDelta, 15, 'server RA is based on the API per-chart ra field');
 assert.equal(report.totalRatingDelta, 12);
+assert.deepEqual(onlyServerRaImprovements(report.rows).map(row => row.songId).sort(), ['802', '803', '804'], 'new records with a reported positive server single-chart RA count as improvements');
+assert.equal(serverRaIncrease(null, mkScore('900', 'DX', 100, 42)), 42, 'new imported records count their reported ra from zero');
+assert.equal(serverRaIncrease(mkScore('900', 'DX', 99), mkScore('900', 'DX', 100, 42)), null, 'do not infer server RA increase when previous server ra is unavailable');
+assert.equal(onlyServerRaImprovements([{ serverRaDelta: 0 }, { serverRaDelta: null }, { serverRaDelta: -1 }]).length, 0);
+assert.equal(sumServerRaIncreases([{ serverRaDelta: 5 }, { serverRaDelta: -2 }, { serverRaDelta: null }]), 5);
+assert.equal(optionalFiniteNumber(undefined), undefined, 'missing API numeric fields remain unknown instead of zero');
+assert.equal(optionalFiniteNumber(null), undefined);
+assert.equal(optionalFiniteNumber(''), undefined);
+assert.equal(optionalFiniteNumber('265'), 265);
+assert.equal(optionalFiniteNumber('unknown'), undefined);
+
+// v1.17.3：成绩同步只对本次真正从未达标跨到达标的条目做一次性沉底。
+{
+  const entry = (entryId: string, songId: string, order: number, targetScore = 100) => ({
+    entryId, songId, difficultyIndex: 4, musicType: 'DX' as const, addedAt: 1, order, targetScore, pin: 'top' as const,
+  });
+  const sinkMusic = [makeMusic('950', 'maimai でらっくす'), makeMusic('951', 'maimai でらっくす'), makeMusic('952', 'maimai でらっくす')];
+  const sinkEntries = [entry('sink-a', '950', 0), entry('sink-b', '951', 1), entry('sink-c', '952', 2)];
+  const changes = [
+    { chartKey: 'DX:950:4', previous: { ...mkScore('950', 'DX', 99), serverRating: 10 }, current: { ...mkScore('950', 'DX', 100), serverRating: 11 }, changedAt: 2 },
+    { chartKey: 'DX:951:4', previous: { ...mkScore('951', 'DX', 99), serverRating: 10 }, current: { ...mkScore('951', 'DX', 100), serverRating: 11 }, changedAt: 2 },
+  ];
+  const newlyAchieved = findNewlyAchievedPlanEntryIds(sinkEntries, changes, sinkMusic, changes.map(change => change.current!));
+  assert.deepEqual(newlyAchieved, ['sink-a', 'sink-b']);
+  const sunk = moveNewlyAchievedEntriesToEnd(sinkEntries, newlyAchieved);
+  assert.deepEqual(sunk.map(item => item.entryId), ['sink-c', 'sink-a', 'sink-b']);
+  assert.deepEqual(sunk.map(item => item.order), [0, 1, 2]);
+  assert.ok(sunk.every(item => item.pin === undefined), 'clear legacy pin groups so later normalization cannot undo manual sink order');
+  assert.deepEqual(normalizePlanEntries(sunk).map(item => item.entryId), ['sink-c', 'sink-a', 'sink-b']);
+  assert.equal(moveNewlyAchievedEntriesToEnd(sunk, newlyAchieved), sunk, 'one-shot sink does not repeatedly reorder entries');
+  const otherSunk = moveNewlyAchievedEntriesToEnd(sunk, ['sink-c']);
+  assert.deepEqual(otherSunk.map(item => item.entryId), ['sink-a', 'sink-b', 'sink-c'], 'a later different transition moves only its new row to the tail');
+  const draggedAfterSink = moveNewlyAchievedEntriesToEnd([sunk[1], sunk[0], sunk[2]], newlyAchieved);
+  assert.deepEqual(draggedAfterSink.map(item => item.entryId), ['sink-c', 'sink-a', 'sink-b'], 'still-target-achieved rows are not sunk again after user manual drag');
+  const initialScore = { ...mkScore('952', 'DX', 100), serverRating: 1 };
+  assert.deepEqual(findNewlyAchievedPlanEntryIds([sinkEntries[2]], [{ chartKey: 'DX:952:4', previous: null, current: initialScore, changedAt: 3 }], sinkMusic, [initialScore]), [], 'first-ever score has no known crossing and must not reorder the plan');
+}
+
+// v1.17.3：成绩导入端点诊断只用于连接状态分类。
+assert.equal(classifyScoreImportDiagnostic(400, '导入token有误'), 'invalid-token');
+assert.equal(classifyScoreImportDiagnostic(400, '其他过滤条件无效'), 'reachable', 'non-token 400 still means API endpoint reached');
+assert.equal(classifyScoreImportDiagnostic(403, 'forbidden'), 'blocked');
+assert.equal(classifyScoreImportDiagnostic(429, null), 'rate-limited');
+assert.equal(classifyScoreImportDiagnostic(503, null), 'server-error');
+assert.equal(classifyScoreImportDiagnostic(null, null), 'network-error');
+assert.equal(classifyScoreImportDiagnostic(200, null), 'unexpected-success');
+assert.deepEqual(SCORE_IMPORT_DIAGNOSTIC_ENDPOINTS, ['/player/validate', '/player/records'], 'diagnostics probe both Import-Token endpoints without a saved Import-Token');
 
 // v1.15.0：快照保留数量归一化（默认 20，边界 1/1000）。
 assert.equal(normalizeSnapshotLimit(undefined), 20);

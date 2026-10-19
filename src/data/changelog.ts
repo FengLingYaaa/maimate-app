@@ -11,6 +11,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.17.3',
+    date: '2026-10-18',
+    highlights: [
+      '成绩 Token 验证失败时区分无效 Token、连接失败、403 拒绝、429 限流和服务器错误',
+      '设置页新增 Token 安全连通性诊断，使用随机占位 Token，不读取或发送已保存 Token',
+      '只有已有成绩低于目标且本次同步达到目标的计划曲目才会移动一次到手动顺序末尾；不重排评分/筛选视图',
+      '推分计划恢复单一手动顺序，不再让旧置顶/置底标记覆盖拖拽或自动沉底顺序',
+      '快照战报可选择仅分享 Diving-Fish 单曲服务器 RA 上升记录；也会保留达成率未变但服务器 RA 上升的记录，并与本地 B50 估值区分',
+      'GitHub README 和官网下载日志补充完整，官网重构素材等待 Cloudflare 登录后部署',
+    ],
+  },
+  {
     version: '1.17.2',
     date: '2026-09-06',
     highlights: [

@@ -38,7 +38,18 @@
     <p class="intro">这里记录 MaiMate 的主要版本变化。应用内也会在新版本首次启动时展示当版摘要。</p>
 
     <article class="entry">
-      <div class="entry-head"><span class="version">v1.17.2</span><span class="date">2026-09-06</span></div>
+      <div class="entry-head"><span class="version">v1.17.3 · 构建准备中</span><span class="date">2026-10-18</span></div>
+      <ul>
+        <li>成绩同步后，只把已有成绩低于目标且本次达到目标的计划曲目一次性移到手动顺序最末尾；评分/筛选排序视图不被改动。</li>
+        <li>推分计划恢复单一手动顺序；旧置顶/置底字段不会再覆盖拖拽或自动沉底顺序。</li>
+        <li>快照战报分享可选择只包含 Diving-Fish 单曲服务器 RA（records[].ra）明确上升的曲目；达成率未变但 RA 上升的记录也会保留，并与本地 B50 估值分开展示。</li>
+        <li>成绩导入 Token 验证通过只读 records 端点；设置页诊断端点可达性时使用占位 Token，不发送已保存的用户 Token。</li>
+        <li>补齐官网历史更新日志，部署素材已就绪，等待生产站发布。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.17.2</span><span class="date">2026-09-09</span></div>
       <ul>
         <li>成绩排序直接显示达成率数值；FC/FC+ 使用绿色，AP/AP+ 使用橙色。</li>
         <li>DX Rating 预估中，官方定数对应的 Rating 统一使用粉色。</li>
@@ -83,18 +94,227 @@
     <article class="entry">
       <div class="entry-head"><span class="version">v1.16.8</span><span class="date">2026-08-30</span></div>
       <ul>
-        <li>曲绘分级缓存：列表使用缩略图，详情页按需使用原图并受 LRU 上限控制。</li>
-        <li>修复曲绘进入系统图片缓存的问题，增加其它缓存明细和清理。</li>
-        <li>搜索改为分片处理并显示真实进度，识别中删除图片不再复活迟到结果。</li>
+        <li>曲绘分级缓存：列表使用低清缩略图，详情页大图按需加载原图（LRU 上限 80 张）。</li>
+        <li>曲绘不再进入系统图片缓存，修复其它缓存统计并增加旧缓存清理。</li>
+        <li>纯数字搜索短路，模糊搜索分片处理并显示真实进度；识别删图不再复活迟到结果。</li>
       </ul>
     </article>
 
     <article class="entry">
       <div class="entry-head"><span class="version">v1.16.7</span><span class="date">2026-09-02</span></div>
       <ul>
-        <li>详情页新增歌曲数字 ID，CSV 导出独立成设置子页面。</li>
+        <li>详情页新增歌曲 ID，CSV 导出独立成设置页面。</li>
         <li>识别改为增量匹配，原始识别文字默认折叠。</li>
-        <li>搜索改为确认式触发并显示匹配进度，快照对比行可跳转详情。</li>
+        <li>搜索改为确认式触发并显示匹配进度；快照战报行可打开详情。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.16.6</span><span class="date">2026-08-29</span></div>
+      <ul>
+        <li>修复战报 +0 RA 显示，修正存储占用统计并增加其它缓存清理。</li>
+        <li>搜索支持歌曲 ID；成绩 CSV 与 JSON 备份支持直接保存或分享。</li>
+        <li>移除媒体/音频权限；计划、全曲和条件抽歌分别保存今日历史。</li>
+        <li>修复照片识别删图与容错问题，清空计划更快。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.16.5</span><span class="date">2026-08-29</span></div>
+      <ul>
+        <li>修复长计划列表滑动与跳到底部卡顿，B50 计算增加缓存。</li>
+        <li>战报行显示该曲对 B50 总分的真实影响；新增搜索历史管理和存储占用面板。</li>
+        <li>今日舞萌运势曲绘完整正方形显示；下线实验性成绩曲线。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.16.4</span><span class="date">2026-08-29</span></div>
+      <ul>
+        <li>修复快照页标题/返回键遮挡与 B50 榜内战报分数。</li>
+        <li>搜索历史支持长按删除；歌曲详情新增基于本机快照的成绩曲线。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.16.3</span><span class="date">2026-08-29</span></div>
+      <ul>
+        <li>快照管理独立为顶级页面；战报行 RA 改为对 B50 总分的影响。</li>
+        <li>计划到底按钮移至右下角；增加计划查漏和下载站直链。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.16.2</span><span class="date">2026-08-29</span></div>
+      <ul>
+        <li>成绩同步后新达标曲目可自动沉底；推分计划抽歌默认排除已达标曲目。</li>
+        <li>抽歌新增每日不重复优先与近 7 天抽歌历史。</li>
+        <li>牌子页导入曲目后可批量设置 100% 目标。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.16.1</span><span class="date">2026-08-28</span></div>
+      <ul>
+        <li>修复设置次级页面导航和推分计划环形进度条。</li>
+        <li>曲库与计划搜索历史分开保存；新增 nb50 提示和版本更新日志浮层。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.16.0</span><span class="date">2026-08-28</span></div>
+      <ul>
+        <li>推出八色分段街机环应用图标和拟合定数排序。</li>
+        <li>计划进度环按已达标比例显示；战报汇总显示 DX Rating 变化。</li>
+        <li>修复设置页归位、B50 默认网格和相册 API 告警。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.15.2</span><span class="date">2026-08-28</span></div>
+      <ul>
+        <li>修复分享卡预览、五列布局和存相册流程；新增推分战报与牌子完成度卡试验。</li>
+        <li>完成率损失提示改为固定等效容错口径；曲库新增搜索历史。</li>
+        <li>推分战报精简汇总，并把 APK 下载改为 GitHub 直链。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.15.1</span><span class="date">2026-08-28</span></div>
+      <ul>
+        <li>新增信息查询聚合页和可用的拟合 50 切换入口。</li>
+        <li>修复分享卡五列展示、长卡片预览与曲绘 ID；新增等效容错提示。</li>
+        <li>存相册权限和计划页排序布局按反馈调整。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.15.0</span><span class="date">2026-08-28</span></div>
+      <ul>
+        <li>新增拟合 50 榜单、B50/拟合榜切换和对应分享卡片。</li>
+        <li>快照对比升级为逐曲推分战报；快照保留数可在设置中调整。</li>
+        <li>详情页曲绘支持大图查看；修复 B50 顶栏、池切换和计划底部空间。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.14.0</span><span class="date">2026-08-28</span></div>
+      <ul>
+        <li>分享卡改为预览后再分享或存相册；修复误触分享和 B50 捕获。</li>
+        <li>B50 网格增加完成率着色、同分分隔和多选入计划。</li>
+        <li>推分计划进度环、牌子页定数和快照比较体验改进。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.13.0</span><span class="date">2026-08-28</span></div>
+      <ul>
+        <li>B50 新增网格视图、多选加入计划和成绩分享卡。</li>
+        <li>推分计划新增目标进度环和已达标/未达标筛选。</li>
+        <li>牌子页支持定数排序和筛选状态记忆；新增快照管理。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.12.0</span><span class="date">2026-08-27</span></div>
+      <ul>
+        <li>推分计划改为单组拖拽；B50 按新曲 TOP15 / 旧曲 TOP35 分池浏览。</li>
+        <li>计划目标新增 B50 增量提示；曲库可显示 B50 徽标。</li>
+        <li>新增成绩 CSV 导出与批量清除已达标目标。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.11.0</span><span class="date">2026-08-27</span></div>
+      <ul>
+        <li>新增 B50 总览、成绩趋势图和曲绘本地缓存。</li>
+        <li>更新红点、牌子高难聚焦、完成率损失判定配色。</li>
+        <li>限制置顶/普通/置底分组之间拖拽，并优化计划列表。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.10.0</span><span class="date">2026-08-27</span></div>
+      <ul>
+        <li>推分计划拖拽重写为持久 entryId 身份，修复连续拖拽串位。</li>
+        <li>新增 JSON 数据备份/恢复、CSV 导出和应用内更新检查。</li>
+        <li>音乐平台搜索词复制兜底，牌子页和列表滚动体验优化。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.9.0</span><span class="date">2026-08-26</span></div>
+      <ul>
+        <li>修复 Bilibili 视频深链、推分计划拖拽和完成率损失口径。</li>
+        <li>详情页板块支持排序和默认折叠；音乐平台设置新增诊断入口。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.8.0</span><span class="date">2026-08-26</span></div>
+      <ul>
+        <li>优化 B 站短链、音乐平台应用跳转和详情页返回来源。</li>
+        <li>新增完成率损失试算，修复牌子筛选和计划拖拽问题。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.7.0</span><span class="date">2026-08-26</span></div>
+      <ul>
+        <li>新增推歌英灵殿、计划置顶/置底和本地牌子查询重做。</li>
+        <li>筛选栏改版，改善版本筛选、随机抽歌和歌曲详情信息布局。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.6.6</span><span class="date">2026-08-20</span></div>
+      <ul>
+        <li>Bilibili 与音乐平台优先尝试打开已安装应用，失败时回退 HTTPS 网页。</li>
+        <li>支持粘贴 Bilibili 分享文本，按单条链接保存标题与封面；新增本地 FC/SSS/FS DX/AP 牌子查询。</li>
+        <li>原始日服版本与中国区版本独立筛选，计划列表支持搜索和目标摘要。</li>
+        <li>修复设置、歌曲详情、嵌套导航和 Android 返回入口。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.5.0-alpha · Phase A–F</span><span class="date">2026-08-20</span></div>
+      <ul>
+        <li>加入歌曲别名、PLUS/国区版本筛选和宴会场同名普通曲绘回退。</li>
+        <li>只读成绩快照与变化记录；支持本机 Bilibili 单条链接备注、标签、编辑和删除。</li>
+        <li>完善目标达成率、连续多图 OCR、今日运势和音乐平台搜索。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.4.0-alpha · Phase 1–4</span><span class="date">2026-08-19</span></div>
+      <ul>
+        <li>修正 DX Rating 系数和宴会场无定数显示。</li>
+        <li>加入曲名搜索、定数筛选、目标分数和本机成绩导入。</li>
+        <li>新增舞萌运势、歌曲详情和相机文字识别流程。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v1.1.0-alpha · Phase 1–2</span><span class="date">2026-08-18</span></div>
+      <ul>
+        <li>曲库增加 12 小时缓存与后台更新；离线时保留本机数据。</li>
+        <li>随机结果可打开详情，新增滚筒切曲动画并改善谱师、定数展示。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">P0–P6 内测构建</span><span class="date">2026-08-18</span></div>
+      <ul>
+        <li>建立分类、SD/DX、版本、曲师、谱师、模糊搜索和定数筛选。</li>
+        <li>增加随机抽歌、推分计划、拟合定数与 DX Rating 估算。</li>
+      </ul>
+    </article>
+
+    <article class="entry">
+      <div class="entry-head"><span class="version">v0.1.0-alpha</span><span class="date">2026-08-16</span></div>
+      <ul>
+        <li>项目初始化，建立曲目浏览器、谱面详情和随机滚筒。</li>
+        <li>推出推分计划管理和 MaiMate 霓虹暗色主题。</li>
       </ul>
     </article>
 

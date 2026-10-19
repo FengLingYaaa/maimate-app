@@ -5,7 +5,7 @@
  *   （releases/latest/download 自动跟随最新 tag）。重定向响应体积极小，
  *   不再消耗 Workers 代理流量，也不再有 CF 服务条款大文件分发风险；
  *   下载流量直接走 GitHub CDN。
- * - 其余路径走 Pages 静态资源（index.html）。
+ * - 其余已存在路径走 Pages 静态资源（/、/changelog.html、/icon.png 等）；未知路径回退到首页。
  */
 const APK_PATH = '/MaiMate-latest.apk';
 const APK_SOURCE = 'https://github.com/FengLingYaaa/maimate-app/releases/latest/download/MaiMate-latest.apk';

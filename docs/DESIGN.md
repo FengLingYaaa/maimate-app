@@ -1,9 +1,9 @@
 # MaiMate（舞萌伴侣）项目设计案
 
 > 文档性质：项目事实基线、产品设计、工程约束和持续变更记录。
-> 最后更新：2026-09-06
-> 当前版本：`v1.17.2`
-> 当前状态：v1.17.2（第十八轮用户反馈）代码与官网静态素材已在本地实现，尚未提交、云构建、创建 Release 或部署落地页；Android 真机验收仍待设备。v1.17.1 的已发布 APK 与公网部署证据继续保留在下方历史记录中。
+> 最后更新：2026-10-18
+> 当前版本：`v1.17.3`
+> 当前状态：v1.17.2 已提交、Release 与 APK 云构建成功（run `34337186939`）；v1.17.3 README、沉底/战报/成绩导入修复和官网完整日志正在本地实现，尚未提交、云构建或发布。官网新版部署未验证，Wrangler 未认证。Android 真机验收待设备。
 > GitHub：<https://github.com/FengLingYaaa/maimate-app>
 
 这份文档的目标不是只描述“理想中的产品”，而是让人类或新对话中的智能体能够回答：
@@ -1100,3 +1100,17 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 验证证据：`npm run lint`、`test:routes`、`test:features`、`test:phase-af`、`test:rating`、`test:backup`、`test:update`、`test:match`、`npx expo-doctor`（21/21）、`npx expo export --platform android --no-bytecode`、`git diff --check` 均通过；Expo 补丁依赖已对齐到 expo 57.0.21 / expo-router 57.0.20。
 - 人类需要确认：是否继续创建提交、触发 v1.17.2 云构建并部署下载站；未获得明确发布指示前不执行外部发布。
 - 下一步：完成本地验证，读回变更文件并根据测试结果修正问题。
+
+### v1.17.3（2026-10-18，第十九轮用户反馈；本地实施完成，未发布）
+
+- 用户目标：新增仅用于 GitHub 的 README；新达标计划曲目只在手动顺序中一次性移至列表末尾，不影响评分/筛选排序；战报分享增加“仅服务器单曲 RA 提升”模式；检查并完成官网重构；修复成绩 Token 反复验证失败。
+- 成绩 Token 调查：用户报告“验证时报 Token 无效或已失效”。公开前端通过 `/api/maimaidxprober/player/import_token` 生成 Import-Token；官方 `oauth_or_login_required` 明确接受 `Import-Token` 头，而 `/player/validate` 使用 `login_or_token_required` 并返回 `login_type`，因此该端点本身**也接受 Import-Token**，最初“仅登录态”的判断不成立。两端点对随机无效 Token 均返回 400「导入token有误」，只能验证拒绝逻辑，不能确认用户 Token。保存前仍通过官方 `/player/validate` 检查 `message: "ok"` 和 username；真正成绩读取使用 `/player/records`。用户侧若验证仍返回 400，则服务端确实拒绝当前 Import-Token，可能是粘贴字段/内容错误、重新生成后继续使用旧 Token，或账号/服务端问题；实际令牌未被检查，因此根因仍未确认。应用新增的诊断只用占位 Token 检查 validate/records 路由可达性，不读取真实存储 Token。
+- 计划沉底：新纯函数按快照变化检查 `previous != null && previous < target <= current`，先按真实曲库 SD/DX 谱面选择匹配变化；首次导入就高于目标或已达标但无新跨线的条目不移。Store 只持久化一次的顺序变化；手动顺序视图映射 store order，显式排序视图维持用户指定排序；清除废弃 pin 分组标记避免归一化覆盖顺序。
+- 战报：复用 Diving-Fish `records[].ra` 的单谱服务端 RA 字段计算变化；独立于本地 `ratingDelta` / `b50Delta`。即使达成率没变，只要服务端单谱 RA 增长也保留战报行（并与“达成率变化”分开统计）。分享菜单可选全部变化或仅 `serverRaDelta>0`，空列表不打开导出；PNG 的计数/行依据筛选同步，B50 本地估算标为 B50，不冒称服务器 RA。
+- README：新增下载链接、功能、隐私、安全、构建和 Token 故障排查说明。官网次级日志恢复被 v1.17.2 简化版删掉的 v1.16.7 及更早历史，首页/日志文件明确区分本地重构素材和正式站部署状态。
+- 官网部署：从共享 workspace `.env` 安全读取 `CLOUDFLARE_API_TOKEN` 后，`wrangler whoami` 成功，Pages 项目为 `maimate-landing`（绑定 `maimate.flya.ccwu.cc`）。尚未部署，需在 v1.17.3 构建成功后把 `.landing-deploy/` 发布到该项目并在线验收。
+- 版本：已将应用元数据设为 `1.17.3` / Android versionCode `39`，并对齐 Expo SDK 补丁版本；尚未提交、构建原生 APK 或发布。
+- 回归验证：使用 `npm ci --legacy-peer-deps --no-audit --no-fund --ignore-scripts` 后，`npx expo-doctor` **21/21 通过**，`npx expo install --check` 无过时依赖；`npm run lint`、`test:landing`、`test:routes`、`test:features`、`test:phase-af`、`test:rating`、`test:backup`、`test:update`、`test:match` 均通过；`npx expo export --platform android` 与 `git diff --check` 通过。`test:landing` 对 Pages Worker 首页/日志/图标路由、未知路径 fallback、APK redirect、历史日志与当前发行文案做本地断言，不代表 Cloudflare 正式站已部署。Expo 官方精确 SDK 57.0.0 指南 `https://docs.expo.dev/versions/v57.0.0/` 和 SecureStore 参考页 `https://docs.expo.dev/versions/v57.0.0/sdk/securestore/` 已打开读取。
+- 回归用例覆盖：只读 server-ra 单谱 positive delta、新谱记录与缺少前值场景；400/403/429/5xx/network token 诊断分类；忽略变化/旧顺序、不同批次新的成就跃迁和保序沉底。
+- 官网/发布核查：`GH_TOKEN` 属于 FengLingYaaa，GitHub API 显示 `maimate-app` push=true；用户在本轮确认 `.env` 中是轮换后的新 token。Cloudflare Token 的 `wrangler whoami` 成功，目标 Pages 项目 `maimate-landing`。但 Git push 的 HTTPS 连接被当前环境/代理拒绝（直连也失败），故尚未推送、打 tag 或创建 Release；Cloudflare 尚未部署，等 APK 发布后再上 production。远端 URL 中意外发现的旧 token 已从 URL 和 Git Credential Manager 清除，并已提醒用户撤销。更新后的 `.landing-deploy/` 与路由 `test:landing` 通过本地核查。
+- 下一步：用户应撤销误暴露的旧 GitHub token；在 Cloudflare Pages 与 GitHub 获得新的安全认证后，推送源码并创建 `v1.17.3` tag 触发 `build-apk.yml`，部署完整 `.landing-deploy/` 并验收 `/`、`/changelog.html`、`/icon.png`、`/MaiMate-latest.apk`；原生 Android SDK 不在本机，因此以 Actions 云构建 APK。当前均未执行外部发布/部署。

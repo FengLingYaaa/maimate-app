@@ -5,6 +5,7 @@ import { Colors } from '../../../src/constants';
 import { useScoreStore, useSettingsStore } from '../../../src/store';
 import { MUSIC_PLATFORM_OPTIONS, getSortLabel } from '../../../src/data/settings-options';
 import { measureStorageBreakdown, clearCovers, clearOtherCache, formatBytes, type StorageBreakdown } from '../../../src/data/storage-usage';
+import { diagnoseScoreImportEndpoints } from '../../../src/data/score-import-diagnostics';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -111,9 +112,33 @@ export default function SettingsPage() {
     try {
       await verifyAndSaveToken(tokenInput);
       setTokenInput('');
-      setTokenMessage('Token 验证成功，已安全保存到设备');
+      setTokenMessage('Token 验证成功，已安全保存到设备。现在可以点击“立即同步成绩”。');
     } catch (error) {
-      setTokenMessage(error instanceof Error ? error.message : 'Token 验证失败');
+      const tokenError = error instanceof Error ? error.message : 'Token 验证失败';
+      setTokenMessage(`${tokenError}\nToken 已隐藏。可点击下方诊断按钮检查端点连通性（诊断不会发送已保存的真实 Token）。`);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const handleDiagnoseToken = async () => {
+    setWorking(true);
+    setTokenMessage(null);
+    try {
+      const results = await diagnoseScoreImportEndpoints();
+      const lines = results.map(result => {
+        const endpoint = result.endpoint.endsWith('/validate') ? 'Import-Token 验证端点' : 'Import-Token 成绩记录端点';
+        if (result.kind === 'invalid-token') return `${endpoint}可达；诊断占位 Token 被正确拒绝（400）。网络正常，诊断不会验证或发送已保存 Token。`;
+        if (result.kind === 'blocked') return `${endpoint}返回 403：可能被网络、地区策略或服务端访问规则拦截。`;
+        if (result.kind === 'rate-limited') return `${endpoint}触发 HTTP 429 限流；请稍后再试。`;
+        if (result.kind === 'server-error') return `${endpoint}返回服务器错误 ${result.status}，请稍后重试。`;
+        if (result.kind === 'unexpected-success') return `${endpoint}对诊断占位 Token 返回 ${result.status}；请停止诊断并检查服务响应。`;
+        if (result.kind === 'network-error') return `${endpoint}无法连接或请求超时；请检查网络、DNS、VPN/代理或稍后再试。`;
+        return `${endpoint}返回 HTTP ${result.status}${result.message ? `：${result.message}` : ''}。`;
+      });
+      setTokenMessage(lines.join('\n'));
+    } catch {
+      setTokenMessage('诊断未完成。请检查网络后重试；诊断不会读取或发送已保存的用户 Token。');
     } finally {
       setWorking(false);
     }
@@ -180,29 +205,33 @@ export default function SettingsPage() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Diving-Fish 成绩导入</Text>
+        <Text style={styles.preferenceDescription}>请粘贴官网生成的成绩导入 Import-Token（不是网页登录 Token）；验证通过后才会保存在本机安全存储中。</Text>
         <TextInput
           style={styles.tokenInput}
           value={tokenInput}
           onChangeText={setTokenInput}
-          placeholder={tokenConfigured ? '已配置 Token；粘贴新 Token 可替换' : '粘贴 Token 或 Shadowrocket 链接'}
+          placeholder={tokenConfigured ? '已配置 Import-Token；粘贴新 Token 可替换' : '粘贴成绩导入 Import-Token'}
           placeholderTextColor={Colors.text.muted}
           autoCapitalize="none"
           autoCorrect={false}
           secureTextEntry
         />
         <Pressable style={[styles.primaryButton, working && styles.disabled]} disabled={working} onPress={() => void handleVerify()}>
-          <Text style={styles.primaryButtonText}>{working ? '验证中…' : tokenConfigured ? '验证并替换 Token' : '验证并保存 Token'}</Text>
+          <Text style={styles.primaryButtonText}>{working ? '验证中…' : tokenConfigured ? '验证并替换 Import-Token' : '验证并保存 Import-Token'}</Text>
         </Pressable>
         {tokenConfigured && <Text style={styles.configuredText}>状态：已配置（Token 内容已隐藏）</Text>}
         {!!tokenMessage && <Text style={styles.messageText}>{tokenMessage}</Text>}
         <View style={styles.buttonRow}>
-          <Pressable style={styles.secondaryButton} onPress={() => void syncScores()}>
+          <Pressable style={styles.secondaryButton} disabled={working} onPress={() => void syncScores()}>
             <Text style={styles.secondaryButtonText}>立即同步成绩</Text>
           </Pressable>
-          <Pressable style={styles.dangerButton} onPress={handleClearToken}>
+          <Pressable style={styles.dangerButton} disabled={working} onPress={handleClearToken}>
             <Text style={styles.dangerButtonText}>删除 Token</Text>
           </Pressable>
         </View>
+        <Pressable style={[styles.secondaryButton, working && styles.disabled]} disabled={working} onPress={() => void handleDiagnoseToken()}>
+          <Text style={styles.secondaryButtonText}>{working ? '请求处理中…' : '诊断成绩连接（不发送已保存 Token）'}</Text>
+        </Pressable>
         <View style={styles.snapshotLimitRow}>
           <View style={styles.preferenceText}>
             <Text style={styles.preferenceTitle}>快照保留数量</Text>
@@ -221,7 +250,7 @@ export default function SettingsPage() {
         <Pressable style={styles.snapshotLimitRow} onPress={() => void updateSettings({ autoSinkAchieved: !settings.autoSinkAchieved })}>
           <View style={styles.preferenceText}>
             <Text style={styles.preferenceTitle}>新达标自动沉底</Text>
-            <Text style={styles.preferenceDescription}>同步成绩后自动把新达标的曲目移到推分计划最下侧</Text>
+            <Text style={styles.preferenceDescription}>只有已有成绩低于目标且本次同步达到目标的曲目会在手动顺序中移动一次到列表末尾；评分/筛选排序不受影响</Text>
           </View>
           <Text style={[styles.valueButtonText, { color: settings.autoSinkAchieved ? Colors.functional.success : Colors.text.muted }]}>
             {settings.autoSinkAchieved ? '开' : '关'}

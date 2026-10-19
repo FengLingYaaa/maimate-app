@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { PlanEntry, PlanGraveyardEntry, PushPlan } from '../data/types';
 import { CACHE_KEYS } from '../constants/game';
+import { moveNewlyAchievedEntriesToEnd } from '../data/plan-auto-sink';
 import {
   createPlanEntryId,
   migratePlanEntryIds,
@@ -114,26 +115,20 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
   addEntry: entry => {
     const current = get().entries;
     if (current.some(item => matchesPlanEntry(item, entry.songId, entry.difficultyIndex, entry.musicType))) return;
-    const sorted = normalizePlanEntries(current);
-    const insertAt = sorted.findIndex(item => item.pin !== 'top');
-    const newEntry: PlanEntry = { ...entry, entryId: createPlanEntryId(), addedAt: Date.now(), order: 0 };
-    if (insertAt < 0) sorted.push(newEntry);
-    else sorted.splice(insertAt, 0, newEntry);
-    const entries = normalizePlanEntries(sorted);
+    const sorted = [...current].sort((left, right) => left.order - right.order);
+    const newEntry: PlanEntry = { ...entry, entryId: createPlanEntryId(), addedAt: Date.now(), order: sorted.length };
+    const entries = [...sorted, newEntry].map((item, order) => ({ ...item, order }));
     set({ entries });
     void enqueuePlanPersist(entries);
   },
 
   bulkAddEntries: incoming => {
     const addedKeys: PlanEntryKey[] = [];
-    const working = normalizePlanEntries(get().entries);
+    const working = [...get().entries].sort((left, right) => left.order - right.order);
     for (const entry of incoming) {
       if (working.some(item => matchesPlanEntry(item, entry.songId, entry.difficultyIndex, entry.musicType))) continue;
       addedKeys.push(planEntryKey(entry));
-      const insertAt = working.findIndex(item => item.pin !== 'top');
-      const newEntry: PlanEntry = { ...entry, entryId: createPlanEntryId(), addedAt: Date.now(), order: 0 };
-      if (insertAt < 0) working.push(newEntry);
-      else working.splice(insertAt, 0, newEntry);
+      working.push({ ...entry, entryId: createPlanEntryId(), addedAt: Date.now(), order: working.length });
     }
     if (addedKeys.length > 0) {
       const entries = normalizePlanEntries(working);
@@ -278,15 +273,11 @@ export const usePlanStore = create<PlanStore>((set, get) => ({
     return true;
   },
 
-  /** v1.16.2：新达标沉底——保持相对顺序移到计划末尾并持久化。 */
+  /** v1.17.3：仅对首次跨过目标的条目执行一次手动顺序沉底。 */
   sinkAchievedEntries: entryIds => {
-    if (entryIds.length === 0) return;
-    const idSet = new Set(entryIds);
-    const entries = get().entries;
-    const sunk = entries.filter(entry => idSet.has(entry.entryId));
-    if (sunk.length === 0) return;
-    const kept = entries.filter(entry => !idSet.has(entry.entryId));
-    const next = normalizePlanEntries([...kept, ...sunk]);
+    const current = get().entries;
+    const next = moveNewlyAchievedEntriesToEnd(current, entryIds);
+    if (next === current) return;
     set({ entries: next });
     void enqueuePlanPersist(next);
   },

@@ -1,5 +1,5 @@
 import type { MusicData, PlanEntry, PlanGraveyardEntry, PlayerScore } from './types';
-import { applyDragWithPinGroups, compareByPinThenOrder } from './plan-order';
+
 
 let idSequence = 0;
 
@@ -48,11 +48,14 @@ export function migratePlanGraveyardIds(graveyard: PlanGraveyardEntry[], now = D
   return { graveyard: migratedGraveyard, migrated };
 }
 
-/** 展示/持久化统一顺序：置顶 → 普通 → 置底；order 永远等于数组下标。 */
+/** v1.17.3：移除旧版置顶/置底 UI 后，计划单一手动顺序按 order 归一化。 */
 export function normalizePlanEntries(entries: PlanEntry[]): PlanEntry[] {
   return [...entries]
-    .sort(compareByPinThenOrder)
-    .map((entry, order) => ({ ...entry, order }));
+    .sort((left, right) => left.order - right.order)
+    .map((entry, order) => {
+      const { pin: _obsoletePin, ...manualEntry } = entry;
+      return { ...manualEntry, order };
+    });
 }
 
 /** 曲库记录类型（SD=旧世代 / DX=でらっくす 世代）；同一 songId 可能最多有 SD、DX 两条记录。 */
@@ -203,5 +206,8 @@ export function reorderPlanEntriesById(current: PlanEntry[], orderedIds: string[
   const byId = new Map(current.map(entry => [entry.entryId, entry]));
   if (byId.size !== current.length || orderedIds.some(id => !byId.has(id))) return null;
   const dragged = orderedIds.map(id => byId.get(id)!);
-  return applyDragWithPinGroups(dragged).map((entry, order) => ({ ...entry, order }));
+  return dragged.map((entry, order) => {
+    const { pin: _obsoletePin, ...manualEntry } = entry;
+    return { ...manualEntry, order };
+  });
 }

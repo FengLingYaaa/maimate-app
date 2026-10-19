@@ -13,9 +13,15 @@
 5. 等待约 10~15 分钟，任务完成后进入该次运行页面
 6. 在 **Artifacts** 区域下载 `MaiMate-APK`
 
-> Artifact 内容与触发方式有关：tag（`v*`）构建的 Artifact 在原始 `app-release.apk` 之外，还包含命名副本 `MaiMate-v<版本>.apk`（如 `MaiMate-v1.17.2.apk`）和 `MaiMate-latest.apk`；手动触发（Run workflow）的 Artifact 仅含原始 `app-release.apk`。
+> Artifact 内容与触发方式有关：tag（`v*`）构建的 Artifact 在原始 `app-release.apk` 之外，还包含命名副本 `MaiMate-v<版本>.apk`（如 `MaiMate-v1.17.3.apk`）和 `MaiMate-latest.apk`；手动触发（Run workflow）的 Artifact 仅含原始 `app-release.apk`。
 
 > GitHub 托管 runner 内存充足，不受本机 4GB 容器限制。
+
+### 官网重构静态素材检查与部署
+
+GitHub 源码中的网站静态文件位于 `.landing-deploy/`：`index.html` 首页、`changelog.html` 更新日志、`icon.png` 应用图标和 `_worker.js`。`_worker.js` 负责将 `/MaiMate-latest.apk` 重定向到 GitHub Release；这不会自动部署 Pages 静态文件。v1.17.3 的首页和历史日志按发布前预览内容标注当前正式 APK 仍为 v1.17.2，版本化 APK 链接在发版前不应当作可用链接。
+
+每次更新网站内容后，必须把整个 `.landing-deploy/` 目录（包括新页面、新图片和 `_worker.js`）发布到 Cloudflare Pages。部署后验证 `/`、`/changelog.html`、`/icon.png` 均为新内容，且 `/MaiMate-latest.apk` 返回正确的 GitHub latest 跳转。只有站点目标账号认证可用时才可以执行生产部署；否则明确报告素材已提交但官网未部署。
 
 ### 发布到个人下载站
 
@@ -28,7 +34,7 @@ git push origin v1.3.0-alpha
 
 工作流会完成 arm64 APK 云构建，并把产物以两个文件名同时上传到该 tag 对应的 GitHub Release：
 
-- `MaiMate-v<版本>.apk`（如 `MaiMate-v1.17.2.apk`）：按 tag 留存的版本化命名
+- `MaiMate-v<版本>.apk`（如 `MaiMate-v1.17.3.apk`）：按 tag 留存的版本化命名
 - `MaiMate-latest.apk`：沿用原有固定下载名，现有 latest 直链继续可用
 
 随后更新 `landing/_worker.js` 中的 Release 地址，执行 `landing/deploy-download-site.sh` 部署 Cloudflare Pages/Worker；下载站不会把 42 MiB APK 直接上传到 Pages，而是由 Worker 转发 GitHub Release 资产。

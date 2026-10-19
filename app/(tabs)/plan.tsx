@@ -1,4 +1,4 @@
-/** 推分计划：计划专属筛选、置顶分组拖拽、推歌英灵殿和自定义移除控件。 */
+/** 推分计划：计划专属筛选、手动顺序拖拽、推歌英灵殿和自定义移除控件。 */
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -119,11 +119,18 @@ export default function PushPlan() {
     .filter((item): item is PlanRow => item !== null)
     .sort((left, right) => left.entry.order - right.entry.order), [entries, rawData, scores]);
 
-  const filteredRows = useMemo(() => {
-    const rows = plannedRows.filter(row => matchesPlanRow(row, filters));
-    return sortPlanRows(rows, filters.sort, filters.titleSearch, chartStats, scoreIndex);
-  }, [plannedRows, filters, chartStats, scoreIndex]);
   const manualOrderView = canDragPlanRows(filters);
+  // 新达标条目只改变计划手动顺序；派生排序/筛选视图始终遵循用户当前条件。
+  const manualOrderedRows = useMemo(() => {
+    if (!manualOrderView) return plannedRows;
+    const rowById = new Map(plannedRows.map(row => [row.entry.entryId, row]));
+    return entries.map(entry => rowById.get(entry.entryId)).filter((row): row is PlanRow => row !== undefined);
+  }, [entries, manualOrderView, plannedRows]);
+  const filteredRows = useMemo(() => {
+    const rows = manualOrderView ? manualOrderedRows : plannedRows;
+    const matched = rows.filter(row => matchesPlanRow(row, filters));
+    return sortPlanRows(matched, filters.sort, filters.titleSearch, chartStats, scoreIndex);
+  }, [manualOrderView, manualOrderedRows, plannedRows, filters, chartStats, scoreIndex]);
   // v1.17.1：仅成绩排序（scoreDesc）时向卡片下发排序难度（默认 Master=3），用于显示排序成绩行。
   const scoreSortDifficultyIndex = filters.sort?.mode === 'scoreDesc' ? (filters.sort?.difficultyIndex ?? 3) : undefined;
 
@@ -237,16 +244,24 @@ export default function PushPlan() {
 
   const [achieveFilter, setAchieveFilter] = useState<'all' | 'achieved' | 'unachieved'>('all');
   // v1.15.1：按用户要求移除「缺口优先」排序切换，恢复 v1.14 手动拖拽序布局。
+  const manualAchievedOrderedRows = useMemo(() => {
+    if (!manualOrderView || filters.titleSearch?.trim()) return filteredRows;
+    const rankById = new Map(manualOrderedRows.map((row, index) => [row.entry.entryId, index]));
+    return [...filteredRows].sort((left, right) =>
+      (rankById.get(left.entry.entryId) ?? Number.MAX_SAFE_INTEGER)
+      - (rankById.get(right.entry.entryId) ?? Number.MAX_SAFE_INTEGER));
+  }, [manualOrderView, filters.titleSearch, filteredRows, manualOrderedRows]);
 
   const displayRows = useMemo(() => {
-    if (achieveFilter === 'all') return filteredRows;
+    const sourceRows = manualOrderView ? manualAchievedOrderedRows : filteredRows;
+    if (achieveFilter === 'all') return sourceRows;
     const achievedSet = new Set(achievedEntryIds);
-    return filteredRows.filter(row => {
+    return sourceRows.filter(row => {
       if (row.entry.targetScore === undefined) return achieveFilter === 'unachieved';
       const achieved = achievedSet.has(row.entry.entryId);
       return achieveFilter === 'achieved' ? achieved : !achieved;
     });
-  }, [filteredRows, achieveFilter, achievedEntryIds]);
+  }, [filteredRows, manualOrderView, manualAchievedOrderedRows, achieveFilter, achievedEntryIds]);
 
   return (
     <View style={styles.container}>
