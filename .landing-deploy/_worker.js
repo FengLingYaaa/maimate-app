@@ -10,6 +10,12 @@
 const APK_PATH = '/MaiMate-latest.apk';
 const APK_SOURCE = 'https://github.com/FengLingYaaa/maimate-app/releases/latest/download/MaiMate-latest.apk';
 
+// Cloudflare Pages normalizes static HTML paths (changelog.html -> /changelog).
+// Keep the public .html URL working even though ASSETS looks up the extensionless path.
+const ASSET_ALIASES = new Map([
+  ['/changelog.html', '/changelog'],
+]);
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -25,7 +31,11 @@ export default {
       });
     }
 
-    const asset = await env.ASSETS.fetch(request);
+    const routedAsset = ASSET_ALIASES.get(url.pathname);
+    const assetRequest = routedAsset
+      ? new Request(new URL(routedAsset + url.search, url), request)
+      : request;
+    const asset = await env.ASSETS.fetch(assetRequest);
     if (asset.status === 200) return asset;
 
     // 未知路径回退到落地页。

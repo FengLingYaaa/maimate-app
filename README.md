@@ -6,13 +6,12 @@ MaiMate 是为 MaimaiDX（舞萌 DX）玩家准备的 Android 辅助应用，帮
 
 ## 下载
 
-**最新正式发布：v1.17.2 · Android arm64 内测 APK**
+**最新正式发布：v1.17.3 · Android arm64 内测 APK**
 
-v1.17.3 发布源码与官网素材已就绪，等待 GitHub Actions 构建并发布 APK；在发布前请使用上方最新版正式版下载链接。
-
-- [下载最新版 APK](https://github.com/FengLingYaaa/maimate-app/releases/latest/download/MaiMate-latest.apk)
+- [下载 MaiMate-latest.apk](https://github.com/FengLingYaaa/maimate-app/releases/latest/download/MaiMate-latest.apk)
+- [下载 v1.17.3 版本化 APK](https://github.com/FengLingYaaa/maimate-app/releases/download/v1.17.3/MaiMate-v1.17.3.apk)
+- [查看 v1.17.3 Release 说明](https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.17.3)
 - [查看全部 GitHub Releases](https://github.com/FengLingYaaa/maimate-app/releases)
-- [v1.17.2 版本说明](https://github.com/FengLingYaaa/maimate-app/releases/tag/v1.17.2)
 
 APK 为 arm64-v8a 构建，面向常见的现代 Android 设备。当前发布包使用 debug 签名，适用于内测；Android 安装时如出现系统确认，请按设备提示操作。
 

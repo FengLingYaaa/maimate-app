@@ -19,9 +19,15 @@
 
 ### 官网重构静态素材检查与部署
 
-GitHub 源码中的网站静态文件位于 `.landing-deploy/`：`index.html` 首页、`changelog.html` 更新日志、`icon.png` 应用图标和 `_worker.js`。`_worker.js` 负责将 `/MaiMate-latest.apk` 重定向到 GitHub Release；这不会自动部署 Pages 静态文件。v1.17.3 的首页和历史日志按发布前预览内容标注当前正式 APK 仍为 v1.17.2，版本化 APK 链接在发版前不应当作可用链接。
+GitHub 源码中的网站静态文件位于 `.landing-deploy/`：`index.html` 首页、`changelog.html` 更新日志、`icon.png` 应用图标和 `_worker.js`。`_worker.js` 负责将 `/MaiMate-latest.apk` 重定向到 GitHub Release，并把 `/changelog.html` 映射到 Pages 规范化后的 `/changelog` 静态资源；这不会自动部署 Pages 静态文件。
 
-每次更新网站内容后，必须把整个 `.landing-deploy/` 目录（包括新页面、新图片和 `_worker.js`）发布到 Cloudflare Pages。部署后验证 `/`、`/changelog.html`、`/icon.png` 均为新内容，且 `/MaiMate-latest.apk` 返回正确的 GitHub latest 跳转。只有站点目标账号认证可用时才可以执行生产部署；否则明确报告素材已提交但官网未部署。
+每次更新网站内容后，必须把整个 `.landing-deploy/` 目录（包括新页面、新图片和 `_worker.js`）发布到 Cloudflare Pages 项目 `maimate-landing`：
+
+```bash
+npx wrangler pages deploy .landing-deploy --project-name maimate-landing --branch main --commit-hash <git-sha> --commit-message "MaiMate landing update"
+```
+
+部署后验证 `/`、`/changelog.html`、`/icon.png` 均为新内容，且 `/MaiMate-latest.apk` 返回正确的 GitHub latest 跳转。只有站点目标账号认证可用时才可以执行生产部署。v1.17.3 的正式站已通过 Production 部署上线。
 
 ### 发布到个人下载站
 

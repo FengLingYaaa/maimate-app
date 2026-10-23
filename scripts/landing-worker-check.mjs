@@ -13,13 +13,13 @@ for (const asset of ['index.html', 'changelog.html', 'icon.png', '_worker.js']) 
 
 const homeHtml = readFileSync(join(deployDirectory, 'index.html'), 'utf8');
 const changelogHtml = readFileSync(join(deployDirectory, 'changelog.html'), 'utf8');
-assert.match(homeHtml, /下载 MaiMate v1\.17\.2/);
-assert.match(homeHtml, /当前正式 APK 仍为 v1\.17\.2/);
-assert.match(homeHtml, /v1\.17\.3.*GitHub Actions 构建并发布 APK/);
-assert.doesNotMatch(homeHtml, /下载 MaiMate v1\.17\.3/);
+assert.match(homeHtml, /下载 MaiMate v1\.17\.3/);
+assert.match(homeHtml, /MaiMate-v1\.17\.3\.apk/);
+assert.match(homeHtml, /v1\.17\.3/);
+assert.doesNotMatch(homeHtml, /当前正式 APK 仍为 v1\.17\.2/);
 const loggedVersions = changelogHtml.split('class="version">').slice(1).map(entry => entry.split('</span>')[0]);
 assert.ok(loggedVersions.length >= 30, 'the historical changelog includes versioned entries back to the alpha builds');
-assert.match(loggedVersions[0], /构建准备中/);
+assert.equal(loggedVersions[0], 'v1.17.3');
 assert.match(loggedVersions.at(-1), /v0\.1\.0-alpha/);
 assert.ok(loggedVersions.some(version => version === 'v1.17.2'));
 
@@ -32,7 +32,7 @@ const assets = {
     const request = input instanceof Request ? input : new Request(input);
     const pathname = new URL(request.url).pathname;
     assetRequests.push(pathname);
-    if (['/', '/changelog.html', '/icon.png'].includes(pathname)) {
+    if (['/', '/changelog', '/icon.png'].includes(pathname)) {
       return new Response(`asset:${pathname}`, { status: 200 });
     }
     return new Response('not found', { status: 404 });
@@ -49,12 +49,13 @@ assert.equal(assetRequests.length, 0, 'APK redirect must not fetch or proxy the 
 for (const pathname of ['/', '/changelog.html', '/icon.png']) {
   const response = await workerModule.default.fetch(new Request(`https://maimate.example${pathname}`), env);
   assert.equal(response.status, 200, `Pages serves ${pathname}`);
-  assert.equal(await response.text(), `asset:${pathname}`);
+  const served = pathname === '/changelog.html' ? '/changelog' : pathname;
+  assert.equal(await response.text(), `asset:${served}`);
 }
 
 const fallback = await workerModule.default.fetch(new Request('https://maimate.example/unknown-route'), env);
 assert.equal(fallback.status, 200, 'unknown routes fall back to the landing home');
 assert.equal(await fallback.text(), 'asset:/');
-assert.deepEqual(assetRequests, ['/', '/changelog.html', '/icon.png', '/unknown-route', '/']);
+assert.deepEqual(assetRequests, ['/', '/changelog', '/icon.png', '/unknown-route', '/']);
 
 console.log('Landing worker checks passed (static assets, changelog route, APK redirect, unknown-route fallback)');
