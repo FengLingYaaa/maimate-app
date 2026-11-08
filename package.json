@@ -57,7 +57,8 @@
     "test:backup": "tsx scripts/backup-check.ts",
     "test:update": "tsx scripts/update-check.ts",
     "test:routes": "node scripts/route-check.mjs",
-    "test:landing": "node scripts/landing-worker-check.mjs"
+    "test:landing": "node scripts/landing-worker-check.mjs",
+    "test:range": "tsx scripts/range-input-check.ts"
   },
   "private": true,
   "expo": {

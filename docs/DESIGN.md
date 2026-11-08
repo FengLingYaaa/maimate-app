@@ -1114,3 +1114,10 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 回归用例覆盖：只读 server-ra 单谱 positive delta、新谱记录与缺少前值场景；400/403/429/5xx/network token 诊断分类；忽略变化/旧顺序、不同批次新的成就跃迁和保序沉底。
 - 发布链路：`GH_TOKEN` 属于 FengLingYaaa 且对 `maimate-app` 有写权限；用户确认 `.env` 中已是轮换后的新 token。由于本机到 `github.com:443` 的 Git 传输被网络阻断，改用 GitHub Git Data API 写入与本地提交完全相同的 tree，更新 `main` 并创建 `v1.17.3` tag；该 tag 触发了 Actions。远端 URL 和 Git Credential Manager 中此前暴露的旧 token 已清除，并已提醒用户撤销。Cloudflare Production 最终部署 ID `25baee57`；`maimate-landing.pages.dev` 与 `maimate.flya.ccwu.cc` 的 `/`、`/changelog.html`、`/changelog`、`/icon.png`、`/MaiMate-latest.apk` 已逐项在线验收通过。
 - 下一步：在 Android 真机安装 `MaiMate-v1.17.3.apk` 验收。发布、官网部署与在线路由验收已完成。
+
+### 未发布（2026-11-09，定数范围条精确输入；本地修改）
+
+- 用户目标：定数范围条只能拖动、精度不够；新增点数字直接输入精确值，并评估竖向布局。
+- 实际修改：`src/components/RangeSlider.tsx` 每行改为「下限/上限 · − · 滑块 · ＋ · 数值框」；点数值框切换为 `TextInput`（decimal-pad），失焦或按完成提交，非法输入还原；−/＋ 按 0.1 微调。解析/夹取/保序逻辑抽到纯函数 `src/data/range-input.ts`（支持 `13,7`、全角数字、按步长四舍五入、超界夹到 0–15、修改一端时保证 lower ≤ upper）。新增 `scripts/range-input-check.ts` 与 `npm run test:range`。曲库筛选面板与随机抽歌页共用此组件，两处同时生效。
+- 竖向评估（未采用）：`@react-native-community/slider` 无竖向模式，只能旋转 -90°，Android 上布局尺寸与触摸区域不随旋转变化；更关键的是滑块位于可上下滚动的筛选面板里，竖向拖动会与 ScrollView 滚动手势抢夺；竖向还会占用约 250dp 以上高度。精度问题由输入框 + ±0.1 解决，比竖向更直接。
+- 状态：未提交、未推送、未创建 PR。
