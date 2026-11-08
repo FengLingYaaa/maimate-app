@@ -1120,4 +1120,4 @@ https://maimate.flya.ccwu.cc/MaiMate-latest.apk
 - 用户目标：定数范围条只能拖动、精度不够；新增点数字直接输入精确值，并评估竖向布局。
 - 实际修改：`src/components/RangeSlider.tsx` 每行改为「下限/上限 · − · 滑块 · ＋ · 数值框」；点数值框切换为 `TextInput`（decimal-pad），失焦或按完成提交，非法输入还原；−/＋ 按 0.1 微调。解析/夹取/保序逻辑抽到纯函数 `src/data/range-input.ts`（支持 `13,7`、全角数字、按步长四舍五入、超界夹到 0–15、修改一端时保证 lower ≤ upper）。新增 `scripts/range-input-check.ts` 与 `npm run test:range`。曲库筛选面板与随机抽歌页共用此组件，两处同时生效。
 - 竖向评估（未采用）：`@react-native-community/slider` 无竖向模式，只能旋转 -90°，Android 上布局尺寸与触摸区域不随旋转变化；更关键的是滑块位于可上下滚动的筛选面板里，竖向拖动会与 ScrollView 滚动手势抢夺；竖向还会占用约 250dp 以上高度。精度问题由输入框 + ±0.1 解决，比竖向更直接。
-- 状态：未提交、未推送、未创建 PR。
+- 状态：已本地提交、未推送、未创建 PR。
