@@ -11,6 +11,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.19.0',
+    date: '2026-11-09',
+    highlights: [
+      '曲库与计划页支持别名搜索（内置 Yuzu 别名并可在线更新），歌曲详情页可添加自己的叫法，长按删除',
+      '新增 Rating 历史曲线与分享图；备份文件现在包含 Rating 历史和自定义别名',
+      '同步成绩后生成战报：Rating 变化、进入 B50 的歌曲与单曲贡献；Rating 上涨时提示',
+      '新增「目标 Rating」：列出冲到下一档最划算的谱面和所需达成率',
+      '曲库定数调整后提醒受影响的 B50 歌曲',
+      'OCR 识别按图分组显示候选与置信度，可手动重选；定数范围条支持精确输入',
+      '修复快照对比卡死；曲绘缺失时自动改用备用图源，并不再重复请求 404 曲绘',
+    ],
+  },
+  {
     version: '1.17.3',
     date: '2026-10-18',
     highlights: [
