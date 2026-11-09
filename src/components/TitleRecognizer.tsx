@@ -42,7 +42,7 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
   const isInPlan = usePlanStore(s => s.isInPlan);
   const planLoaded = usePlanStore(s => s.loaded);
 
-  /** 由每图候选合并出展示列表（去重取最优分，排序，截断 12）。 */
+  /** 由每图候选合并出展示列表（去重取最优分，排序，v1.18.0 起取前 5 名候选）。 */
   const mergedMatches = React.useMemo(
     () => mergeImageMatches([...perImageMatches.values()]),
     [perImageMatches],
@@ -266,8 +266,8 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
 
             {mergedMatches.length > 0 && (
               <View style={styles.results}>
-                <Text style={styles.sectionTitle}>合并后的可能歌曲（已去重）</Text>
-                {mergedMatches.map(match => {
+                <Text style={styles.sectionTitle}>识别候选（前 {mergedMatches.length} 名，点一首即选中）</Text>
+                {mergedMatches.map((match, rank) => {
                   const difficultyIndex = getQuickAddDifficulty(match.music);
                   const difficultyLabel = difficultyIndex === null ? null : DifficultyLabels[difficultyIndex];
                   const alreadyInPlan = difficultyIndex !== null && planLoaded && isInPlan(match.music.id, difficultyIndex, match.music.type);
@@ -275,9 +275,16 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
                     <View key={`${match.music.id}-${match.music.type}`} style={styles.resultRow}>
                       <Pressable style={styles.resultMain} onPress={() => handleOpenSong(match.music)} accessibilityRole="button" accessibilityLabel={`查看歌曲 ${match.music.title}`}>
                         <View style={styles.resultInfo}>
-                          <Text style={styles.resultTitle} numberOfLines={2}>{match.music.title}</Text>
+                          <Text style={styles.resultTitle} numberOfLines={2}>
+                            <Text style={styles.resultRank}>{rank + 1}. </Text>{match.music.title}
+                          </Text>
                           <Text style={styles.resultMeta}>{match.music.basic_info.artist} · {match.music.type}</Text>
                           <Text style={styles.resultSource}>识别文字：{match.recognizedText}</Text>
+                          {match.matchedKind && match.matchedKind !== 'title' && (
+                            <Text style={styles.resultVia}>
+                              经{match.matchedKind === 'alias' ? '别名' : match.matchedKind === 'artist' ? '曲师' : '谱师'}匹配：{match.matchedText}
+                            </Text>
+                          )}
                         </View>
                       </Pressable>
                       <View style={styles.resultActions}>
@@ -347,6 +354,8 @@ const styles = StyleSheet.create({
   resultTitle: { fontSize: 13, fontWeight: '800', color: Colors.text.primary },
   resultMeta: { fontSize: 10, color: Colors.text.secondary },
   resultSource: { fontSize: 9, color: Colors.text.muted },
+  resultRank: { color: Colors.accent.primary },
+  resultVia: { fontSize: 9, fontWeight: '700', color: Colors.accent.secondary },
   resultActions: { alignItems: 'flex-end', justifyContent: 'space-between', gap: 6 },
   score: { fontSize: 12, fontWeight: '800', color: Colors.accent.primary },
   quickAddButton: { paddingHorizontal: 7, paddingVertical: 5, borderRadius: 7, backgroundColor: `${Colors.accent.secondary}22`, borderWidth: 1, borderColor: Colors.accent.secondary },

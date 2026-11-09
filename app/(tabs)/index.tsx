@@ -5,12 +5,12 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMusicStore, useScoreStore, useSettingsStore } from '../../src/store';
 import { SongCard, FilterBar, TitleRecognizer } from '../../src/components';
 import { Colors } from '../../src/constants';
-import { getMatchingDifficultyIndices, getFitChartConstant, getMusicSearchScore, MusicList, buildScoreIndex } from '../../src/data/music-list';
+import { getMatchingDifficultyIndices, getFitChartConstant, getMusicSearchHit, parseConstantQuery, MusicList, buildScoreIndex } from '../../src/data/music-list';
 import { getChinaVersionOptions, getVersionOptions } from '../../src/data/version-catalog';
 import { computeB50 } from '../../src/data/b50';
 import type { FilterOptions, MusicData } from '../../src/data/types';
@@ -127,6 +127,27 @@ export default function SongBrowser() {
     router.push({ pathname: '/song/[id]' as any, params: { id: music.id, type: music.type, source: 'library' } });
   }, [router]);
 
+  // v1.18.0：详情页点别名 chip 跳回曲库并以该别名执行一次确认式搜索（不引入实时搜索）。
+  const { q: queryParam } = useLocalSearchParams<{ q?: string }>();
+  const handledQueryParam = useRef<string | null>(null);
+  useEffect(() => {
+    const query = (Array.isArray(queryParam) ? queryParam[0] : queryParam)?.trim();
+    if (!query || handledQueryParam.current === query) return;
+    handledQueryParam.current = query;
+    const next: FilterOptions = { ...useMusicStore.getState().filters, titleSearch: query };
+    void applyFiltersChunked(next, undefined, scoreIndex).then(() => setLibraryLoaded(true));
+    router.setParams({ q: undefined } as any);
+    handledQueryParam.current = null;
+  }, [queryParam, applyFiltersChunked, scoreIndex, router]);
+
+  // v1.18.0：搜索结果中经别名命中的歌曲，卡片上标出命中的别名。
+  const activeQuery = filters.titleSearch?.trim() || '';
+  const aliasHitFor = useCallback((music: MusicData): string | null => {
+    if (!activeQuery) return null;
+    const hit = getMusicSearchHit(music, activeQuery);
+    return hit?.kind === 'alias' ? hit.text : null;
+  }, [activeQuery]);
+
   const getPreviewCount = useCallback((nextFilters: FilterOptions) => {
     return new MusicList(rawData).filter(nextFilters).length;
   }, [rawData]);
@@ -161,6 +182,7 @@ export default function SongBrowser() {
   }, [isScoreSort, scores]);
   const hasChartHighlightFilter = Boolean(
     filters.charter?.trim()
+      || parseConstantQuery(filters.titleSearch) !== null
       || filters.difficulty !== undefined
       || filters.level !== undefined
       || filters.dsRange !== undefined
@@ -222,6 +244,7 @@ export default function SongBrowser() {
                 fitDiffForIndex={fitDiffForIndex(item)}
                 scoreDifficultyIndex={isScoreSort ? sortDifficultyIndex : undefined}
                 scoreForDifficulty={isScoreSort ? getScoreForDifficulty(item) : undefined}
+                aliasHit={aliasHitFor(item)}
               />
             </View>
           );

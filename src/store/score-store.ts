@@ -16,6 +16,8 @@ import { useMusicStore } from './music-store';
 import { usePlanStore } from './plan-store';
 import { findNewlyAchievedPlanEntryIds } from '../data/plan-auto-sink';
 import { normalizeSnapshotLimit } from '../data/settings-defaults';
+import { computeB50 } from '../data/b50';
+import { useRatingHistoryStore } from './rating-history-store';
 
 interface StoredScorePayload {
   scores: PlayerScore[];
@@ -180,6 +182,18 @@ export const useScoreStore = create<ScoreStore>((set, get) => ({
       await AsyncStorage.setItem(CACHE_KEYS.scoreSnapshots, JSON.stringify(snapshots));
       await AsyncStorage.setItem(CACHE_KEYS.scoreChanges, JSON.stringify(changes));
       set({ scores: result.scores, profile: result.profile, sync, snapshots, changes, tokenConfigured: true });
+      // v1.18.0：同步成功（同时保存快照）时记录一个 Rating 历史点；记录失败不影响同步结果。
+      try {
+        const b50Rating = computeB50(useMusicStore.getState().rawData, result.scores).total;
+        await useRatingHistoryStore.getState().record({
+          at: new Date(syncedAt).toISOString(),
+          totalRating: result.serverRating ?? b50Rating,
+          b50Rating,
+          songCount: result.scores.length,
+        });
+      } catch {
+        // 历史记录只是附加信息，失败时静默跳过。
+      }
       // v1.16.2：同步后把「新达标」的计划条目沉底（设置可关）。
       // 判定：计划条目设了目标分，且该谱面成绩从 <目标 变为 ≥目标。
       if (useSettingsStore.getState().settings.autoSinkAchieved) {

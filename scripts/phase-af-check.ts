@@ -40,12 +40,17 @@ assert.equal(normalizeBilibiliVideoUrl('https://example.com/video/BV1xx411c7mD')
 assert.deepEqual(BILIBILI_QUICK_TAGS, ['手元', '邪道', '研究', 'AP', 'FC']);
 
 const music = {
-  id: '1',
+  id: 'no-alias-test',
   type: 'SD',
   title: '晴天',
   basic_info: { title: '晴天', artist: '周杰伦' },
 };
 assert.deepEqual(getSearchTitles(music), ['晴天']);
-assert.deepEqual(CURATED_SONG_ALIASES, []);
+// v1.18.0：内置 Yuzu 别名快照已填入（全部收录，不按票数过滤）；无别名的曲只有标题。
+assert.ok(CURATED_SONG_ALIASES.length >= 1400);
+assert.ok(CURATED_SONG_ALIASES.every(entry => entry.source === 'curated' && entry.aliases.length > 0));
+const aliased = { id: '11663', type: 'DX', title: '系ぎて', basic_info: { title: '系ぎて', artist: '' } };
+assert.equal(getSearchTitles(aliased)[0], '系ぎて');
+assert.ok(getSearchTitles(aliased).includes('tsunagite'));
 
-console.log('Phase A-F pure checks passed (music URLs, Bilibili keys, empty aliases)');
+console.log('Phase A-F pure checks passed (music URLs, Bilibili keys, bundled aliases)');

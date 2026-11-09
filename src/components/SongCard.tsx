@@ -29,6 +29,8 @@ interface Props {
   scoreDifficultyIndex?: number;
   /** v1.17.2：成绩排序启用时，按难度返回完整本机成绩（无成绩 null），徽章旁标注。 */
   scoreForDifficulty?: (index: number) => PlayerScore | null;
+  /** v1.18.0：搜索经别名命中时传入命中的别名，卡片上标出「别名：xx」。 */
+  aliasHit?: string | null;
 }
 
 export const SongCard = memo(function SongCard({
@@ -43,6 +45,7 @@ export const SongCard = memo(function SongCard({
   fitDiffForIndex,
   scoreDifficultyIndex,
   scoreForDifficulty,
+  aliasHit = null,
 }: Props) {
   const selected = selectedDifficultyIndex !== undefined
     ? music.level[selectedDifficultyIndex] !== undefined
@@ -72,6 +75,12 @@ export const SongCard = memo(function SongCard({
         <Text style={styles.artist} numberOfLines={1}>
           {music.basic_info.artist}
         </Text>
+        {!!aliasHit && (
+          <View style={styles.aliasHitRow}>
+            <Text style={styles.aliasHitTag}>别名命中</Text>
+            <Text style={styles.aliasHitText} numberOfLines={1}>{aliasHit}</Text>
+          </View>
+        )}
         <View style={styles.meta}>
           <Text style={styles.metaText}>{music.basic_info.genre}</Text>
           <Text style={styles.metaDot}>·</Text>
@@ -160,6 +169,27 @@ const styles = StyleSheet.create({
   artist: {
     fontSize: 12,
     color: Colors.text.secondary,
+  },
+  aliasHitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  aliasHitTag: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: Colors.accent.secondary,
+    borderWidth: 1,
+    borderColor: Colors.accent.secondary,
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    overflow: 'hidden',
+  },
+  aliasHitText: {
+    flexShrink: 1,
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.accent.secondary,
   },
   meta: {
     flexDirection: 'row',

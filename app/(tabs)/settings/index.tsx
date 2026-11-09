@@ -1,11 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, ToastAndroid, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../../src/constants';
 import { useScoreStore, useSettingsStore } from '../../../src/store';
 import { MUSIC_PLATFORM_OPTIONS, getSortLabel } from '../../../src/data/settings-options';
 import { measureStorageBreakdown, clearCovers, clearOtherCache, formatBytes, type StorageBreakdown } from '../../../src/data/storage-usage';
 import { diagnoseScoreImportEndpoints } from '../../../src/data/score-import-diagnostics';
+import { refreshAliasLibrary } from '../../../src/api/aliases';
+import { getActiveAliasLibraryInfo } from '../../../src/data/song-aliases';
+
+/** v1.18.0：轻提示（Android 原生 Toast，其它平台退回 Alert）。 */
+function showToast(message: string): void {
+  if (Platform.OS === 'android') ToastAndroid.show(message, ToastAndroid.SHORT);
+  else Alert.alert('', message);
+}
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -20,6 +28,28 @@ export default function SettingsPage() {
   const clearScores = useScoreStore(s => s.clearScores);
   const snapshots = useScoreStore(s => s.snapshots);
   const changes = useScoreStore(s => s.changes);
+  // v1.18.0：别名库手动刷新。
+  const [aliasInfo, setAliasInfo] = useState(() => getActiveAliasLibraryInfo());
+  const [aliasRefreshing, setAliasRefreshing] = useState(false);
+  const handleRefreshAliases = async () => {
+    if (aliasRefreshing) return;
+    setAliasRefreshing(true);
+    try {
+      await refreshAliasLibrary();
+      const info = getActiveAliasLibraryInfo();
+      setAliasInfo(info);
+      showToast(`别名库已更新：${info.songCount} 首 / ${info.aliasCount} 条`);
+    } catch {
+      setAliasInfo(getActiveAliasLibraryInfo());
+      showToast('别名库更新失败，已用上次缓存的别名');
+    } finally {
+      setAliasRefreshing(false);
+    }
+  };
+  useEffect(() => {
+    // 启动时异步读入的缓存别名库可能晚于本页首帧，进入页面时再取一次。
+    setAliasInfo(getActiveAliasLibraryInfo());
+  }, []);
   const [tokenInput, setTokenInput] = useState('');
   const [tokenMessage, setTokenMessage] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
@@ -280,6 +310,18 @@ export default function SettingsPage() {
         </Pressable>
       </View>
 
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>曲目别名库</Text>
+        <Text style={styles.preferenceDescription}>别名来自 Yuzu 别名库（社区投票），用于曲库搜索、拍照识别和详情页。应用内置一份快照，离线也能用；手动刷新获取最新别名。</Text>
+        <View style={styles.syncCard}>
+          <Text style={styles.syncText}>当前使用：{aliasInfo.source === 'refreshed' ? '手动刷新的别名库' : '内置快照'}</Text>
+          <Text style={styles.syncText}>收录：{aliasInfo.songCount} 首 / {aliasInfo.aliasCount} 条</Text>
+          <Text style={styles.syncText}>更新时间：{new Date(aliasInfo.updatedAt).toLocaleString()}</Text>
+        </View>
+        <Pressable style={[styles.secondaryButton, aliasRefreshing && styles.disabled]} disabled={aliasRefreshing} onPress={() => void handleRefreshAliases()}>
+          <Text style={styles.secondaryButtonText}>{aliasRefreshing ? '正在更新别名库…' : '刷新别名库'}</Text>
+        </Pressable>
+      </View>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>数据与隐私</Text>
         <Text style={styles.securityNote}>曲库、推分计划和已导入成绩默认保存在本机。删除 Token 不会删除成绩；清除本地成绩不会影响服务器。</Text>

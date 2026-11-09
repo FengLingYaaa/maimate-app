@@ -1,15 +1,30 @@
 import { normalizeSearchText } from './music-list';
-import { getSearchTitles } from './song-aliases';
+import { getAliasVersion, getSongAliases } from './song-aliases';
 import type { MusicData } from './types';
+
+/** v1.18.0：OCR 命中的字段来源。 */
+export type OcrFieldKind = 'title' | 'alias' | 'artist' | 'charter';
 
 export interface TitleMatch {
   music: MusicData;
   recognizedText: string;
   score: number;
+  /** v1.18.0：命中来源与命中的原文（别名命中时用于在候选里标注）。 */
+  matchedKind?: OcrFieldKind;
+  matchedText?: string;
 }
 
+/** v1.18.0：识别结果默认返回前 5 名候选。 */
+export const OCR_CANDIDATE_LIMIT = 5;
+
+/** v1.18.0：OCR 比较时去掉的装饰符号（成绩图上常被漏识别或识别成别的字）。 */
+const DECORATIVE_SYMBOLS = /[★☆♪♫♬♡♥◆◇■□●○▲△▼▽†‡∞♂♀※＊*･・。、「」『』〈〉]/g;
+
 function compact(value: string): string {
-  return normalizeSearchText(value).replace(/\s/g, '');
+  const base = normalizeSearchText(value).replace(/\s/g, '');
+  const stripped = base.replace(DECORATIVE_SYMBOLS, '');
+  // 《I ♥》《+♂》这类符号本身就是曲名主体的短标题：去符号后不足 2 字符时保留符号。
+  return stripped.length >= 2 ? stripped : base;
 }
 
 function levenshtein(a: string, b: string): number {
@@ -38,8 +53,9 @@ function levenshtein(a: string, b: string): number {
  * 修复《VeRForTe αRtE:VEiN→aRtE》《Destr0yer→DestrOyer》等场景。
  */
 function slidingWindowScore(title: string, line: string): number | null {
-  const minSize = Math.max(2, title.length - 2);
-  const maxSize = Math.min(line.length, title.length + 2);
+  const slack = Math.max(2, Math.floor(title.length * 0.2));
+  const minSize = Math.max(2, title.length - slack);
+  const maxSize = Math.min(line.length, title.length + slack);
   if (minSize > maxSize) return null;
   let bestDistance = Number.POSITIVE_INFINITY;
   for (let size = minSize; size <= maxSize; size += 1) {
@@ -48,32 +64,42 @@ function slidingWindowScore(title: string, line: string): number | null {
       if (distance < bestDistance) bestDistance = distance;
     }
   }
-  if (!Number.isFinite(bestDistance) || bestDistance > 2) return null;
+  // v1.18.0：长曲名容错按比例放宽（≥10 字符允许约 20% 错字），短曲名仍最多 2。
+  const maxDistance = Math.max(2, Math.floor(title.length * 0.2));
+  if (!Number.isFinite(bestDistance) || bestDistance > maxDistance) return null;
   // 短标题的容错窗收紧：距离 2 只允许较长标题（≥6 字符），距离 1 只允许 ≥4 字符，
   // 避免《39》这类超短名被任意 2 字符窗口在距离 ≤2 内「全部命中」（0.70 噪音霸榜）。
   if (bestDistance === 2 && title.length < 6) return null;
   if (bestDistance === 1 && title.length < 4) return null;
-  // 距离 0（窗口恰等于标题）理论已在 includes 命中，兜底给最高档；
-  // 距离 1 = 0.78+，距离 2 = 0.70+（低于整行精确/包含，高于 0.55 兜底）。
-  if (bestDistance === 0) return 0.9;
-  if (bestDistance === 1) return 0.78 + Math.max(0, 1 - 1 / title.length) * 0.08;
-  return 0.7 + Math.max(0, 1 - 2 / title.length) * 0.06;
+  // v1.18.0：按「相似度 × 覆盖率」打分（与包含命中同理）：同一行里，模糊命中整行的长标题
+  // 高于只模糊命中其中一段的短标题（修复长标题有 3 个错字时被《Future》这类短标题抢第一）。
+  const similarity = 1 - bestDistance / title.length;
+  const lineCoverage = coverage(title.length, stripScoreNoise(line).length);
+  return 0.55 + 0.35 * similarity * (0.5 + 0.5 * lineCoverage);
 }
 
-function scoreTitle(title: string, recognizedLine: string): number | null {
-  const normalizedTitle = compact(title);
-  const normalizedLine = compact(recognizedLine);
+/**
+ * 曲名（或别名/曲师/谱师）与一行识别文字的匹配分。
+ * v1.18.0：入参为已 compact 的文本（调用方预先归一，避免全库扫描时重复归一）；
+ * fuzzy=false 时只做相等/包含，不做滑窗与整行编辑距离。
+ */
+function scoreTitle(normalizedTitle: string, normalizedLine: string, fuzzy = true): number | null {
   if (normalizedTitle.length < 2 || normalizedLine.length < 2) return null;
 
   if (normalizedLine === normalizedTitle) return 1;
-  // v1.16.9：行包含完整曲名 → 0.96；短曲名（<4 字符）子串命中降档，
-  // 避免《39》这类纯数字短名被任意含数字的行以 0.96 冒名顶替（旧粘连行 0.96 bug）。
+  // v1.18.0：行包含完整曲名 → 按覆盖率打分（曲名长度 ÷ 去掉成绩/难度噪音后的行长度）：
+  // 曲名占满整行 ≈0.96，短曲名只占行的一小部分 ≈0.5。修复《Catch The Future》被
+  // 《Future》以固定 0.96 抢走、《天国と地獄 -言ノ葉リンネ-》被《天国と地獄》抢走等「显示错歌」。
   if (normalizedLine.includes(normalizedTitle)) {
-    return normalizedTitle.length >= 4 ? 0.96 : 0.6;
+    return 0.5 + 0.46 * coverage(normalizedTitle.length, stripScoreNoise(normalizedLine).length);
   }
+  // 行是曲名的一部分（标题被截断/折行）：同样按覆盖率打折，片段越短分越低。
   if (normalizedTitle.includes(normalizedLine) && normalizedLine.length >= 3) {
-    return 0.78 + Math.min(normalizedLine.length / normalizedTitle.length, 1) * 0.12;
+    return 0.5 + 0.4 * coverage(normalizedLine.length, normalizedTitle.length);
   }
+
+  // v1.18.0：别名/曲师/谱师只做相等与包含，不做模糊（社区别名噪音大，且模糊匹配成本高）。
+  if (!fuzzy) return null;
 
   // v1.16.9：粘连行滑动窗口（在整行 levenshtein 之前，因为整行距离会被行尾噪音拖大）。
   const windowScore = slidingWindowScore(normalizedTitle, normalizedLine);
@@ -84,7 +110,22 @@ function scoreTitle(title: string, recognizedLine: string): number | null {
   // v1.16.6：OCR 少识别一个字符（缺字母）是高频场景——允许 1 字符差异的行
   // 以较高相似度入围（0.72 档），避免「缺一个字母就不显示」。
   if (distance === 1 && normalizedTitle.length >= 3) return 0.72 + similarity * 0.1;
-  return similarity >= 0.55 ? similarity : null;
+  // v1.18.0：整行 Levenshtein 相似度门槛 0.55 → 0.7（减少不相干的长行凑数）。
+  return similarity >= 0.7 ? similarity : null;
+}
+
+/** 覆盖率：part / whole，夹在 0–1。 */
+function coverage(part: number, whole: number): number {
+  if (whole <= 0) return 1;
+  return Math.max(0, Math.min(1, part / whole));
+}
+
+/** 计算覆盖率时去掉成绩图里常和曲名粘在同一行的数字、百分号和难度词。 */
+function stripScoreNoise(compactLine: string): string {
+  const stripped = compactLine
+    .replace(/re:?master|remaster|master|expert|advanced|basic|utage|lv\.?/g, '')
+    .replace(/[0-9.%+]/g, '');
+  return stripped.length > 0 ? stripped : compactLine;
 }
 
 /**
@@ -103,51 +144,116 @@ function isNoiseLine(line: string): boolean {
   return NOISE_LINE_PATTERNS.some(pattern => pattern.test(compact));
 }
 
+interface OcrField {
+  kind: OcrFieldKind;
+  raw: string;
+  /** compact 后的比较键（预先计算，全库扫描时不再重复归一）。 */
+  key: string;
+}
+
 /**
- * Match OCR text against official titles and the independent alias layer.
- * Artist, charter, cover artwork, and other metadata are deliberately ignored.
- * v1.16.6：默认上限 8 → 12（一张图可能含多首，10 张图批量导入场景）。
+ * v1.18.0：OCR 匹配字段 = 标题 + 别名 + 曲师 + 谱师（均经 normalizeSearchText 统一全角半角、
+ * 大小写与平/片假名）。别名至少 3 个字符才参与（过短的社区别名在成绩图里误撞太多）。
  */
-export function matchSongTitles(rawData: MusicData[], recognizedText: string, limit = 12): TitleMatch[] {
+const ocrFieldCache = new WeakMap<MusicData, { version: number; fields: OcrField[] }>();
+
+export function getOcrMatchFields(music: MusicData): OcrField[] {
+  const version = getAliasVersion();
+  const cached = ocrFieldCache.get(music);
+  if (cached && cached.version === version) return cached.fields;
+  const fields: OcrField[] = [];
+  const seen = new Set<string>();
+  const push = (kind: OcrFieldKind, raw: string | undefined, minLength: number) => {
+    if (!raw) return;
+    const key = compact(raw);
+    if (key.length < minLength || seen.has(key)) return;
+    seen.add(key);
+    fields.push({ kind, raw, key });
+  };
+  push('title', music.title, 1);
+  push('title', music.basic_info.title, 1);
+  for (const alias of getSongAliases(music)) push('alias', alias, 3);
+  push('artist', music.basic_info.artist, 3);
+  for (const chart of music.charts) {
+    if (chart.charter && chart.charter !== '-') push('charter', chart.charter, 3);
+  }
+  ocrFieldCache.set(music, { version, fields });
+  return fields;
+}
+
+/** 字段权重：标题原分；别名略低；曲师/谱师单独命中只作参考（避免同曲师的整批歌霸榜）。 */
+const FIELD_WEIGHT: Record<OcrFieldKind, number> = { title: 1, alias: 0.95, artist: 0.5, charter: 0.4 };
+/** 标题/别名命中且同图里也出现了曲师时的小幅加分（用于区分同名或相近标题）。 */
+const ARTIST_CONFIRM_BONUS = 0.03;
+
+/**
+ * Match OCR text against titles, aliases, artists and charters.
+ * v1.16.6：默认上限 8 → 12（一张图可能含多首，10 张图批量导入场景）。
+ * v1.18.0：默认返回前 5 名候选；相邻两行拼接后也参与匹配（长曲名折行）。
+ */
+export function matchSongTitles(rawData: MusicData[], recognizedText: string, limit = OCR_CANDIDATE_LIMIT): TitleMatch[] {
   const rawLines = recognizedText
     .split(/\r?\n/)
     .map(line => line.trim())
-    .filter(line => line.length >= 2);
+    .filter(line => line.length >= 1);
   if (rawLines.length === 0) return [];
 
-  // v1.16.8：先取全部真实标题集合用于「曲名豁免」。
-  const allTitles = rawData.flatMap(music => getSearchTitles(music));
-  // v1.16.9：行与任一真实曲名【完全相等】直接豁免（不再要求行长 ≥3）——
-  // 修复《39》等纯数字/超短曲名被噪音过滤误杀（识别完全正确却不显示）。
+  // v1.16.8：先取全部真实标题集合用于「曲名豁免」。v1.18.0：两侧统一用 compact 归一。
+  const allTitleKeys = new Set<string>();
+  for (const music of rawData) {
+    for (const field of getOcrMatchFields(music)) {
+      // 噪音豁免只认官方标题：别名里有「perfect」之类的词，不能让成绩图 UI 文字借别名混进来。
+      if (field.kind === 'title') allTitleKeys.add(field.key);
+    }
+  }
+  const titleKeyList = [...allTitleKeys];
+  // v1.16.9：行与任一真实曲名【完全相等】直接豁免（不再要求行长 ≥3）。
   const titleEquals = (line: string) => {
-    const compactLine = line.normalize('NFKC').toLocaleLowerCase().replace(/[\s\u3000]+/g, '');
-    if (compactLine.length === 0) return false;
-    return allTitles.some(title => title.replace(/[\s\u3000]+/g, '').toLowerCase() === compactLine);
+    const key = compact(line);
+    return key.length > 0 && allTitleKeys.has(key);
   };
   const titleContains = (line: string) => {
-    const compactLine = line.normalize('NFKC').toLocaleLowerCase().replace(/[\s\u3000]+/g, '');
-    if (compactLine.length < 3) return false;
-    return allTitles.some(title => title.replace(/[\s\u3000]+/g, '').toLowerCase().includes(compactLine));
+    const key = compact(line);
+    if (key.length < 3) return false;
+    return titleKeyList.some(title => title.includes(key));
   };
 
-  const lines = rawLines.filter(line => !isNoiseLine(line) || titleEquals(line) || titleContains(line));
-  if (lines.length === 0) return [];
+  const kept = rawLines.filter(line => !isNoiseLine(line) || titleEquals(line) || titleContains(line));
+  if (kept.length === 0) return [];
+  // v1.18.0：相邻两行拼接（长曲名在成绩图上常被折成两行）。
+  const rawCandidates = [...kept];
+  for (let index = 0; index + 1 < kept.length; index += 1) rawCandidates.push(`${kept[index]}${kept[index + 1]}`);
+  const lines = rawCandidates
+    .map(raw => ({ raw, key: compact(raw) }))
+    .filter((line, index, all) => line.key.length >= 2 && all.findIndex(other => other.key === line.key) === index);
+  const compactImage = compact(kept.join(''));
 
   return rawData
     .map(music => {
       let best: TitleMatch | null = null;
-      for (const line of lines) {
-        for (const title of getSearchTitles(music)) {
-          const score = scoreTitle(title, line);
-          if (score !== null && (!best || score > best.score)) {
-            best = { music, recognizedText: line, score };
+      const fields = getOcrMatchFields(music);
+      for (const field of fields) {
+        const fuzzy = field.kind === 'title';
+        const weight = FIELD_WEIGHT[field.kind];
+        for (const line of lines) {
+          const rawScore = scoreTitle(field.key, line.key, fuzzy);
+          if (rawScore === null) continue;
+          const score = rawScore * weight;
+          if (!best || score > best.score) {
+            best = { music, recognizedText: line.raw, score, matchedKind: field.kind, matchedText: field.raw };
           }
+        }
+      }
+      if (best && (best.matchedKind === 'title' || best.matchedKind === 'alias') && best.score >= 0.6) {
+        const artist = fields.find(field => field.kind === 'artist');
+        if (artist && compactImage.includes(artist.key)) {
+          best = { ...best, score: Math.min(1, best.score + ARTIST_CONFIRM_BONUS) };
         }
       }
       return best;
     })
     .filter((match): match is TitleMatch => match !== null)
-    .sort((left, right) => right.score - left.score)
+    .sort((left, right) => right.score - left.score || right.music.title.length - left.music.title.length)
     .slice(0, limit);
 }
 
@@ -163,7 +269,7 @@ export function matchSongTitlesForImage(rawData: MusicData[], imageText: string)
  * v1.16.7：合并多图候选——按曲去重取最高分，排序后截断。
  * 与全量一次性匹配在数学上等价（原实现同样取每曲全文本最优），输出一致。
  */
-export function mergeImageMatches(imageMatches: TitleMatch[][], limit = 12): TitleMatch[] {
+export function mergeImageMatches(imageMatches: TitleMatch[][], limit = OCR_CANDIDATE_LIMIT): TitleMatch[] {
   const byMusic = new Map<string, TitleMatch>();
   for (const matches of imageMatches) {
     for (const match of matches) {

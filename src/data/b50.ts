@@ -65,6 +65,8 @@ export interface B50Result {
   oldTies: B50Entry[];
 }
 
+export type B50Candidate = Candidate;
+
 interface Candidate {
   rating: number;
   ds: number;
@@ -74,6 +76,11 @@ interface Candidate {
   difficultyIndex: number;
   title: string;
   isNew: boolean;
+}
+
+/** v1.18.0：导出供快照对比的增量 B50 计算复用（口径与 computeB50 完全一致）。 */
+export function buildB50Candidates(musicList: MusicData[], scores: PlayerScore[]): B50Candidate[] {
+  return buildCandidates(musicList, scores);
 }
 
 function buildCandidates(musicList: MusicData[], scores: PlayerScore[]): Candidate[] {

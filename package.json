@@ -58,7 +58,11 @@
     "test:update": "tsx scripts/update-check.ts",
     "test:routes": "node scripts/route-check.mjs",
     "test:landing": "node scripts/landing-worker-check.mjs",
-    "test:range": "tsx scripts/range-input-check.ts"
+    "test:range": "tsx scripts/range-input-check.ts",
+    "test:search": "tsx scripts/search-alias-check.ts",
+    "test:snapshot": "tsx scripts/snapshot-battle-check.ts",
+    "test:rating-history": "tsx scripts/rating-history-check.ts",
+    "test:cover": "tsx scripts/cover-fallback-check.ts"
   },
   "private": true,
   "expo": {

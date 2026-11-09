@@ -13,6 +13,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Colors } from '../src/constants';
 import { ChangelogOverlay } from '../src/components/ChangelogOverlay';
 import { useBilibiliStore, useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '../src/store';
+import { loadStoredAliases } from '../src/api/aliases';
+import { useRatingHistoryStore } from '../src/store/rating-history-store';
 
 export default function RootLayout() {
   const loadData = useMusicStore(s => s.loadData);
@@ -28,6 +30,9 @@ export default function RootLayout() {
     loadScores();
     loadSettings();
     loadBilibiliLinks();
+    // v1.18.0：读入上次手动刷新的别名库（没有则用内置快照）与 Rating 历史。
+    void loadStoredAliases();
+    void useRatingHistoryStore.getState().load();
   }, []);
 
   if (loading) {
@@ -54,6 +59,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="song" />
         <Stack.Screen name="b50" />
+        <Stack.Screen name="rating-history" options={{ headerShown: true, title: 'Rating 历史', headerStyle: { backgroundColor: Colors.bg.primary }, headerTintColor: Colors.text.primary, contentStyle: { backgroundColor: Colors.bg.primary } }} />
         <Stack.Screen
           name="snapshots"
           options={{

@@ -27,6 +27,8 @@ import { computeB50 } from '../src/data/b50';
 import { computeFit50, sortFit50Entries, type Fit50Sort } from '../src/data/fit50';
 import { shareCardFileName } from '../src/data/share-card';
 import { useMusicStore, usePlanStore, useScoreStore } from '../src/store';
+import { useRatingHistoryStore } from '../src/store/rating-history-store';
+import { computeRatingHistoryStats } from '../src/data/rating-history';
 
 type ScreenMode = 'b50' | 'fit50' | 'ap50';
 type PoolTab = 'new' | 'old';
@@ -142,6 +144,15 @@ export default function B50Screen() {
   const musicFor = (entry: { songId: string; musicType: string }) =>
     rawData.find(candidate => candidate.id === entry.songId && candidate.type === entry.musicType);
 
+  // v1.18.0：Rating 历史入口放在 B50 总览（总分卡下方）。
+  const ratingHistoryPoints = useRatingHistoryStore(state => state.points);
+  const ratingHistoryStats = useMemo(() => computeRatingHistoryStats(ratingHistoryPoints), [ratingHistoryPoints]);
+  const ratingHistorySummary = ratingHistoryStats.count === 0
+    ? '同步成绩后开始记录'
+    : ratingHistoryStats.change7d === null
+      ? `已记录 ${ratingHistoryStats.count} 次`
+      : `7 日 ${ratingHistoryStats.change7d > 0 ? '+' : ''}${ratingHistoryStats.change7d} · 已记录 ${ratingHistoryStats.count} 次`;
+
   return (
     <View style={styles.root}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -236,6 +247,7 @@ export default function B50Screen() {
         ) : (
           <>
             {screenMode === 'b50' ? (
+              <>
               <View style={styles.summaryRow}>
                 <View style={[styles.summaryCard, styles.totalCard]}>
                   <Text style={styles.totalValue}>{b50.total}</Text>
@@ -250,6 +262,19 @@ export default function B50Screen() {
                   </View>
                 </View>
               </View>
+              {!selectionMode && (
+                <Pressable
+                  style={({ pressed }) => [styles.historyEntry, pressed && styles.historyEntryPressed]}
+                  onPress={() => router.push('/rating-history' as any)}
+                  accessibilityRole="button"
+                  accessibilityLabel="查看 Rating 历史曲线"
+                >
+                  <Text style={styles.historyEntryTitle}>📈 Rating 历史</Text>
+                  <Text style={styles.historyEntrySub} numberOfLines={1}>{ratingHistorySummary}</Text>
+                  <Text style={styles.historyEntryArrow}>›</Text>
+                </Pressable>
+              )}
+              </>
             ) : screenMode === 'ap50' ? (
               <View style={styles.summaryRow}>
                 <View style={[styles.summaryCard, styles.totalCard]}>
@@ -465,6 +490,11 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 15, fontWeight: '800', color: Colors.text.primary },
   emptyText: { fontSize: 12, lineHeight: 18, color: Colors.text.secondary },
   summaryRow: { flexDirection: 'row', gap: 10 },
+  historyEntry: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, backgroundColor: Colors.bg.secondary, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, borderWidth: 1, borderColor: Colors.border.light },
+  historyEntryPressed: { backgroundColor: Colors.bg.tertiary, borderColor: Colors.border.accent },
+  historyEntryTitle: { fontSize: 13, fontWeight: '800', color: Colors.text.primary },
+  historyEntrySub: { flex: 1, fontSize: 11, color: Colors.text.secondary, textAlign: 'right' },
+  historyEntryArrow: { fontSize: 16, color: Colors.text.muted },
   summaryCard: { backgroundColor: Colors.bg.secondary, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12 },
   totalCard: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   totalValue: { fontSize: 30, fontWeight: '900', color: Colors.accent.primary },

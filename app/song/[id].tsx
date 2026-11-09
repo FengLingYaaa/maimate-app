@@ -25,7 +25,10 @@ import { formatClearStatus } from '../../src/data/status-labels';
 import { shareCardFileName } from '../../src/data/share-card';
 import { openMusicPlatformSearch } from '../../src/data/external-links';
 import { getMusicPlatformSearchText, MUSIC_PLATFORM_LABELS } from '../../src/data/music-platforms';
+import { getSongAliases } from '../../src/data/song-aliases';
 import type { ChartData, DetailBoardId, MusicPlatform } from '../../src/data/types';
+
+const ALIAS_PREVIEW_COUNT = 12;
 
 export default function SongDetail() {
   const { id, type, difficultyIndex, source } = useLocalSearchParams<{ id: string; type?: 'SD' | 'DX'; difficultyIndex?: string; source?: string }>();
@@ -120,6 +123,24 @@ export default function SongDetail() {
     setCustomTarget(targetEntry?.targetScore === undefined ? '' : String(targetEntry.targetScore));
   }, [targetEntry?.targetScore, music?.id, selectedDiff]);
 
+  // v1.18.0：别名小节（Yuzu 别名库）。SD/DX 同名两条记录的别名合并去重展示。
+  const [aliasesExpanded, setAliasesExpanded] = useState(false);
+  const aliases = useMemo(() => {
+    if (!music) return [];
+    const sameTitle = rawData.filter(candidate => candidate.title === music.title && candidate.id !== music.id);
+    const merged = [...getSongAliases(music), ...sameTitle.flatMap(candidate => getSongAliases(candidate))];
+    const seen = new Set<string>();
+    return merged.filter(alias => {
+      const key = alias.trim().normalize('NFKC').toLocaleLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [music, rawData]);
+  const searchAlias = useCallback((alias: string) => {
+    router.push({ pathname: '/' as any, params: { q: alias } });
+  }, [router]);
+
   if (!music) {
     return (
       <View style={styles.notFound}>
@@ -207,6 +228,32 @@ export default function SongDetail() {
             <Text style={styles.heroVersion}>国区版本：{getChinaVersionName(music.basic_info.from)}</Text>
           </View>
         </View>
+
+        {/* v1.18.0：别名（点 chip 回曲库搜索该别名） */}
+        {aliases.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>别名 · {aliases.length}</Text>
+            <View style={styles.aliasChipRow}>
+              {(aliasesExpanded ? aliases : aliases.slice(0, ALIAS_PREVIEW_COUNT)).map(alias => (
+                <Pressable
+                  key={alias}
+                  style={({ pressed }) => [styles.aliasChip, pressed && styles.aliasChipPressed]}
+                  onPress={() => searchAlias(alias)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`搜索别名 ${alias}`}
+                >
+                  <Text style={styles.aliasChipText} numberOfLines={1}>{alias}</Text>
+                </Pressable>
+              ))}
+              {aliases.length > ALIAS_PREVIEW_COUNT && (
+                <Pressable style={styles.aliasMoreChip} onPress={() => setAliasesExpanded(value => !value)}>
+                  <Text style={styles.aliasMoreText}>{aliasesExpanded ? '收起' : `全部 ${aliases.length} 个`}</Text>
+                </Pressable>
+              )}
+            </View>
+            <Text style={styles.aliasSource}>别名来自 Yuzu 别名库（社区投票），点击可在曲库中搜索</Text>
+          </View>
+        )}
 
         {/* 难度选择器 */}
         <View style={styles.section}>
@@ -539,6 +586,46 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     textTransform: 'uppercase',
     marginBottom: 8,
+  },
+  // v1.18.0：别名 chips
+  aliasChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  aliasChip: {
+    maxWidth: '100%',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: Colors.bg.secondary,
+    borderWidth: 1,
+    borderColor: Colors.border.light,
+  },
+  aliasChipPressed: {
+    borderColor: Colors.accent.secondary,
+    backgroundColor: Colors.bg.tertiary,
+  },
+  aliasChipText: {
+    fontSize: 12,
+    color: Colors.text.primary,
+  },
+  aliasMoreChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.accent.secondary,
+  },
+  aliasMoreText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.accent.secondary,
+  },
+  aliasSource: {
+    marginTop: 6,
+    fontSize: 10,
+    color: Colors.text.muted,
   },
   // Difficulty selector
   diffRow: {

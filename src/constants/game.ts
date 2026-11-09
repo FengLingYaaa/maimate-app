@@ -121,6 +121,21 @@ export function getCoverUrl(id: string): string {
   return `${COVER_BASE}/${len5}.png`;
 }
 
+/**
+ * v1.18.0：备用曲绘源（落雪 LXNS 图床）。Diving-Fish /covers 缺新版本曲绘（PRiSM / PRiSM PLUS 等），
+ * 只在 Diving-Fish 候选全部失败后才使用。
+ * LXNS 曲目 ID：SD 同 Diving-Fish；DX（10001–99999）去掉 10000；宴会场 6 位 ID 该图床无曲绘，返回 null。
+ */
+export const COVER_FALLBACK_BASE = 'https://assets2.lxns.net/maimai/jacket';
+
+export function getFallbackCoverUrl(id: string): string | null {
+  if (!/^\d+$/.test(id)) return null;
+  const num = Number.parseInt(id, 10);
+  if (!Number.isFinite(num) || num <= 0 || num >= 100000) return null;
+  const lxnsId = num > 10000 ? num - 10000 : num;
+  return `${COVER_FALLBACK_BASE}/${lxnsId}.png`;
+}
+
 /** 本地缓存键 */
 export const CACHE_KEYS = {
   musicData: 'maimate_music_data',

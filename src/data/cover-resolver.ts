@@ -1,5 +1,5 @@
 import type { MusicData } from './types';
-import { getCoverUrl, isBanquetGenre } from '../constants/game';
+import { getCoverUrl, getFallbackCoverUrl, isBanquetGenre } from '../constants/game';
 
 function normalizeTitle(value: string): string {
   return value
@@ -26,9 +26,21 @@ function getLegacyIdCandidates(id: string): string[] {
 }
 
 /**
+ * 备用源候选：只用真实曲目 ID（宴会场的同名普通曲 + 本曲），不用 getLegacyIdCandidates 推出的 ID——
+ * 推导 ID 在备用图床上可能对应别的图（例如 851/998 在 LXNS 返回 200 但不是曲库里的曲目）。
+ */
+function getFallbackCandidates(songIds: string[]): string[] {
+  return songIds
+    .map(id => getFallbackCoverUrl(id))
+    .filter((url): url is string => !!url);
+}
+
+/**
  * Return ordered public cover candidates. The caller must still handle 404/network errors.
  * Banquet charts intentionally fall back to an ordinary same-title song cover, matching the
  * in-game presentation requested for MaiMate.
+ *
+ * v1.18.0：Diving-Fish 候选（原顺序不变）之后追加备用源（LXNS）候选。
  */
 export function getCoverCandidates(music: MusicData, allSongs: MusicData[] = []): string[] {
   const ids = [music.id, ...getLegacyIdCandidates(music.id)];
@@ -49,10 +61,11 @@ export function getCoverCandidates(music: MusicData, allSongs: MusicData[] = [])
     return [...new Set([
       ...fallbackSongs.map(candidate => getCoverUrl(candidate.id)),
       ...directUrls,
+      ...getFallbackCandidates([...fallbackSongs.map(candidate => candidate.id), music.id]),
     ])];
   }
 
-  return [...new Set(directUrls)];
+  return [...new Set([...directUrls, ...getFallbackCandidates([music.id])])];
 }
 
 export function getCoverCandidateKey(music: MusicData): string {

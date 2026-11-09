@@ -35,9 +35,13 @@ interface Props {
   onlyServerRaImprovements?: boolean;
 }
 
+/** v1.18.0：分享图最多画这么多行，避免几千行渲染成超长位图导致内存溢出。 */
+export const SHARE_CARD_ROW_LIMIT = 60;
+
 export function BattleReportShareCard({ report, base, target, rawData, userName, onlyServerRaImprovements: onlyImprovements = false }: Props) {
   const changedRows = report.rows.filter(row => row.kind !== 'removed');
   const rows = onlyImprovements ? onlyServerRaImprovements(changedRows) : changedRows;
+  const musicByKey = new Map(rawData.map(music => [`${music.id}:${music.type}`, music]));
   const raDelta = base.serverRating != null && target.serverRating != null
     ? target.serverRating - base.serverRating
     : null;
@@ -78,8 +82,8 @@ export function BattleReportShareCard({ report, base, target, rawData, userName,
         ) : null}
       </View>
       {rows.length === 0 && <Text style={styles.emptyText}>{onlyImprovements ? '两份快照中没有服务器 RA 提升的曲目' : '两份快照之间成绩没有变化'}</Text>}
-      {rows.map(row => {
-        const music = rawData.find(candidate => candidate.id === row.songId && candidate.type === row.musicType);
+      {rows.slice(0, SHARE_CARD_ROW_LIMIT).map(row => {
+        const music = musicByKey.get(`${row.songId}:${row.musicType}`);
         const diffColor = DifficultyColorMap[row.difficultyIndex] || Colors.accent.secondary;
         return (
           <View key={row.chartKey} style={styles.battleRow}>
@@ -114,6 +118,9 @@ export function BattleReportShareCard({ report, base, target, rawData, userName,
           </View>
         );
       })}
+      {rows.length > SHARE_CARD_ROW_LIMIT && (
+        <Text style={styles.emptyText}>另有 {rows.length - SHARE_CARD_ROW_LIMIT} 首未展示（分享图最多 {SHARE_CARD_ROW_LIMIT} 首）</Text>
+      )}
       <Text style={styles.footer}>maimate.flya.ccwu.cc</Text>
     </View>
   );

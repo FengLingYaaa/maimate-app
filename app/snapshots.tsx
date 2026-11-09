@@ -5,14 +5,14 @@
  * 保留数量由设置驱动（默认 20，可设至多 1000）。
  */
 
-import React, { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Colors, DifficultyColorMap, DifficultyLabels } from '../src/constants';
 import { CoverImage } from '../src/components/CoverImage';
 import { ShareCardOverlay } from '../src/components/ShareCardOverlay';
 import { BattleReportShareCard } from '../src/components/BattleReportShareCard';
-import { buildSnapshotBattleReport } from '../src/data/snapshot-battle';
+import { buildSnapshotBattleReportAsync, type SnapshotBattleReport } from '../src/data/snapshot-battle';
 import { onlyServerRaImprovements } from '../src/data/server-ra';
 import { shareCardFileName } from '../src/data/share-card';
 import { useMusicStore, useScoreStore, useSettingsStore } from '../src/store';
@@ -32,9 +32,31 @@ export default function SnapshotsPage() {
   const [shareVisible, setShareVisible] = useState(false);
   const [shareOnlyServerRa, setShareOnlyServerRa] = useState(false);
 
-  const report = useMemo(() => {
-    if (!comparison) return null;
-    return buildSnapshotBattleReport(comparison.base, comparison.target, rawData);
+  // v1.18.0：对比计算移出渲染路径——分片异步计算（setTimeout(0) 让出主线程），
+  // 计算期间显示「计算中」，切换/收起时取消在途计算。
+  const [report, setReport] = useState<SnapshotBattleReport | null>(null);
+  const [computing, setComputing] = useState(false);
+  useEffect(() => {
+    setReport(null);
+    if (!comparison) {
+      setComputing(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setComputing(true);
+    buildSnapshotBattleReportAsync(comparison.base, comparison.target, rawData, { isCancelled: () => cancelled })
+      .then(result => {
+        if (!cancelled && result) setReport(result);
+      })
+      .catch(() => {
+        if (!cancelled) Alert.alert('对比失败', '快照对比计算出错，请重试。');
+      })
+      .finally(() => {
+        if (!cancelled) setComputing(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [comparison, rawData]);
   const serverRaRows = useMemo(
     () => report ? onlyServerRaImprovements(report.rows) : [],
@@ -85,6 +107,12 @@ export default function SnapshotsPage() {
         {snapshots.length === 0 && (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>还没有快照。去「设置 → Diving-Fish 成绩导入」同步一次成绩即可生成。</Text>
+          </View>
+        )}
+        {computing && comparison && (
+          <View style={styles.computingCard}>
+            <ActivityIndicator size="small" color={Colors.accent.secondary} />
+            <Text style={styles.computingText}>正在计算推分战报…</Text>
           </View>
         )}
         {report && comparison && (
@@ -155,13 +183,18 @@ export default function SnapshotsPage() {
 function BattleReportCard({ base, target, report, rawData, onClose, onShare, serverRaImprovementCount }: {
   base: ScoreSnapshot;
   target: ScoreSnapshot;
-  report: ReturnType<typeof buildSnapshotBattleReport>;
+  report: SnapshotBattleReport;
   rawData: MusicData[];
   onClose: () => void;
   onShare: (onlyServerRaImprovements: boolean) => void;
   serverRaImprovementCount: number;
 }) {
   const router = useRouter();
+  // v1.18.0：差异再多也只先渲染前 200 行，点「加载更多」每次再加 200 行。
+  const [visibleCount, setVisibleCount] = useState(BATTLE_PAGE_SIZE);
+  useEffect(() => setVisibleCount(BATTLE_PAGE_SIZE), [report]);
+  const musicByKey = useMemo(() => new Map(rawData.map(music => [`${music.id}:${music.type}`, music])), [rawData]);
+  const displayRows = useMemo(() => report.rows.filter(row => row.kind !== 'removed'), [report]);
   const shareChoices = () => Alert.alert(
     '分享推分战报',
     `服务器 RA 有明确提升的曲目：${serverRaImprovementCount} 首。只分享此类曲目时，不会用本地 B50 估算代替服务器数据。`,
@@ -219,11 +252,11 @@ function BattleReportCard({ base, target, report, rawData, onClose, onShare, ser
       <Text style={styles.compareSummary}>
         记录 {base.recordCount} → {target.recordCount} · 服务器提升曲目 {serverRaImprovementCount} 首
       </Text>
-      {report.rows.filter(row => row.kind !== 'removed').length === 0 ? (
+      {displayRows.length === 0 ? (
         <Text style={styles.compareEmpty}>两份快照之间成绩没有变化</Text>
       ) : (
-        report.rows.filter(row => row.kind !== 'removed').map(row => {
-          const music = rawData.find(candidate => candidate.id === row.songId && candidate.type === row.musicType);
+        displayRows.slice(0, visibleCount).map(row => {
+          const music = musicByKey.get(`${row.songId}:${row.musicType}`);
           const difficultyColor = DifficultyColorMap[row.difficultyIndex] || Colors.accent.secondary;
           // v1.16.7：行可点击进详情页；详情页返回时 replace 回快照页（source: 'snapshots'）。
           return (
@@ -269,9 +302,18 @@ function BattleReportCard({ base, target, report, rawData, onClose, onShare, ser
           );
         })
       )}
+      {displayRows.length > visibleCount && (
+        <Pressable style={styles.loadMoreButton} onPress={() => setVisibleCount(count => count + BATTLE_PAGE_SIZE)}>
+          <Text style={styles.loadMoreText}>
+            仅显示前 {visibleCount} 条（共 {displayRows.length} 条），点加载更多
+          </Text>
+        </Pressable>
+      )}
     </View>
   );
 }
+
+const BATTLE_PAGE_SIZE = 200;
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.bg.primary },
@@ -303,6 +345,10 @@ const styles = StyleSheet.create({
   summaryChipValue: { fontSize: 13, fontWeight: '900', color: Colors.text.primary },
   summaryChipLabel: { fontSize: 8.5, color: Colors.text.muted, marginTop: 1 },
   compareSummary: { fontSize: 11, fontWeight: '700', color: Colors.accent.secondary },
+  computingCard: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.bg.secondary, borderRadius: 12, padding: 12 },
+  computingText: { fontSize: 12, color: Colors.text.secondary },
+  loadMoreButton: { alignItems: 'center', paddingVertical: 10, borderRadius: 9, borderWidth: 1, borderColor: Colors.accent.secondary },
+  loadMoreText: { fontSize: 11, fontWeight: '700', color: Colors.accent.secondary },
   compareEmpty: { fontSize: 11, color: Colors.text.muted },
   battleRow: {
     flexDirection: 'row', alignItems: 'center', gap: 9,

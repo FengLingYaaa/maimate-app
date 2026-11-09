@@ -8,7 +8,7 @@
 import type { FilterOptions, MusicData, ChartData, SortOptions, ChartStatsMap, PlayerScore } from './types';
 import { getChinaVersionName, isBanquetGenre } from '../constants/game';
 import { expandVersionSelection } from './version-catalog';
-import { getSearchTitles } from './song-aliases';
+import { getAliasVersion, getSearchTitles, getSongAliases } from './song-aliases';
 
 /** 返回可用于官方定数筛选/排序/Rating 的定数；宴会場保留为缺失。 */
 export function getOfficialChartConstant(music: MusicData, index: number): number | null {
@@ -31,12 +31,28 @@ export function hasOfficialChartConstant(music: MusicData, index: number): boole
   return getOfficialChartConstant(music, index) !== null;
 }
 
+/**
+ * v1.18.0：片假名统一折叠为平假名（カ↔か 互相匹配）。
+ * 只折叠 ァ-ヶ 与 ヽヾ；长音符「ー」等不变。NFKC 已先把半角片假名转为全角。
+ */
+function foldKana(value: string): string {
+  let result = '';
+  for (const char of value) {
+    const code = char.charCodeAt(0);
+    if ((code >= 0x30a1 && code <= 0x30f6) || code === 0x30fd || code === 0x30fe) {
+      result += String.fromCharCode(code - 0x60);
+    } else {
+      result += char;
+    }
+  }
+  return result;
+}
+
 /** 将用户输入和曲库文本统一成适合搜索的形式。 */
 export function normalizeSearchText(value: string): string {
-  return value
-    .normalize('NFKC')
+  return foldKana(value.normalize('NFKC'))
     .toLocaleLowerCase()
-    .replace(/[，。！？、；：“”‘’（）【】《》·…—–_\-/:;!?.,()[\]{}]+/g, ' ')
+    .replace(/[，。！？、；：“”‘’（）【】《》·…—–_\-/:;!?.,()[\]{}~〜]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -78,22 +94,37 @@ function isSubsequence(query: string, text: string): boolean {
  * v1.17.0：搜索字段预归一化缓存——`getMusicSearchScore` 每次全库扫描会对每首曲的
  * 标题/别名/曲师/谱师反复跑 `normalizeSearchText`（NFKC+正则），是模糊搜索的主要耗时。
  * 以曲对象身份作键缓存归一化结果，全库同一首歌只归一化一次；曲库刷新换新对象时自然失效。
+ * v1.18.0：字段带来源标记（标题/别名/曲师/谱师），缓存同时记录别名库版本，别名刷新后失效。
  */
-const searchFieldCache = new WeakMap<MusicData, string[]>();
+export type SearchFieldKind = 'title' | 'alias' | 'artist' | 'charter';
 
-function getSearchFields(music: MusicData): string[] {
-  let fields = searchFieldCache.get(music);
-  if (!fields) {
-    fields = [
-      ...getSearchTitles(music),
-      music.basic_info.artist,
-      ...music.charts.map(chart => chart.charter),
-    ]
-      .map(normalizeSearchText)
-      .filter((value): value is string => Boolean(value))
-      .filter((value, index, all) => all.indexOf(value) === index);
-    searchFieldCache.set(music, fields);
+interface SearchField {
+  kind: SearchFieldKind;
+  raw: string;
+  normalized: string;
+}
+
+const searchFieldCache = new WeakMap<MusicData, { version: number; fields: SearchField[] }>();
+
+function getSearchFields(music: MusicData): SearchField[] {
+  const version = getAliasVersion();
+  const cached = searchFieldCache.get(music);
+  if (cached && cached.version === version) return cached.fields;
+  const aliases = new Set(getSongAliases(music).map(alias => alias.trim()));
+  const candidates: Array<{ kind: SearchFieldKind; raw: string }> = [
+    ...getSearchTitles(music).map(raw => ({ kind: aliases.has(raw) ? 'alias' as const : 'title' as const, raw })),
+    { kind: 'artist', raw: music.basic_info.artist },
+    ...music.charts.map(chart => ({ kind: 'charter' as const, raw: chart.charter })),
+  ];
+  const seen = new Set<string>();
+  const fields: SearchField[] = [];
+  for (const candidate of candidates) {
+    const normalized = normalizeSearchText(candidate.raw || '');
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    fields.push({ kind: candidate.kind, raw: candidate.raw, normalized });
   }
+  searchFieldCache.set(music, { version, fields });
   return fields;
 }
 
@@ -137,8 +168,31 @@ function scoreNormalized(normalizedText: string, query: string): number | null {
   return null;
 }
 
-/** 返回歌曲与标题搜索词的相关度，供筛选结果排序。 */
-export function getMusicSearchScore(music: MusicData, query: string): number | null {
+/** v1.18.0：小数定数查询（如 13.7 / 14.0），精确匹配任一谱面的官方定数。 */
+const DECIMAL_CONSTANT_PATTERN = /^\d{1,2}\.\d{1,2}$/;
+
+export function parseConstantQuery(query: string | undefined): number | null {
+  if (query === undefined) return null;
+  const trimmed = query.trim().normalize('NFKC');
+  if (!DECIMAL_CONSTANT_PATTERN.test(trimmed)) return null;
+  const value = Number(trimmed);
+  return Number.isFinite(value) ? value : null;
+}
+
+function sameConstant(left: number, right: number): boolean {
+  return Math.abs(left - right) < 1e-6;
+}
+
+export interface MusicSearchHit {
+  score: number;
+  /** 命中来源：标题/别名/曲师/谱师；数字 ID 与定数查询分别为 id / constant。 */
+  kind: SearchFieldKind | 'id' | 'constant';
+  /** 命中的原始文本（别名命中时即别名本身）。 */
+  text: string;
+}
+
+/** 返回歌曲与搜索词的最佳命中（分数 + 来源），未命中返回 null。 */
+export function getMusicSearchHit(music: MusicData, query: string): MusicSearchHit | null {
   // v1.16.9：NFKC 归一（全角数字→半角），纯数字查询四级规则——只做确定性比较，
   // 零模糊零窗口（搜 ID 秒出；杜绝数字撞上谱师/标题子串产生无关结果）：
   //   1) ID 精确相等 = 1（搜 ID 的主意图，排最前）
@@ -147,16 +201,37 @@ export function getMusicSearchScore(music: MusicData, query: string): number | n
   //   4) 2~3 位短数字为 ID 子串 = 0.5 封顶（成绩图里的短数字压底不出头）
   const trimmed = query.trim().normalize('NFKC');
   if (/^\d+$/.test(trimmed)) {
-    if (music.id === trimmed) return 1;
-    if (getSearchTitles(music).some(title => normalizeSearchText(title).replace(/\s/g, '') === trimmed)) return 0.95;
-    if (trimmed.length >= 2 && music.id.startsWith(trimmed)) return 0.85;
-    if (trimmed.length >= 2 && trimmed.length <= 3 && music.id.includes(trimmed)) return 0.5;
+    if (music.id === trimmed) return { score: 1, kind: 'id', text: music.id };
+    const exactTitle = getSearchFields(music).find(field =>
+      (field.kind === 'title' || field.kind === 'alias') && field.normalized.replace(/\s/g, '') === trimmed);
+    if (exactTitle) return { score: 0.95, kind: exactTitle.kind, text: exactTitle.raw };
+    if (trimmed.length >= 2 && music.id.startsWith(trimmed)) return { score: 0.85, kind: 'id', text: music.id };
+    if (trimmed.length >= 2 && trimmed.length <= 3 && music.id.includes(trimmed)) return { score: 0.5, kind: 'id', text: music.id };
     return null;
   }
-  const values = getSearchFields(music)
-    .map(text => scoreNormalized(text, query))
-    .filter((score): score is number => score !== null);
-  return values.length > 0 ? Math.max(...values) : null;
+  // v1.18.0：小数定数精确匹配（13.7 → 任一谱面官方定数 = 13.7）。
+  const constant = parseConstantQuery(trimmed);
+  if (constant !== null) {
+    const chartCount = Math.min(music.charts.length, music.ds.length);
+    for (let index = 0; index < chartCount; index += 1) {
+      const ds = getOfficialChartConstant(music, index);
+      if (ds !== null && sameConstant(ds, constant)) return { score: 0.9, kind: 'constant', text: ds.toFixed(1) };
+    }
+    return null;
+  }
+  let best: MusicSearchHit | null = null;
+  for (const field of getSearchFields(music)) {
+    const score = scoreNormalized(field.normalized, query);
+    if (score === null) continue;
+    // 同分时标题优先于别名，别名优先于曲师/谱师（字段顺序即优先级）。
+    if (!best || score > best.score) best = { score, kind: field.kind, text: field.raw };
+  }
+  return best;
+}
+
+/** 返回歌曲与标题搜索词的相关度，供筛选结果排序。 */
+export function getMusicSearchScore(music: MusicData, query: string): number | null {
+  return getMusicSearchHit(music, query)?.score ?? null;
 }
 
 /** 检查值是否命中单值、列表或数值区间。 */
@@ -199,6 +274,12 @@ function matchesChart(
   if (opts.dsRange !== undefined) {
     const constant = getOfficialChartConstant(music, index);
     if (constant === null || !inOrEqual(constant, opts.dsRange)) return false;
+  }
+  // v1.18.0：搜索框是小数定数时，只有该定数的谱面算命中（用于高亮对应难度）。
+  const constantQuery = parseConstantQuery(opts.titleSearch);
+  if (constantQuery !== null) {
+    const constant = getOfficialChartConstant(music, index);
+    if (constant === null || !sameConstant(constant, constantQuery)) return false;
   }
   if (opts.charter !== undefined && opts.charter.trim() !== '') {
     const query = normalizeSearchText(opts.charter);
@@ -296,9 +377,12 @@ export function sortMusicItems(
   const mode = sort?.mode || (query?.trim() ? 'relevance' : null);
   if (!mode || mode === 'relevance') {
     if (!query?.trim()) return items;
+    // v1.18.0：先算一遍分数再排序，避免比较函数里 O(n log n) 次重复打分。
+    const scores = new Map<MusicData, number>();
+    for (const item of items) scores.set(item, getMusicSearchScore(item, query) ?? -1);
     return items.sort((left, right) => {
-      const leftScore = getMusicSearchScore(left, query) ?? -1;
-      const rightScore = getMusicSearchScore(right, query) ?? -1;
+      const leftScore = scores.get(left) ?? -1;
+      const rightScore = scores.get(right) ?? -1;
       if (rightScore !== leftScore) return rightScore - leftScore;
       return compareTitles(left, right, false);
     });
