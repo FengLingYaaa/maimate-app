@@ -64,12 +64,61 @@ function sameText(left: string, right: string): boolean {
   return left.trim().normalize('NFKC').toLocaleLowerCase() === right.trim().normalize('NFKC').toLocaleLowerCase();
 }
 
-/** 一首歌的别名（去掉与原标题相同的那一条）。 */
-export function getSongAliases(music: MusicData): string[] {
+/**
+ * v1.19.0：本地自定义别名层（只存本机 AsyncStorage `maimate.custom-aliases.v1`，不写入 Yuzu 快照、不上传）。
+ * 由 custom-aliases.ts 读写存储后通过 setCustomAliasMap() 注入；这里只保存内存副本。
+ */
+let customAliasMap: Record<string, string[]> = {};
+
+export function setCustomAliasMap(map: Record<string, string[]>): void {
+  customAliasMap = map;
+  aliasVersion += 1;
+}
+
+export function getCustomAliasMap(): Record<string, string[]> {
+  return customAliasMap;
+}
+
+/** 一首歌的自定义别名（原样顺序）。 */
+export function getCustomAliases(music: Pick<MusicData, 'id'>): string[] {
+  return customAliasMap[music.id] ?? [];
+}
+
+/** 文本是否为该曲的自定义别名（NFKC+小写比较）。 */
+export function isCustomAlias(music: Pick<MusicData, 'id'>, text: string): boolean {
+  return getCustomAliases(music).some(alias => sameText(alias, text));
+}
+
+function yuzuAliasesOf(music: MusicData): string[] {
   const list = activeLibrary.bySongId[music.id];
   if (!list || list.length === 0) return [];
   const titles = [music.title, music.basic_info?.title ?? ''];
   return list.filter(alias => alias.trim().length > 0 && !titles.some(title => sameText(title, alias)));
+}
+
+/**
+ * 一首歌的别名（去掉与原标题相同的那一条）。
+ * v1.19.0：自定义别名排在 Yuzu 别名之前（自定义优先），与 Yuzu 重复的只保留自定义那条。
+ */
+export function getSongAliases(music: MusicData): string[] {
+  const custom = getCustomAliases(music);
+  const yuzu = yuzuAliasesOf(music);
+  if (custom.length === 0) return yuzu;
+  return [...custom, ...yuzu.filter(alias => !custom.some(item => sameText(item, alias)))];
+}
+
+export interface AliasWithSource {
+  text: string;
+  source: 'custom' | 'yuzu';
+}
+
+/** v1.19.0：带来源的别名列表（详情页区分「自定义」与 Yuzu）。 */
+export function getSongAliasEntries(music: MusicData): AliasWithSource[] {
+  const custom = getCustomAliases(music);
+  return [
+    ...custom.map(text => ({ text, source: 'custom' as const })),
+    ...yuzuAliasesOf(music).filter(alias => !custom.some(item => sameText(item, alias))).map(text => ({ text, source: 'yuzu' as const })),
+  ];
 }
 
 /** 搜索用标题集合：官方标题 + 别名（顺序即优先级）。 */

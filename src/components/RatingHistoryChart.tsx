@@ -31,13 +31,18 @@ function niceRange(min: number, max: number): { low: number; high: number; step:
   return { low, high, step };
 }
 
-export function RatingHistoryChart({ points }: { points: RatingHistoryPoint[] }) {
-  const [width, setWidth] = useState(0);
-  const onLayout = (event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width);
+/**
+ * v1.19.0：fixedWidth 用于分享卡——首帧即按固定宽度绘制（不等 onLayout），截图时曲线一定已经画好。
+ */
+export function RatingHistoryChart({ points, fixedWidth, height = HEIGHT }: { points: RatingHistoryPoint[]; fixedWidth?: number; height?: number }) {
+  const [measuredWidth, setWidth] = useState(0);
+  const width = fixedWidth ?? measuredWidth;
+  const onLayout = (event: LayoutChangeEvent) => { if (fixedWidth === undefined) setWidth(event.nativeEvent.layout.width); };
+  const HEIGHT_ = height;
 
   if (points.length === 0) {
     return (
-      <View style={[styles.empty, { height: HEIGHT }]}>
+      <View style={[styles.empty, { height: HEIGHT_ }]}>
         <Text style={styles.emptyText}>还没有记录。同步一次成绩后这里会出现第一个点。</Text>
       </View>
     );
@@ -47,7 +52,7 @@ export function RatingHistoryChart({ points }: { points: RatingHistoryPoint[] })
   const times = points.map(point => Date.parse(point.at));
   const { low, high, step } = niceRange(Math.min(...ratings), Math.max(...ratings));
   const plotWidth = Math.max(width - PAD_LEFT - PAD_RIGHT, 1);
-  const plotHeight = HEIGHT - PAD_TOP - PAD_BOTTOM;
+  const plotHeight = HEIGHT_ - PAD_TOP - PAD_BOTTOM;
   const minTime = Math.min(...times);
   const maxTime = Math.max(...times);
   const single = points.length === 1 || maxTime === minTime;
@@ -66,9 +71,9 @@ export function RatingHistoryChart({ points }: { points: RatingHistoryPoint[] })
   const lastRating = ratings[ratings.length - 1];
 
   return (
-    <View onLayout={onLayout} style={{ height: HEIGHT }}>
+    <View onLayout={onLayout} style={{ height: HEIGHT_ }}>
       {width > 0 && (
-        <Svg width={width} height={HEIGHT}>
+        <Svg width={width} height={HEIGHT_}>
           <Defs>
             <LinearGradient id="ratingArea" x1="0" y1="0" x2="0" y2="1">
               <Stop offset="0" stopColor={LINE_COLOR} stopOpacity={0.32} />
@@ -108,7 +113,7 @@ export function RatingHistoryChart({ points }: { points: RatingHistoryPoint[] })
             <SvgText
               key={`x-${index}`}
               x={coords[index].x}
-              y={HEIGHT - 8}
+              y={HEIGHT_ - 8}
               fontSize={10}
               fill={Colors.text.muted}
               textAnchor={single ? 'middle' : index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'middle'}

@@ -10,7 +10,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMusicStore, useScoreStore, useSettingsStore } from '../../src/store';
 import { SongCard, FilterBar, TitleRecognizer } from '../../src/components';
 import { Colors } from '../../src/constants';
-import { getMatchingDifficultyIndices, getFitChartConstant, getMusicSearchHit, parseConstantQuery, MusicList, buildScoreIndex } from '../../src/data/music-list';
+import { isCustomAlias } from '../../src/data/song-aliases';
+import { getMatchingDifficultyIndices, getFitChartConstant, getAliasHitText, parseConstantQuery, MusicList, buildScoreIndex } from '../../src/data/music-list';
 import { getChinaVersionOptions, getVersionOptions } from '../../src/data/version-catalog';
 import { computeB50 } from '../../src/data/b50';
 import type { FilterOptions, MusicData } from '../../src/data/types';
@@ -142,11 +143,7 @@ export default function SongBrowser() {
 
   // v1.18.0：搜索结果中经别名命中的歌曲，卡片上标出命中的别名。
   const activeQuery = filters.titleSearch?.trim() || '';
-  const aliasHitFor = useCallback((music: MusicData): string | null => {
-    if (!activeQuery) return null;
-    const hit = getMusicSearchHit(music, activeQuery);
-    return hit?.kind === 'alias' ? hit.text : null;
-  }, [activeQuery]);
+  const aliasHitFor = useCallback((music: MusicData): string | null => getAliasHitText(music, activeQuery), [activeQuery]);
 
   const getPreviewCount = useCallback((nextFilters: FilterOptions) => {
     return new MusicList(rawData).filter(nextFilters).length;
@@ -245,6 +242,7 @@ export default function SongBrowser() {
                 scoreDifficultyIndex={isScoreSort ? sortDifficultyIndex : undefined}
                 scoreForDifficulty={isScoreSort ? getScoreForDifficulty(item) : undefined}
                 aliasHit={aliasHitFor(item)}
+                aliasHitCustom={(() => { const hit = aliasHitFor(item); return hit ? isCustomAlias(item, hit) : false; })()}
               />
             </View>
           );

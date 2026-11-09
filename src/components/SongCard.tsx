@@ -31,6 +31,8 @@ interface Props {
   scoreForDifficulty?: (index: number) => PlayerScore | null;
   /** v1.18.0：搜索经别名命中时传入命中的别名，卡片上标出「别名：xx」。 */
   aliasHit?: string | null;
+  /** v1.19.0：命中的是本地自定义别名时为 true，标注「自定义别名」。 */
+  aliasHitCustom?: boolean;
 }
 
 export const SongCard = memo(function SongCard({
@@ -46,6 +48,7 @@ export const SongCard = memo(function SongCard({
   scoreDifficultyIndex,
   scoreForDifficulty,
   aliasHit = null,
+  aliasHitCustom = false,
 }: Props) {
   const selected = selectedDifficultyIndex !== undefined
     ? music.level[selectedDifficultyIndex] !== undefined
@@ -77,7 +80,7 @@ export const SongCard = memo(function SongCard({
         </Text>
         {!!aliasHit && (
           <View style={styles.aliasHitRow}>
-            <Text style={styles.aliasHitTag}>别名命中</Text>
+            <Text style={styles.aliasHitTag}>{aliasHitCustom ? '自定义别名' : '别名命中'}</Text>
             <Text style={styles.aliasHitText} numberOfLines={1}>{aliasHit}</Text>
           </View>
         )}

@@ -14,6 +14,8 @@ import { Colors } from '../src/constants';
 import { ChangelogOverlay } from '../src/components/ChangelogOverlay';
 import { useBilibiliStore, useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '../src/store';
 import { loadStoredAliases } from '../src/api/aliases';
+import { loadCustomAliases } from '../src/data/custom-aliases';
+import { useLevelStore } from '../src/data/level-store';
 import { useRatingHistoryStore } from '../src/store/rating-history-store';
 
 export default function RootLayout() {
@@ -33,6 +35,10 @@ export default function RootLayout() {
     // v1.18.0：读入上次手动刷新的别名库（没有则用内置快照）与 Rating 历史。
     void loadStoredAliases();
     void useRatingHistoryStore.getState().load();
+    // v1.19.0：本地自定义别名。
+    void loadCustomAliases();
+    // v1.19.0：定数变更报告。
+    void useLevelStore.getState().load();
   }, []);
 
   if (loading) {
@@ -59,6 +65,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="song" />
         <Stack.Screen name="b50" />
+        <Stack.Screen name="rating-target" options={{ headerShown: true, title: '目标 Rating', headerStyle: { backgroundColor: Colors.bg.primary }, headerTintColor: Colors.text.primary, contentStyle: { backgroundColor: Colors.bg.primary } }} />
         <Stack.Screen name="rating-history" options={{ headerShown: true, title: 'Rating 历史', headerStyle: { backgroundColor: Colors.bg.primary }, headerTintColor: Colors.text.primary, contentStyle: { backgroundColor: Colors.bg.primary } }} />
         <Stack.Screen
           name="snapshots"

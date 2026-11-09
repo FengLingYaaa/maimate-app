@@ -5,7 +5,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import type { ReactElement, RefObject } from 'react';
 import type { View as RNView } from 'react-native';
 import { Colors } from '../constants';
@@ -19,11 +19,14 @@ interface Props {
   onClose: () => void;
   /** 捕获前等待曲绘等异步资源就绪的时间（毫秒）。 */
   readinessDelayMs?: number;
+  /** v1.19.0：图片生成（截图）失败时可改为分享的文字版；不传则不提供文字兜底。 */
+  fallbackText?: string;
 }
 
 type BusyKind = 'share' | 'save' | null;
 
-export function ShareCardOverlay({ visible, card, fileName, onClose, readinessDelayMs = 700 }: Props) {
+export function ShareCardOverlay({ visible, card, fileName, onClose, readinessDelayMs = 700, fallbackText }: Props) {
+  const [captureFailed, setCaptureFailed] = useState(false);
   const holderRef = useRef<RNView>(null);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState<BusyKind>(null);
@@ -38,6 +41,7 @@ export function ShareCardOverlay({ visible, card, fileName, onClose, readinessDe
       setBusy(null);
       setError(null);
       setNotice(null);
+      setCaptureFailed(false);
       return;
     }
     const timer = setTimeout(() => setReady(true), readinessDelayMs);
@@ -56,10 +60,27 @@ export function ShareCardOverlay({ visible, card, fileName, onClose, readinessDe
 
   const capture = useCallback(async (): Promise<string> => {
     cleanupTempFile();
-    const uri = await captureCardToTempFile(holderRef as RefObject<View | null>, fileName);
-    tempFileRef.current = uri;
-    return uri;
+    try {
+      const uri = await captureCardToTempFile(holderRef as RefObject<View | null>, fileName);
+      tempFileRef.current = uri;
+      setCaptureFailed(false);
+      return uri;
+    } catch (captureError) {
+      // v1.19.0：截图失败单独标记，供文字版兜底。
+      setCaptureFailed(true);
+      throw captureError instanceof Error ? new Error(`图片生成失败：${captureError.message}`) : new Error('图片生成失败');
+    }
   }, [cleanupTempFile, fileName]);
+
+  const handleShareText = useCallback(async () => {
+    if (!fallbackText) return;
+    try {
+      await Share.share({ message: fallbackText });
+      setError(null);
+    } catch (shareError) {
+      setError(shareError instanceof Error ? shareError.message : '分享失败');
+    }
+  }, [fallbackText]);
 
   const handleShare = useCallback(async () => {
     if (busy) return;
@@ -118,6 +139,11 @@ export function ShareCardOverlay({ visible, card, fileName, onClose, readinessDe
         <View style={styles.actions}>
           {error && <Text style={styles.errorText}>{error}</Text>}
           {notice && <Text style={styles.noticeText}>{notice}</Text>}
+          {captureFailed && !!fallbackText && (
+            <Pressable style={[styles.button, styles.buttonClose]} onPress={() => void handleShareText()}>
+              <Text style={styles.buttonCloseText}>改为分享文字版</Text>
+            </Pressable>
+          )}
           <View style={styles.buttonRow}>
             <Pressable style={[styles.button, styles.buttonClose]} onPress={onClose} disabled={busy !== null}>
               <Text style={styles.buttonCloseText}>关闭</Text>

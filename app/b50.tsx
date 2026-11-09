@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../src/constants';
@@ -29,6 +29,13 @@ import { shareCardFileName } from '../src/data/share-card';
 import { useMusicStore, usePlanStore, useScoreStore } from '../src/store';
 import { useRatingHistoryStore } from '../src/store/rating-history-store';
 import { computeRatingHistoryStats } from '../src/data/rating-history';
+import { SyncReportCard } from '../src/components/SyncReportCard';
+import { RatingTargetRow } from '../src/components/RatingTargetRow';
+import { syncReportBanner } from '../src/data/sync-report';
+import { computeRatingTarget } from '../src/data/next-rating-target';
+import { computeLevelImpact } from '../src/data/level-change';
+import { useLevelStore } from '../src/data/level-store';
+import { DifficultyLabels as DiffLabels } from '../src/constants/game';
 
 type ScreenMode = 'b50' | 'fit50' | 'ap50';
 type PoolTab = 'new' | 'old';
@@ -153,6 +160,37 @@ export default function B50Screen() {
       ? `已记录 ${ratingHistoryStats.count} 次`
       : `7 日 ${ratingHistoryStats.change7d > 0 ? '+' : ''}${ratingHistoryStats.change7d} · 已记录 ${ratingHistoryStats.count} 次`;
 
+  // v1.19.0：同步战报未读横幅（点开看战报卡片）。
+  const lastSyncReport = useScoreStore(state => state.lastSyncReport);
+  const markSyncReportSeen = useScoreStore(state => state.markSyncReportSeen);
+  const syncBanner = syncReportBanner(lastSyncReport);
+  const [syncReportVisible, setSyncReportVisible] = useState(false);
+
+  // v1.19.0：距下一档 Rating 还差什么。
+  const planEntries = usePlanStore(state => state.entries);
+  const ratingTarget = useMemo(
+    () => (hasScores && rawData.length > 0 ? computeRatingTarget(rawData, scores, { isInPlan, limit: 10 }) : null),
+    // planEntries 变化时重新标注「已在计划」。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [hasScores, rawData, scores, planEntries],
+  );
+
+  // v1.19.0：定数变更提醒——只在变更影响到 B50（含接近门槛）时显示。
+  const levelReport = useLevelStore(state => state.report);
+  const markLevelSeen = useLevelStore(state => state.markSeen);
+  const levelImpact = useMemo(
+    () => (levelReport && !levelReport.seen && hasScores && rawData.length > 0
+      ? computeLevelImpact(rawData, scores, levelReport)
+      : null),
+    [levelReport, hasScores, rawData, scores],
+  );
+  const showLevelCard = !!levelImpact && (levelImpact.rows.length > 0 || levelImpact.removedInB50.length > 0);
+  const [levelDetailVisible, setLevelDetailVisible] = useState(false);
+  const openSongRef = (ref: { songId: string; musicType: 'SD' | 'DX'; difficultyIndex: number }) => router.push({
+    pathname: '/song/[id]' as any,
+    params: { id: ref.songId, type: ref.musicType, difficultyIndex: String(ref.difficultyIndex) },
+  });
+
   return (
     <View style={styles.root}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -207,6 +245,59 @@ export default function B50Screen() {
         </View>
       )}
 
+      {/* v1.19.0：同步战报（未读横幅点开） */}
+      <Modal visible={syncReportVisible && !!lastSyncReport} transparent animationType="fade" onRequestClose={() => setSyncReportVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <ScrollView>
+              {lastSyncReport && (
+                <SyncReportCard
+                  report={lastSyncReport}
+                  onOpenHistory={() => { setSyncReportVisible(false); router.push('/rating-history' as any); }}
+                  onOpenSong={ref => { setSyncReportVisible(false); openSongRef(ref); }}
+                />
+              )}
+            </ScrollView>
+            <Pressable style={styles.modalClose} onPress={() => setSyncReportVisible(false)}>
+              <Text style={styles.modalCloseText}>关闭</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* v1.19.0：定数变更明细 */}
+      <Modal visible={levelDetailVisible && !!levelImpact} transparent animationType="fade" onRequestClose={() => setLevelDetailVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.levelModalTitle}>定数变更（影响 B50 的谱面）</Text>
+            <ScrollView>
+              {levelImpact?.rows.map(row => (
+                <Pressable key={row.key} style={styles.levelRow} onPress={() => { setLevelDetailVisible(false); openSongRef(row); }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.levelRowTitle} numberOfLines={1}>{row.title}</Text>
+                    <Text style={styles.levelRowSub}>
+                      {DiffLabels[row.difficultyIndex] ?? row.difficultyIndex} · 定数 {row.oldDs.toFixed(1)} → {row.newDs.toFixed(1)} · {row.inB50After ? '在 B50 内' : row.inB50Before ? '已出 B50' : '接近 B50 门槛'}
+                    </Text>
+                  </View>
+                  <Text style={[styles.levelRowDelta, { color: row.newRating >= row.oldRating ? Colors.functional.success : Colors.functional.danger }]}>
+                    {row.oldRating} → {row.newRating}
+                  </Text>
+                </Pressable>
+              ))}
+              {(levelImpact?.removedInB50.length ?? 0) > 0 && (
+                <Text style={styles.levelRowSub}>下架的在榜曲：{levelImpact?.removedInB50.map(song => song.title).join('、')}</Text>
+              )}
+              {(levelReport?.addedSongs.length ?? 0) > 0 && (
+                <Text style={styles.levelRowSub}>本次曲库另有 {levelReport?.addedSongs.length} 首新曲加入（不影响现有 B50）。</Text>
+              )}
+            </ScrollView>
+            <Pressable style={styles.modalClose} onPress={() => { setLevelDetailVisible(false); void markLevelSeen(); }}>
+              <Text style={styles.modalCloseText}>知道了</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       {hasScores && shareVisible && (
         <ShareCardOverlay
           visible
@@ -248,6 +339,26 @@ export default function B50Screen() {
           <>
             {screenMode === 'b50' ? (
               <>
+              {!!syncBanner && !selectionMode && (
+                <View style={styles.syncBanner}>
+                  <Pressable style={styles.syncBannerMain} onPress={() => { setSyncReportVisible(true); void markSyncReportSeen(); }} accessibilityRole="button">
+                    <Text style={styles.syncBannerText} numberOfLines={2}>🎉 {syncBanner}</Text>
+                    <Text style={styles.syncBannerLink}>查看战报 ›</Text>
+                  </Pressable>
+                  <Pressable onPress={() => void markSyncReportSeen()} hitSlop={8} accessibilityLabel="关闭同步横幅">
+                    <Text style={styles.syncBannerClose}>✕</Text>
+                  </Pressable>
+                </View>
+              )}
+              {showLevelCard && !selectionMode && levelImpact && (
+                <Pressable style={styles.levelCard} onPress={() => setLevelDetailVisible(true)} accessibilityRole="button">
+                  <Text style={styles.levelCardTitle}>⚠ 定数更新影响了你的 B50</Text>
+                  <Text style={styles.levelCardSub}>
+                    {levelImpact.rows.length} 张谱面定数调整{levelImpact.removedInB50.length > 0 ? `，${levelImpact.removedInB50.length} 首在榜曲下架` : ''} · B50 {levelImpact.b50Before} → {levelImpact.b50After}（{levelImpact.b50After - levelImpact.b50Before >= 0 ? '+' : ''}{levelImpact.b50After - levelImpact.b50Before}）
+                  </Text>
+                  <Text style={styles.levelCardLink}>点开看每首旧定数 → 新定数 ›</Text>
+                </Pressable>
+              )}
               <View style={styles.summaryRow}>
                 <View style={[styles.summaryCard, styles.totalCard]}>
                   <Text style={styles.totalValue}>{b50.total}</Text>
@@ -273,6 +384,23 @@ export default function B50Screen() {
                   <Text style={styles.historyEntrySub} numberOfLines={1}>{ratingHistorySummary}</Text>
                   <Text style={styles.historyEntryArrow}>›</Text>
                 </Pressable>
+              )}
+              {!selectionMode && ratingTarget && ratingTarget.gap > 0 && (
+                <View style={styles.targetCard}>
+                  <Pressable style={styles.targetHead} onPress={() => router.push('/rating-target' as any)} accessibilityRole="button">
+                    <View style={styles.targetHeadText}>
+                      <Text style={styles.targetTitle}>🎯 距下一档 Rating 还差 {ratingTarget.gap}</Text>
+                      <Text style={styles.targetSub}>
+                        目标 {ratingTarget.targetLabel}{ratingTarget.minCharts !== null ? ` · 最少 ${ratingTarget.minCharts} 张可达` : ''}
+                      </Text>
+                    </View>
+                    <Text style={styles.historyEntryArrow}>›</Text>
+                  </Pressable>
+                  {ratingTarget.candidates.slice(0, 3).map(candidate => (
+                    <RatingTargetRow key={candidate.key} candidate={candidate} onOpen={openSongRef} />
+                  ))}
+                  {ratingTarget.candidates.length === 0 && <Text style={styles.targetSub}>当前定数范围内没有找到能涨分的谱面。</Text>}
+                </View>
               )}
               </>
             ) : screenMode === 'ap50' ? (
@@ -490,6 +618,29 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 15, fontWeight: '800', color: Colors.text.primary },
   emptyText: { fontSize: 12, lineHeight: 18, color: Colors.text.secondary },
   summaryRow: { flexDirection: 'row', gap: 10 },
+  syncBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10, padding: 10, borderRadius: 12, backgroundColor: `${Colors.functional.success}1a`, borderWidth: 1, borderColor: `${Colors.functional.success}66` },
+  syncBannerMain: { flex: 1, gap: 2 },
+  syncBannerText: { fontSize: 12, fontWeight: '800', color: Colors.text.primary },
+  syncBannerLink: { fontSize: 11, fontWeight: '700', color: Colors.functional.success },
+  syncBannerClose: { fontSize: 14, color: Colors.text.muted },
+  levelCard: { gap: 3, marginBottom: 10, padding: 10, borderRadius: 12, backgroundColor: `${Colors.functional.warning}14`, borderWidth: 1, borderColor: `${Colors.functional.warning}66` },
+  levelCardTitle: { fontSize: 12, fontWeight: '800', color: Colors.functional.warning },
+  levelCardSub: { fontSize: 11, color: Colors.text.secondary },
+  levelCardLink: { fontSize: 11, fontWeight: '700', color: Colors.functional.warning },
+  targetCard: { gap: 6, marginTop: 10, padding: 10, borderRadius: 12, backgroundColor: Colors.bg.secondary, borderWidth: 1, borderColor: Colors.border.light },
+  targetHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  targetHeadText: { flex: 1, gap: 2 },
+  targetTitle: { fontSize: 13, fontWeight: '800', color: Colors.text.primary },
+  targetSub: { fontSize: 11, color: Colors.text.secondary },
+  modalBackdrop: { flex: 1, justifyContent: 'center', padding: 18, backgroundColor: 'rgba(0,0,0,0.6)' },
+  modalCard: { maxHeight: '85%', gap: 10, padding: 14, borderRadius: 16, backgroundColor: Colors.bg.primary },
+  modalClose: { alignItems: 'center', paddingVertical: 10, borderRadius: 10, backgroundColor: Colors.accent.primary },
+  modalCloseText: { fontSize: 13, fontWeight: '800', color: '#fff' },
+  levelModalTitle: { fontSize: 14, fontWeight: '800', color: Colors.text.primary },
+  levelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: Colors.border.light },
+  levelRowTitle: { fontSize: 12, fontWeight: '700', color: Colors.text.primary },
+  levelRowSub: { fontSize: 10, color: Colors.text.secondary, marginTop: 4 },
+  levelRowDelta: { fontSize: 12, fontWeight: '800' },
   historyEntry: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, backgroundColor: Colors.bg.secondary, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, borderWidth: 1, borderColor: Colors.border.light },
   historyEntryPressed: { backgroundColor: Colors.bg.tertiary, borderColor: Colors.border.accent },
   historyEntryTitle: { fontSize: 13, fontWeight: '800', color: Colors.text.primary },

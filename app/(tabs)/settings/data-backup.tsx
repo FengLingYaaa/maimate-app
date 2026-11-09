@@ -5,6 +5,22 @@ import { Colors } from '../../../src/constants';
 import { exportBackup, pickAndValidateBackup, restoreBackup } from '../../../src/data/backup-io';
 import type { BackupSummary } from '../../../src/data/backup';
 
+/** v1.19.0：摘要文案统一出口（含 Rating 历史与自定义别名）。 */
+function summaryLine(summary: BackupSummary): string {
+  const parts = [
+    `计划 ${summary.planEntries} 条`,
+    `成绩 ${summary.scores} 条`,
+    `快照 ${summary.snapshots} 次`,
+    `链接 ${summary.bilibiliLinks} 条`,
+    summary.ratingHistoryPoints === null || summary.ratingHistoryPoints === undefined
+      ? 'Rating 历史：备份不含（保留本机记录）'
+      : `Rating 历史 ${summary.ratingHistoryPoints} 条`,
+  ];
+  if (summary.customAliases !== null && summary.customAliases !== undefined) parts.push(`自定义别名 ${summary.customAliases} 条`);
+  const warnings = summary.warnings && summary.warnings.length > 0 ? `\n⚠ ${summary.warnings.join('；')}` : '';
+  return `${parts.join(' · ')}${warnings}`;
+}
+
 type PendingRestore = { backup: Parameters<typeof restoreBackup>[0]; summary: BackupSummary; fileName: string };
 
 export default function DataBackupScreen() {
@@ -24,9 +40,9 @@ export default function DataBackupScreen() {
     try {
       const { fileName, summary, savedTo } = await exportBackup(mode);
       if (mode === 'save') {
-        show('success', `已保存 ${fileName} 到所选目录\n计划 ${summary.planEntries} 条 · 成绩 ${summary.scores} 条 · 快照 ${summary.snapshots} 次 · 链接 ${summary.bilibiliLinks} 条`);
+        show('success', `已保存 ${fileName} 到所选目录\n${summaryLine(summary)}`);
       } else {
-        show('success', `已导出 ${fileName}\n计划 ${summary.planEntries} 条 · 成绩 ${summary.scores} 条 · 快照 ${summary.snapshots} 次 · 链接 ${summary.bilibiliLinks} 条`);
+        show('success', `已导出 ${fileName}\n${summaryLine(summary)}`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : '导出失败';
@@ -43,7 +59,7 @@ export default function DataBackupScreen() {
     try {
       const result = await pickAndValidateBackup();
       setPending({ backup: result.backup, summary: result.summary, fileName: result.fileName });
-      show('info', `已读取 ${result.fileName}\n计划 ${result.summary.planEntries} 条 · 成绩 ${result.summary.scores} 条 · 快照 ${result.summary.snapshots} 次 · 链接 ${result.summary.bilibiliLinks} 条\n确认后现有本地数据将被完整替换。`);
+      show('info', `已读取 ${result.fileName}\n${summaryLine(result.summary)}\n确认后现有本地数据将被完整替换。`);
     } catch (error) {
       show('error', error instanceof Error ? error.message : '读取备份失败');
     } finally {
@@ -55,7 +71,7 @@ export default function DataBackupScreen() {
     if (!pending) return;
     Alert.alert(
       '恢复备份',
-      `将用「${pending.fileName}」完整替换本机数据（计划、成绩、快照、B 站链接、设置与运势种子）。\nDiving-Fish Token 不会被覆盖或删除。`,
+      `将用「${pending.fileName}」完整替换本机数据（计划、成绩、快照、B 站链接、设置、运势种子；备份含 Rating 历史/自定义别名时一并替换）。\nDiving-Fish Token 不会被覆盖或删除。`,
       [
         { text: '取消', style: 'cancel' },
         {

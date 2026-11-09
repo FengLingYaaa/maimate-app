@@ -7,7 +7,7 @@
  */
 import { COVER_BASE, COVER_FALLBACK_BASE, getFallbackCoverUrl } from '../src/constants/game.ts';
 import { getCoverCandidates } from '../src/data/cover-resolver.ts';
-import { resolveCoverChain } from '../src/data/cover-chain.ts';
+import { classifyCoverDownloadStatus, clearMissingCoverUrls, getMissingCoverUrls, isCoverUrlMissing, markCoverUrlMissing, resolveCoverChain } from '../src/data/cover-chain.ts';
 import type { MusicData } from '../src/data/types.ts';
 import fixture from './fixtures/music-data.json';
 
@@ -113,7 +113,50 @@ async function networkCheck() {
   }
 }
 
+/** v1.19.0：404 负缓存——主源 404 后同一次启动内直接走备用源；清空后重新请求主源。 */
+async function negativeCacheChecks(): Promise<void> {
+  clearMissingCoverUrls();
+  assert.equal(classifyCoverDownloadStatus(200), 'ok');
+  assert.equal(classifyCoverDownloadStatus(404), 'missing');
+  assert.equal(classifyCoverDownloadStatus(410), 'missing');
+  assert.equal(classifyCoverDownloadStatus(500), 'retryable');
+  assert.equal(classifyCoverDownloadStatus(0), 'retryable');
+  const primary = 'https://primary.example/1.png';
+  const fallback = 'https://fallback.example/1.png';
+  const requested: string[] = [];
+  // 模拟 cover-cache：主源 404 时记入负缓存。
+  const resolveOne = async (url: string) => {
+    requested.push(url);
+    if (url === primary) {
+      if (classifyCoverDownloadStatus(404) === 'missing') markCoverUrlMissing(url);
+      return null;
+    }
+    return `file://${url}`;
+  };
+  const first = await resolveCoverChain([primary, fallback], 0, resolveOne);
+  assert.equal(first.index, 1);
+  assert.deepEqual(requested, [primary, fallback], '第一次：先撞主源 404，再走备用源');
+  assert.ok(isCoverUrlMissing(primary));
+  assert.deepEqual(getMissingCoverUrls(), [primary]);
+  requested.length = 0;
+  const second = await resolveCoverChain([primary, fallback], 0, resolveOne);
+  assert.equal(second.uri, `file://${fallback}`);
+  assert.deepEqual(requested, [fallback], '第二次：跳过已知 404 的主源，不再请求');
+  // 断网（抛错）/5xx 不记入。
+  const flaky = 'https://primary.example/2.png';
+  await resolveCoverChain([flaky], 0, async () => { throw new Error('network'); });
+  assert.equal(isCoverUrlMissing(flaky), false, '网络错误不进负缓存');
+  // 清空后重新请求主源。
+  clearMissingCoverUrls();
+  assert.deepEqual(getMissingCoverUrls(), []);
+  requested.length = 0;
+  await resolveCoverChain([primary, fallback], 0, resolveOne);
+  assert.deepEqual(requested, [primary, fallback], '清空负缓存后会重新请求主源');
+  clearMissingCoverUrls();
+}
+
 chainChecks()
+  .then(negativeCacheChecks)
   .then(networkCheck)
   .then(() => console.log(`Cover fallback checks passed (${checked} songs)`))
   .catch(error => { console.error(error); process.exit(1); });

@@ -7,7 +7,8 @@ import { useRouter } from 'expo-router';
 import { FilterBar, PlanDragList, PlanProgressRing, type PlanDragRow } from '../../src/components';
 import { Colors, DifficultyColorMap, DifficultyLabels } from '../../src/constants';
 import { getChinaVersionOptions, getVersionOptions } from '../../src/data/version-catalog';
-import { buildScoreIndex, getFitChartConstant, getMusicScore, getMusicSearchScore, getOfficialChartConstant, matchesMusic } from '../../src/data/music-list';
+import { buildScoreIndex, getAliasHitText, getFitChartConstant, getMatchedAliasText, getMusicScore, getMusicSearchScore, getOfficialChartConstant, hasMatchedAlias, hasMatchedTitle, matchesMusic } from '../../src/data/music-list';
+import { isCustomAlias } from '../../src/data/song-aliases';
 import type { ScoreIndex } from '../../src/data/music-list';
 import { canDragPlanRows } from '../../src/data/plan-order';
 import { computeAchievedIds, resolvePlanMusic } from '../../src/data/plan-entries';
@@ -16,6 +17,15 @@ import { useMusicStore, usePlanStore, useScoreStore, useSettingsStore } from '..
 import { planEntryKey } from '../../src/store/plan-store';
 
 type PlanRow = PlanDragRow;
+
+/** v1.19.0：计划页搜索范围——全部字段 / 仅正式标题 / 仅别名（含自定义别名）。 */
+type SearchScope = 'all' | 'title' | 'alias';
+const SEARCH_SCOPE_OPTIONS: ReadonlyArray<readonly [SearchScope, string]> = [['all', '全部'], ['title', '仅标题'], ['alias', '仅别名']];
+
+function matchesSearchScope(row: PlanRow, query: string, scope: SearchScope): boolean {
+  if (scope === 'all' || !query) return true;
+  return scope === 'alias' ? hasMatchedAlias(row.music, query) : hasMatchedTitle(row.music, query);
+}
 
 interface ConfirmRequest {
   title: string;
@@ -109,6 +119,9 @@ export default function PushPlan() {
   // v1.17.1：本地成绩索引（songId+type+难度 → 达成率），成绩排序与排序成绩展示共用。
   const scoreIndex = useMemo(() => buildScoreIndex(scores), [scores]);
   const [filters, setFilters] = useState<FilterOptions>({});
+  const [searchScope, setSearchScope] = useState<SearchScope>('all');
+  // 空串 / 只有空格不触发匹配。
+  const activeQuery = filters.titleSearch?.trim() ?? '';
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [graveyardVisible, setGraveyardVisible] = useState(false);
   const plannedRows = useMemo(() => entries
@@ -128,9 +141,16 @@ export default function PushPlan() {
   }, [entries, manualOrderView, plannedRows]);
   const filteredRows = useMemo(() => {
     const rows = manualOrderView ? manualOrderedRows : plannedRows;
-    const matched = rows.filter(row => matchesPlanRow(row, filters));
+    const matched = rows.filter(row => matchesPlanRow(row, filters) && matchesSearchScope(row, activeQuery, searchScope));
     return sortPlanRows(matched, filters.sort, filters.titleSearch, chartStats, scoreIndex);
-  }, [manualOrderView, manualOrderedRows, plannedRows, filters, chartStats, scoreIndex]);
+  }, [manualOrderView, manualOrderedRows, plannedRows, filters, chartStats, scoreIndex, activeQuery, searchScope]);
+
+  // v1.19.0：卡片「别名命中 / 自定义别名」badge。范围为「仅别名」时总显示命中的别名，否则只在最佳命中来自别名时显示。
+  const getAliasHit = useCallback((music: MusicData) => {
+    if (!activeQuery) return null;
+    const text = searchScope === 'alias' ? getMatchedAliasText(music, activeQuery) : (searchScope === 'title' ? null : getAliasHitText(music, activeQuery));
+    return text ? { text, custom: isCustomAlias(music, text) } : null;
+  }, [activeQuery, searchScope]);
   // v1.17.1：仅成绩排序（scoreDesc）时向卡片下发排序难度（默认 Master=3），用于显示排序成绩行。
   const scoreSortDifficultyIndex = filters.sort?.mode === 'scoreDesc' ? (filters.sort?.difficultyIndex ?? 3) : undefined;
 
@@ -269,6 +289,9 @@ export default function PushPlan() {
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>📋 推分计划</Text>
           <View style={styles.headerActions}>
+            <Pressable onPress={() => router.push('/rating-target' as any)} style={styles.targetRatingButton} accessibilityLabel="目标 Rating 推荐">
+              <Text style={styles.targetRatingText}>🎯 目标 Rating</Text>
+            </Pressable>
             <Pressable onPress={() => setGraveyardVisible(true)} style={styles.graveyardButton} accessibilityLabel="打开推歌英灵殿">
               <Text style={styles.graveyardIcon}>🗑️</Text>
               {graveyard.length > 0 && <View style={styles.graveyardBadge}><Text style={styles.graveyardBadgeText}>{graveyard.length}</Text></View>}
@@ -347,6 +370,21 @@ export default function PushPlan() {
         charters={charters}
         historyKey="plan"
       />
+      {!!activeQuery && plannedRows.length > 0 && (
+        <View style={styles.scopeRow}>
+          <Text style={styles.scopeLabel}>搜索范围</Text>
+          {SEARCH_SCOPE_OPTIONS.map(([value, label]) => (
+            <Pressable
+              key={value}
+              style={[styles.achieveChip, searchScope === value && styles.achieveChipActive]}
+              onPress={() => setSearchScope(value)}
+              accessibilityLabel={`搜索范围：${label}`}
+            >
+              <Text style={[styles.achieveChipText, searchScope === value && styles.achieveChipTextActive]}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
       {plannedRows.length === 0 ? (
         <EmptyPlan />
       ) : displayRows.length === 0 ? (
@@ -372,6 +410,7 @@ export default function PushPlan() {
           }}
           onTarget={updateTargetScoreById}
           onReorder={reorderByIds}
+          getAliasHit={getAliasHit}
         />
       )}
 
@@ -453,6 +492,10 @@ function EmptyPlan() {
 }
 
 const styles = StyleSheet.create({
+  scopeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingBottom: 6 },
+  scopeLabel: { fontSize: 11, color: Colors.text.muted, fontWeight: '700' },
+  targetRatingButton: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: `${Colors.accent.primary}88`, backgroundColor: `${Colors.accent.primary}1a` },
+  targetRatingText: { fontSize: 11, fontWeight: '800', color: Colors.accent.primary },
   container: { flex: 1, backgroundColor: Colors.bg.primary },
   header: { paddingTop: 48, paddingHorizontal: 16, paddingBottom: 2 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

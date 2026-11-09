@@ -4,7 +4,16 @@ import * as ImagePicker from 'expo-image-picker';
 import { CameraType } from 'expo-image-picker';
 import TextRecognition, { TextRecognitionScript } from '@react-native-ml-kit/text-recognition';
 import { Colors, DifficultyLabels } from '../constants';
-import { matchSongTitlesForImage, mergeImageMatches, type TitleMatch } from '../data/title-search';
+import {
+  classifyMatchConfidence,
+  describeMatchReason,
+  hasMatchedAlias,
+  matchSongTitlesForImage,
+  mergePerImageTopMatches,
+  topMatchesForImage,
+  type MatchConfidence,
+  type TitleMatch,
+} from '../data/title-search';
 import { usePlanStore } from '../store';
 import type { MusicData } from '../data/types';
 
@@ -21,6 +30,10 @@ interface ImageTextResult {
 }
 
 const MAX_IMAGES = 10;
+
+function matchKey(music: MusicData): string {
+  return `${music.type}:${music.id}`;
+}
 
 function getQuickAddDifficulty(music: MusicData): number | null {
   const count = Math.min(music.charts.length, music.level.length);
@@ -42,11 +55,52 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
   const isInPlan = usePlanStore(s => s.isInPlan);
   const planLoaded = usePlanStore(s => s.loaded);
 
-  /** 由每图候选合并出展示列表（去重取最优分，排序，v1.18.0 起取前 5 名候选）。 */
+  // v1.19.0：每张图用户选中的候选（type:id）；未选时高置信度图默认第 1 名。
+  const [selectedByImage, setSelectedByImage] = useState<Map<string, string>>(new Map());
+  const [expandedImages, setExpandedImages] = useState<Set<string>>(new Set());
+
+  /** v1.19.0：逐图取前 5 → 合并去重（每张图的第 1 名都保留，不再全局截断成前 5）。 */
   const mergedMatches = React.useMemo(
-    () => mergeImageMatches([...perImageMatches.values()]),
-    [perImageMatches],
+    () => mergePerImageTopMatches(imageUris.map(uri => perImageMatches.get(uri) ?? [])),
+    [imageUris, perImageMatches],
   );
+
+  const groups = React.useMemo(() => imageUris.map((uri, imageIndex) => {
+    const top = topMatchesForImage(perImageMatches.get(uri) ?? []);
+    const confidence: MatchConfidence = classifyMatchConfidence(top);
+    const picked = selectedByImage.get(uri);
+    const selectedKey = picked && top.some(match => matchKey(match.music) === picked)
+      ? picked
+      : confidence === 'high' ? matchKey(top[0].music) : null;
+    return { uri, imageIndex, top, confidence, selectedKey, recognized: perImageMatches.has(uri) };
+  }), [imageUris, perImageMatches, selectedByImage]);
+
+  /** 同一首歌被多张图选中时，只在第一张图上计数，其余标注「与图 X 是同一首」。 */
+  const firstImageBySong = React.useMemo(() => {
+    const map = new Map<string, number>();
+    for (const group of groups) {
+      if (group.selectedKey && !map.has(group.selectedKey)) map.set(group.selectedKey, group.imageIndex);
+    }
+    return map;
+  }, [groups]);
+
+  const selectCandidate = useCallback((uri: string, key: string) => {
+    setSelectedByImage(previous => new Map(previous).set(uri, key));
+    setExpandedImages(previous => {
+      const next = new Set(previous);
+      next.delete(uri);
+      return next;
+    });
+  }, []);
+
+  const toggleExpanded = useCallback((uri: string) => {
+    setExpandedImages(previous => {
+      const next = new Set(previous);
+      if (next.has(uri)) next.delete(uri);
+      else next.add(uri);
+      return next;
+    });
+  }, []);
 
   const applyImageResult = useCallback((result: ImageTextResult) => {
     const matches = matchSongTitlesForImage(rawData, result.text);
@@ -120,6 +174,8 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
       setImageUris([]);
       setImageTexts([]);
       setPerImageMatches(new Map());
+      setSelectedByImage(new Map());
+      setExpandedImages(new Set());
       setStatus('可连续拍摄，或从相册选择多张图片');
       setPlanFeedback(null);
       setWorking(false);
@@ -186,12 +242,19 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
       next.delete(uri);
       return next;
     });
+    setSelectedByImage(previous => {
+      const next = new Map(previous);
+      next.delete(uri);
+      return next;
+    });
   };
 
   const clearImages = () => {
     setImageUris([]);
     setImageTexts([]);
     setPerImageMatches(new Map());
+    setSelectedByImage(new Map());
+    setExpandedImages(new Set());
     setStatus('可连续拍摄，或从相册选择多张图片');
     setPlanFeedback(null);
     setOcrExpanded(false);
@@ -219,6 +282,38 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
     }
     addEntry({ songId: music.id, musicType: music.type, difficultyIndex });
     setPlanFeedback(`已加入推分计划：${music.title} · ${difficultyLabel}`);
+  };
+
+  /** v1.19.0：某张图当前选中的那首（可「重选」展开候选）。 */
+  const renderSelectedRow = (match: TitleMatch, uri: string, duplicateOf: number | undefined, expanded: boolean) => {
+    const difficultyIndex = getQuickAddDifficulty(match.music);
+    const difficultyLabel = difficultyIndex === null ? null : DifficultyLabels[difficultyIndex];
+    const alreadyInPlan = difficultyIndex !== null && planLoaded && isInPlan(match.music.id, difficultyIndex, match.music.type);
+    return (
+      <View style={styles.resultRow}>
+        <Pressable style={styles.resultMain} onPress={() => handleOpenSong(match.music)} accessibilityRole="button" accessibilityLabel={`查看歌曲 ${match.music.title}`}>
+          <View style={styles.resultInfo}>
+            <Text style={styles.resultTitle} numberOfLines={2}>
+              <Text style={styles.resultRank}>✓ </Text>{match.music.title}
+            </Text>
+            <Text style={styles.resultMeta}>{match.music.basic_info.artist} · {match.music.type}</Text>
+            <Text style={styles.resultSource}>为什么是这首：{describeMatchReason(match)}</Text>
+            {hasMatchedAlias(match) && <Text style={styles.resultVia}>经别名匹配：{match.matchedText}</Text>}
+            {duplicateOf !== undefined && <Text style={styles.resultVia}>与图 {duplicateOf + 1} 是同一首（已去重）</Text>}
+          </View>
+        </Pressable>
+        <View style={styles.resultActions}>
+          <Pressable onPress={() => toggleExpanded(uri)} hitSlop={6}>
+            <Text style={styles.reselectText}>{expanded ? '收起 ▲' : '重选 ▾'}</Text>
+          </Pressable>
+          {duplicateOf === undefined && (
+            <Pressable style={[styles.quickAddButton, (!planLoaded || difficultyIndex === null) && styles.quickAddButtonDisabled]} onPress={() => handleQuickAdd(match.music)} disabled={!planLoaded || difficultyIndex === null}>
+              <Text style={styles.quickAddText}>{!planLoaded ? '计划加载中' : alreadyInPlan ? '已在计划' : difficultyLabel ? `+ ${difficultyLabel}` : '不可加入'}</Text>
+            </Pressable>
+          )}
+        </View>
+      </View>
+    );
   };
 
   return (
@@ -264,35 +359,55 @@ export function TitleRecognizer({ visible, rawData, onClose, onOpenSong }: Props
             </View>
             {imageUris.length > 0 && <Pressable style={styles.clearButton} onPress={clearImages} disabled={working}><Text style={styles.clearText}>清空图片并重新识别</Text></Pressable>}
 
-            {mergedMatches.length > 0 && (
+            {groups.some(group => group.recognized) && (
               <View style={styles.results}>
-                <Text style={styles.sectionTitle}>识别候选（前 {mergedMatches.length} 名，点一首即选中）</Text>
-                {mergedMatches.map((match, rank) => {
-                  const difficultyIndex = getQuickAddDifficulty(match.music);
-                  const difficultyLabel = difficultyIndex === null ? null : DifficultyLabels[difficultyIndex];
-                  const alreadyInPlan = difficultyIndex !== null && planLoaded && isInPlan(match.music.id, difficultyIndex, match.music.type);
+                <Text style={styles.sectionTitle}>
+                  识别结果（每张图前 {5} 名候选，合并去重后共 {mergedMatches.length} 首候选，已选 {firstImageBySong.size} 首）
+                </Text>
+                {groups.filter(group => group.recognized).map(group => {
+                  const expanded = expandedImages.has(group.uri) || !group.selectedKey;
+                  const selected = group.top.find(match => matchKey(match.music) === group.selectedKey) ?? null;
+                  const duplicateOf = group.selectedKey !== null ? firstImageBySong.get(group.selectedKey) : undefined;
+                  const isDuplicate = duplicateOf !== undefined && duplicateOf !== group.imageIndex;
                   return (
-                    <View key={`${match.music.id}-${match.music.type}`} style={styles.resultRow}>
-                      <Pressable style={styles.resultMain} onPress={() => handleOpenSong(match.music)} accessibilityRole="button" accessibilityLabel={`查看歌曲 ${match.music.title}`}>
-                        <View style={styles.resultInfo}>
-                          <Text style={styles.resultTitle} numberOfLines={2}>
-                            <Text style={styles.resultRank}>{rank + 1}. </Text>{match.music.title}
-                          </Text>
-                          <Text style={styles.resultMeta}>{match.music.basic_info.artist} · {match.music.type}</Text>
-                          <Text style={styles.resultSource}>识别文字：{match.recognizedText}</Text>
-                          {match.matchedKind && match.matchedKind !== 'title' && (
-                            <Text style={styles.resultVia}>
-                              经{match.matchedKind === 'alias' ? '别名' : match.matchedKind === 'artist' ? '曲师' : '谱师'}匹配：{match.matchedText}
-                            </Text>
-                          )}
-                        </View>
-                      </Pressable>
-                      <View style={styles.resultActions}>
-                        <Text style={styles.score}>{Math.round(match.score * 100)}%</Text>
-                        <Pressable style={[styles.quickAddButton, (!planLoaded || difficultyIndex === null) && styles.quickAddButtonDisabled]} onPress={() => handleQuickAdd(match.music)} disabled={!planLoaded || difficultyIndex === null}>
-                          <Text style={styles.quickAddText}>{!planLoaded ? '计划加载中' : alreadyInPlan ? '已在计划' : difficultyLabel ? `+ ${difficultyLabel}` : '不可加入'}</Text>
-                        </Pressable>
+                    <View key={group.uri} style={styles.group}>
+                      <View style={styles.groupHeader}>
+                        <Text style={styles.groupTitle}>图 {group.imageIndex + 1}</Text>
+                        <Text style={[styles.confidenceTag, group.confidence === 'high' ? styles.confidenceHigh : styles.confidenceLow]}>
+                          {group.confidence === 'high' ? '高置信度' : group.confidence === 'low' ? '识别不确定' : '未识别到曲名'}
+                        </Text>
                       </View>
+                      {group.confidence === 'none' && <Text style={styles.groupHint}>这张图没有匹配到曲名，可以换个角度重拍。</Text>}
+                      {group.confidence === 'low' && !selected && (
+                        <Text style={styles.groupHint}>请从下面 {group.top.length} 个候选里点选正确的一首。</Text>
+                      )}
+                      {selected && renderSelectedRow(selected, group.uri, isDuplicate ? duplicateOf : undefined, expanded)}
+                      {expanded && group.top.length > 0 && (
+                        <View style={styles.candidateList}>
+                          {group.top.map((match, rank) => {
+                            const key = matchKey(match.music);
+                            const isSelected = key === group.selectedKey;
+                            return (
+                              <Pressable
+                                key={key}
+                                style={[styles.candidateRow, isSelected && styles.candidateRowSelected]}
+                                onPress={() => selectCandidate(group.uri, key)}
+                                accessibilityRole="button"
+                                accessibilityLabel={`选择 ${match.music.title}`}
+                              >
+                                <View style={styles.resultInfo}>
+                                  <Text style={styles.resultTitle} numberOfLines={2}>
+                                    <Text style={styles.resultRank}>{isSelected ? '✓ ' : `${rank + 1}. `}</Text>{match.music.title}
+                                  </Text>
+                                  <Text style={styles.resultMeta}>{match.music.basic_info.artist} · {match.music.type}</Text>
+                                  <Text style={styles.resultSource}>{describeMatchReason(match)}</Text>
+                                </View>
+                                <Text style={styles.score}>{Math.round(match.score * 100)}%</Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      )}
                     </View>
                   );
                 })}
@@ -361,6 +476,17 @@ const styles = StyleSheet.create({
   quickAddButton: { paddingHorizontal: 7, paddingVertical: 5, borderRadius: 7, backgroundColor: `${Colors.accent.secondary}22`, borderWidth: 1, borderColor: Colors.accent.secondary },
   quickAddButtonDisabled: { opacity: 0.5 },
   quickAddText: { fontSize: 9, fontWeight: '800', color: Colors.accent.secondary },
+  group: { gap: 6, padding: 10, borderRadius: 12, backgroundColor: Colors.bg.secondary },
+  groupHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  groupTitle: { fontSize: 12, fontWeight: '800', color: Colors.text.primary },
+  confidenceTag: { fontSize: 9, fontWeight: '800', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
+  confidenceHigh: { color: Colors.functional.success, backgroundColor: `${Colors.functional.success}22` },
+  confidenceLow: { color: Colors.functional.warning, backgroundColor: `${Colors.functional.warning}22` },
+  groupHint: { fontSize: 11, color: Colors.functional.warning },
+  candidateList: { gap: 6 },
+  candidateRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 9, borderRadius: 9, borderWidth: 1, borderColor: Colors.border.light, backgroundColor: Colors.bg.tertiary },
+  candidateRowSelected: { borderColor: Colors.accent.primary, backgroundColor: `${Colors.accent.primary}14` },
+  reselectText: { fontSize: 10, fontWeight: '800', color: Colors.accent.secondary },
   planFeedback: { fontSize: 11, lineHeight: 16, color: Colors.accent.secondary },
   note: { fontSize: 10, lineHeight: 15, color: Colors.text.muted },
 });

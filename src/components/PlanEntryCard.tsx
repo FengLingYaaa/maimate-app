@@ -26,9 +26,13 @@ interface Props {
   onLongPress: () => void;
   onRemove: () => void;
   onTarget: (score: number | null) => void;
+  /** v1.19.0：计划页搜索经别名命中时的别名（null 不显示）。 */
+  aliasHit?: string | null;
+  /** v1.19.0：命中的是本地自定义别名。 */
+  aliasHitCustom?: boolean;
 }
 
-export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, allSongs, allScores, importedScore, scoreSortDifficultyIndex, getSortScore, showChinaVersion, showProjectedRating, onPress, onLongPress, onRemove, onTarget }: Props) {
+export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, allSongs, allScores, importedScore, scoreSortDifficultyIndex, getSortScore, showChinaVersion, showProjectedRating, onPress, onLongPress, onRemove, onTarget, aliasHit = null, aliasHitCustom = false }: Props) {
   const officialConstant = getOfficialChartConstant(music, entry.difficultyIndex);
   const targetRating = entry.targetScore === undefined ? null : calculateRating(officialConstant ?? undefined, entry.targetScore);
   // v1.12.0：达成目标后 B50 总分增量（重算口径），无目标不显示。
@@ -69,6 +73,12 @@ export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, 
               <Text style={styles.title} numberOfLines={2}>{music.title}</Text>
             </View>
             <Text style={styles.artist} numberOfLines={1}>{music.basic_info.artist}</Text>
+            {!!aliasHit && (
+              <View style={styles.aliasHitRow}>
+                <Text style={styles.aliasHitTag}>{aliasHitCustom ? '自定义别名' : '别名命中'}</Text>
+                <Text style={styles.aliasHitText} numberOfLines={1}>{aliasHit}</Text>
+              </View>
+            )}
             <View style={styles.metaLine}>
               <Text style={[styles.diffChip, { color: difficultyColor, borderColor: `${difficultyColor}88`, backgroundColor: `${difficultyColor}1a` }]}>
                 {DifficultyLabels[entry.difficultyIndex] || `难度 ${entry.difficultyIndex}`}
@@ -115,6 +125,9 @@ export const PlanEntryCard = memo(function PlanEntryCard({ music, entry, index, 
 });
 
 const styles = StyleSheet.create({
+  aliasHitRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  aliasHitTag: { fontSize: 9, fontWeight: '800', color: Colors.accent.secondary, borderWidth: 1, borderColor: Colors.accent.secondary, borderRadius: 4, paddingHorizontal: 4, overflow: 'hidden' },
+  aliasHitText: { flexShrink: 1, fontSize: 11, fontWeight: '700', color: Colors.accent.secondary },
   wrapper: { paddingHorizontal: 12, paddingVertical: 5 },
   orderBadge: { position: 'absolute', top: 14, left: 7, zIndex: 2, width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.accent.primary, alignItems: 'center', justifyContent: 'center' },
   orderBadgePinned: { backgroundColor: Colors.accent.secondaryDark },

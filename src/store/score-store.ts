@@ -18,6 +18,7 @@ import { findNewlyAchievedPlanEntryIds } from '../data/plan-auto-sink';
 import { normalizeSnapshotLimit } from '../data/settings-defaults';
 import { computeB50 } from '../data/b50';
 import { useRatingHistoryStore } from './rating-history-store';
+import { SYNC_REPORT_STORAGE_KEY, buildSyncReport, parseSyncReport, type SyncReport } from '../data/sync-report';
 
 interface StoredScorePayload {
   scores: PlayerScore[];
@@ -33,6 +34,10 @@ interface ScoreStore {
   changes: ScoreChange[];
   loaded: boolean;
   tokenConfigured: boolean;
+  /** v1.19.0：最近一次成功同步的战报（只保留最新一次）。 */
+  lastSyncReport: SyncReport | null;
+  /** v1.19.0：B50 页未读横幅已读。 */
+  markSyncReportSeen: () => Promise<void>;
   loadScores: () => Promise<void>;
   /** v1.13.0：删除指定快照（快照管理 UI 使用），持久化同步更新。 */
   deleteSnapshot: (snapshotId: string) => Promise<void>;
@@ -92,6 +97,7 @@ export const useScoreStore = create<ScoreStore>((set, get) => ({
   changes: [],
   loaded: false,
   tokenConfigured: false,
+  lastSyncReport: null,
 
   loadScores: async () => {
     let scores: PlayerScore[] = [];
@@ -124,13 +130,20 @@ export const useScoreStore = create<ScoreStore>((set, get) => ({
       changes = [];
     }
 
+    let lastSyncReport: SyncReport | null = null;
+    try {
+      lastSyncReport = parseSyncReport(await AsyncStorage.getItem(SYNC_REPORT_STORAGE_KEY));
+    } catch {
+      lastSyncReport = null;
+    }
+
     let tokenConfigured = false;
     try {
       tokenConfigured = Boolean(await readStoredImportToken());
     } catch {
       tokenConfigured = false;
     }
-    set({ scores, profile, sync, snapshots, changes, tokenConfigured, loaded: true });
+    set({ scores, profile, sync, snapshots, changes, tokenConfigured, lastSyncReport, loaded: true });
   },
 
   verifyAndSaveToken: async value => {
@@ -157,6 +170,7 @@ export const useScoreStore = create<ScoreStore>((set, get) => ({
       const result = await fetchImportedScores(token);
       const syncedAt = Date.now();
       const previousScores = get().scores;
+      const previousServerRating = get().sync.serverRating;
       const changed = diffScores(previousScores, result.scores, syncedAt);
       const snapshot: ScoreSnapshot = {
         id: `snapshot-${syncedAt}`,
@@ -181,7 +195,22 @@ export const useScoreStore = create<ScoreStore>((set, get) => ({
       await persistPayload(payload);
       await AsyncStorage.setItem(CACHE_KEYS.scoreSnapshots, JSON.stringify(snapshots));
       await AsyncStorage.setItem(CACHE_KEYS.scoreChanges, JSON.stringify(changes));
-      set({ scores: result.scores, profile: result.profile, sync, snapshots, changes, tokenConfigured: true });
+      // v1.19.0：本次同步战报（失败不影响同步结果）。首次同步只建立基线。
+      let lastSyncReport: SyncReport | null = get().lastSyncReport;
+      try {
+        lastSyncReport = buildSyncReport({
+          rawData: useMusicStore.getState().rawData,
+          previousScores,
+          currentScores: result.scores,
+          previousServerRating: previousScores.length > 0 ? previousServerRating : null,
+          currentServerRating: result.serverRating,
+          syncedAt,
+        });
+        await AsyncStorage.setItem(SYNC_REPORT_STORAGE_KEY, JSON.stringify(lastSyncReport));
+      } catch {
+        // 战报只是附加信息。
+      }
+      set({ scores: result.scores, profile: result.profile, sync, snapshots, changes, tokenConfigured: true, lastSyncReport });
       // v1.18.0：同步成功（同时保存快照）时记录一个 Rating 历史点；记录失败不影响同步结果。
       try {
         const b50Rating = computeB50(useMusicStore.getState().rawData, result.scores).total;
@@ -213,8 +242,20 @@ export const useScoreStore = create<ScoreStore>((set, get) => ({
   },
 
   clearScores: async () => {
-    await AsyncStorage.multiRemove([CACHE_KEYS.scoreData, CACHE_KEYS.scoreSnapshots, CACHE_KEYS.scoreChanges]);
-    set({ scores: [], profile: null, sync: initialSync, snapshots: [], changes: [] });
+    await AsyncStorage.multiRemove([CACHE_KEYS.scoreData, CACHE_KEYS.scoreSnapshots, CACHE_KEYS.scoreChanges, SYNC_REPORT_STORAGE_KEY]);
+    set({ scores: [], profile: null, sync: initialSync, snapshots: [], changes: [], lastSyncReport: null });
+  },
+
+  markSyncReportSeen: async () => {
+    const report = get().lastSyncReport;
+    if (!report || report.seen) return;
+    const next = { ...report, seen: true };
+    set({ lastSyncReport: next });
+    try {
+      await AsyncStorage.setItem(SYNC_REPORT_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // 已读状态写失败无妨。
+    }
   },
 
   deleteSnapshot: async snapshotId => {

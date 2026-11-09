@@ -62,7 +62,9 @@
     "test:search": "tsx scripts/search-alias-check.ts",
     "test:snapshot": "tsx scripts/snapshot-battle-check.ts",
     "test:rating-history": "tsx scripts/rating-history-check.ts",
-    "test:cover": "tsx scripts/cover-fallback-check.ts"
+    "test:cover": "tsx scripts/cover-fallback-check.ts",
+    "test:backup-history": "tsx scripts/backup-rating-history-check.ts",
+    "test:v119": "tsx scripts/v119-features-check.ts"
   },
   "private": true,
   "expo": {

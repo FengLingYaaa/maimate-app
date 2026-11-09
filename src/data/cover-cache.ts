@@ -13,6 +13,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { getCoverCacheFilename, getCoverCacheStem } from './cover-cache-names';
 import { touchCoverFull, evictCoverFullIfNeeded } from './cover-lru';
+import { classifyCoverDownloadStatus, clearMissingCoverUrls, isCoverUrlMissing, markCoverUrlMissing } from './cover-chain';
 
 const CACHE_DIR_NAME = 'covers';
 const THUMB_DIR_NAME = 'thumbs';
@@ -50,6 +51,8 @@ async function downloadThumb(thumbUri: string, coverUrl: string): Promise<string
   try {
     const result = await FileSystem.downloadAsync(coverUrl, temporary);
     if (result.status !== 200) {
+      // v1.19.0：404/410 记入本次启动内的负缓存，后续直接跳过该源。
+      if (classifyCoverDownloadStatus(result.status) === 'missing') markCoverUrlMissing(coverUrl);
       await FileSystem.deleteAsync(temporary, { idempotent: true });
       return null;
     }
@@ -84,6 +87,8 @@ async function downloadFull(fullUri: string, coverUrl: string): Promise<string |
   try {
     const result = await FileSystem.downloadAsync(coverUrl, temporary);
     if (result.status !== 200) {
+      // v1.19.0：404/410 记入本次启动内的负缓存，后续直接跳过该源。
+      if (classifyCoverDownloadStatus(result.status) === 'missing') markCoverUrlMissing(coverUrl);
       await FileSystem.deleteAsync(temporary, { idempotent: true });
       return null;
     }
@@ -116,6 +121,8 @@ export async function resolveCoverCacheUriBlocking(songId: string, coverUrl: str
   } catch {
     return null;
   }
+  // v1.19.0：本地没有、且本次启动内已确认 404 → 不再请求。
+  if (isCoverUrlMissing(coverUrl)) return null;
   const existing = inflightThumb.get(thumbUri);
   if (existing) return existing;
   const task = downloadThumb(thumbUri, coverUrl).finally(() => inflightThumb.delete(thumbUri));
@@ -145,6 +152,7 @@ export async function resolveCoverCacheUriFull(songId: string, coverUrl: string)
   } catch {
     // 继续走下载。
   }
+  if (isCoverUrlMissing(coverUrl)) return null;
   const existing = inflightFull.get(fullUri);
   if (existing) return existing;
   const task = downloadFull(fullUri, coverUrl).finally(() => inflightFull.delete(fullUri));
@@ -154,6 +162,8 @@ export async function resolveCoverCacheUriFull(songId: string, coverUrl: string)
 
 /** 清空曲绘缓存目录（设置页清理入口使用）。连目录一起删。 */
 export async function clearCoverCache(): Promise<void> {
+  // v1.19.0：清理曲绘缓存时一并清空 404 负缓存，之后会重新请求主源。
+  clearMissingCoverUrls();
   const cacheDirectoryUri = getCacheDirectoryUri();
   if (!cacheDirectoryUri) return;
   try {

@@ -9,7 +9,9 @@ import * as MediaLibrary from 'expo-media-library/legacy';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
-import type { RefObject } from 'react';
+import { createElement, type ReactElement, type RefObject } from 'react';
+import { RatingHistoryShareCard } from '../components/RatingHistoryShareCard';
+import type { RatingHistoryShareData } from './rating-history';
 import type { View } from 'react-native';
 
 /** 捕获指定 ref 指向的卡片视图为 PNG，写入缓存目录，返回本地文件 URI。 */
@@ -66,4 +68,13 @@ export async function sharePngFile(fileUri: string): Promise<void> {
 export function shareCardFileName(prefix: string, now = new Date()): string {
   const pad = (value: number) => String(value).padStart(2, '0');
   return `${prefix}-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.png`;
+}
+
+/**
+ * v1.19.0：Rating 历史分享卡。输入为历史点列派生的分享数据（含阶段涨幅，见 rating-history.ts
+ * buildRatingHistoryShareData），返回交给 ShareCardOverlay 捕获的卡片元素。
+ * 点太少（<2）时卡片只显示当前 Rating 不画曲线。
+ */
+export function renderRatingHistoryShareCard(data: RatingHistoryShareData, rangeLabel: string, userName?: string): ReactElement {
+  return createElement(RatingHistoryShareCard, { data, rangeLabel, userName });
 }

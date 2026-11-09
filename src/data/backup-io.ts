@@ -7,8 +7,14 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { StorageAccessFramework } from 'expo-file-system/legacy';
 import { CACHE_KEYS } from '../constants/game';
 import { useBilibiliStore, usePlanStore, useScoreStore, useSettingsStore } from '../store';
+import { useRatingHistoryStore } from '../store/rating-history-store';
+import { RATING_HISTORY_STORAGE_KEY } from './rating-history';
+import { CUSTOM_ALIAS_STORAGE_KEY, countCustomAliases, loadCustomAliases } from './custom-aliases';
+import { getCustomAliasMap } from './song-aliases';
 import {
+  applyRestoreTransaction,
   BackupError,
+  buildRestorePairs,
   buildBackup,
   parseAndValidateBackup,
   serializeBackup,
@@ -25,6 +31,9 @@ const USER_DATA_KEYS = [
   CACHE_KEYS.scoreChanges,
   CACHE_KEYS.bilibiliLinks,
   CACHE_KEYS.fortuneSeed,
+  // v1.19.0：Rating 历史与自定义别名也纳入回滚快照。
+  RATING_HISTORY_STORAGE_KEY,
+  CUSTOM_ALIAS_STORAGE_KEY,
 ] as const;
 
 function currentAppVersion(): string {
@@ -37,7 +46,10 @@ function exportFileName(now = new Date()): string {
   return `MaiMate-backup-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.json`;
 }
 
-function gatherBackupData(): BackupData {
+async function gatherBackupData(): Promise<BackupData> {
+  // v1.19.0：Rating 历史 store 尚未 load 时先读一次，避免导出空历史。
+  if (!useRatingHistoryStore.getState().loaded) await useRatingHistoryStore.getState().load();
+  const ratingHistory = useRatingHistoryStore.getState().points;
   const settings = useSettingsStore.getState().settings;
   const plan = usePlanStore.getState();
   const score = useScoreStore.getState();
@@ -54,6 +66,20 @@ function gatherBackupData(): BackupData {
     },
     bilibiliLinks: bilibili.links,
     fortuneSeed: null,
+    ratingHistory,
+    customAliases: getCustomAliasMap(),
+  };
+}
+
+function summarizeBuilt(backup: ReturnType<typeof buildBackup>): BackupSummary {
+  return {
+    planEntries: backup.data.plan.entries.length,
+    scores: backup.data.scores.scores.length,
+    snapshots: backup.data.scores.snapshots.length,
+    bilibiliLinks: backup.data.bilibiliLinks.length,
+    hasFortuneSeed: Boolean(backup.data.fortuneSeed),
+    ratingHistoryPoints: backup.data.ratingHistory?.length ?? 0,
+    customAliases: countCustomAliases(backup.data.customAliases ?? {}),
   };
 }
 
@@ -71,7 +97,7 @@ export async function exportBackup(mode: 'share' | 'save'): Promise<{ fileName: 
   const cacheDirectory = FileSystem.cacheDirectory;
   if (!cacheDirectory) throw new BackupError('无法访问应用缓存目录');
 
-  const data = gatherBackupData();
+  const data = await gatherBackupData();
   data.fortuneSeed = await readFortuneSeed();
   const backup = buildBackup(data, currentAppVersion(), Platform.OS);
   const fileName = exportFileName();
@@ -85,13 +111,7 @@ export async function exportBackup(mode: 'share' | 'save'): Promise<{ fileName: 
       await StorageAccessFramework.writeAsStringAsync(fileUri, content, { encoding: FileSystem.EncodingType.UTF8 });
       return {
         fileName,
-        summary: {
-          planEntries: backup.data.plan.entries.length,
-          scores: backup.data.scores.scores.length,
-          snapshots: backup.data.scores.snapshots.length,
-          bilibiliLinks: backup.data.bilibiliLinks.length,
-          hasFortuneSeed: Boolean(backup.data.fortuneSeed),
-        },
+        summary: summarizeBuilt(backup),
         savedTo: fileUri,
       };
     } catch (error) {
@@ -111,13 +131,7 @@ export async function exportBackup(mode: 'share' | 'save'): Promise<{ fileName: 
 
   return {
     fileName,
-    summary: {
-      planEntries: backup.data.plan.entries.length,
-      scores: backup.data.scores.scores.length,
-      snapshots: backup.data.scores.snapshots.length,
-      bilibiliLinks: backup.data.bilibiliLinks.length,
-      hasFortuneSeed: Boolean(backup.data.fortuneSeed),
-    },
+    summary: summarizeBuilt(backup),
   };
 }
 
@@ -143,18 +157,11 @@ export async function pickAndValidateBackup(): Promise<{ backup: ReturnType<type
 }
 
 function payloadFor(backup: ReturnType<typeof parseAndValidateBackup>['backup']): Array<[string, string]> {
-  const { plan, scores, settings, bilibiliLinks, fortuneSeed } = backup.data;
-  const pairs: Array<[string, string]> = [
-    [CACHE_KEYS.planData, JSON.stringify({ entries: plan.entries, updatedAt: Date.now() })],
-    [CACHE_KEYS.planGraveyard, JSON.stringify(plan.graveyard)],
-    [CACHE_KEYS.settings, JSON.stringify(settings)],
-    [CACHE_KEYS.scoreData, JSON.stringify({ scores: scores.scores, sync: scores.sync, profile: scores.profile })],
-    [CACHE_KEYS.scoreSnapshots, JSON.stringify(scores.snapshots)],
-    [CACHE_KEYS.scoreChanges, JSON.stringify(scores.changes)],
-    [CACHE_KEYS.bilibiliLinks, JSON.stringify(bilibiliLinks)],
-  ];
-  if (fortuneSeed) pairs.push([CACHE_KEYS.fortuneSeed, fortuneSeed]);
-  return pairs;
+  return buildRestorePairs(backup, {
+    ...CACHE_KEYS,
+    ratingHistory: RATING_HISTORY_STORAGE_KEY,
+    customAliases: CUSTOM_ALIAS_STORAGE_KEY,
+  });
 }
 
 async function reloadPersistedStores(): Promise<void> {
@@ -163,6 +170,8 @@ async function reloadPersistedStores(): Promise<void> {
     useScoreStore.getState().loadScores(),
     useSettingsStore.getState().loadSettings(),
     useBilibiliStore.getState().loadLinks(),
+    useRatingHistoryStore.getState().load(),
+    loadCustomAliases(),
   ]);
 }
 
@@ -171,22 +180,11 @@ async function reloadPersistedStores(): Promise<void> {
  * 一次 multiSet 写入全部用户键；写失败用回滚快照还原，不留下半恢复状态。
  */
 export async function restoreBackup(backup: ReturnType<typeof parseAndValidateBackup>['backup']): Promise<void> {
-  const rollback = await AsyncStorage.multiGet([...USER_DATA_KEYS]);
-  try {
-    const pairs = payloadFor(backup);
-    await AsyncStorage.multiSet(pairs);
-    if (!backup.data.fortuneSeed) {
-      await AsyncStorage.removeItem(CACHE_KEYS.fortuneSeed);
-    }
-  } catch (error) {
-    // 还原失败：用之前的快照回滚，尽力而为。
-    const rollbackPairs = rollback.filter(([, value]) => value !== null) as Array<[string, string]>;
-    try {
-      await AsyncStorage.multiSet(rollbackPairs);
-    } catch {
-      // 回滚也失败时至少不清空存储。
-    }
-    throw error instanceof Error ? error : new BackupError('恢复失败');
-  }
+  await applyRestoreTransaction(
+    AsyncStorage as unknown as Parameters<typeof applyRestoreTransaction>[0],
+    USER_DATA_KEYS,
+    payloadFor(backup),
+    backup.data.fortuneSeed ? [] : [CACHE_KEYS.fortuneSeed],
+  );
   await reloadPersistedStores();
 }

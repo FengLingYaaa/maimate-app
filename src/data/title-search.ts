@@ -281,3 +281,74 @@ export function mergeImageMatches(imageMatches: TitleMatch[][], limit = OCR_CAND
     .sort((left, right) => right.score - left.score)
     .slice(0, limit);
 }
+
+/* ------------------------------------------------------------------ */
+/* v1.19.0：多图逐图取前 5 → 合并去重；置信度；「为什么是这首」说明。      */
+/* ------------------------------------------------------------------ */
+
+/** 每张图保留的候选数。 */
+export const OCR_PER_IMAGE_LIMIT = 5;
+/** 高置信度：第 1 名 ≥ 0.85 且领先第 2 名 ≥ 0.08（只有 1 个候选时只看分数）。 */
+export const OCR_HIGH_CONFIDENCE_SCORE = 0.85;
+export const OCR_HIGH_CONFIDENCE_GAP = 0.08;
+
+export type MatchConfidence = 'high' | 'low' | 'none';
+
+/** 单张图的前 N 名（matches 已按分数降序，来自 matchSongTitlesForImage）。 */
+export function topMatchesForImage(matches: TitleMatch[], limit = OCR_PER_IMAGE_LIMIT): TitleMatch[] {
+  return [...matches].sort((left, right) => right.score - left.score).slice(0, limit);
+}
+
+export function classifyMatchConfidence(matches: TitleMatch[]): MatchConfidence {
+  if (matches.length === 0) return 'none';
+  const [first, second] = topMatchesForImage(matches, 2);
+  if (first.score < OCR_HIGH_CONFIDENCE_SCORE) return 'low';
+  if (second && first.score - second.score < OCR_HIGH_CONFIDENCE_GAP) return 'low';
+  return 'high';
+}
+
+export interface MergedImageMatch extends TitleMatch {
+  /** 该曲出现在哪些图里（imageKeys 中的下标，升序）。 */
+  imageIndexes: number[];
+}
+
+/**
+ * 多图合并：**先每张图各自取前 5，再合并去重**（同一首歌取最高分，并记录出现在哪些图）。
+ * 修复 v1.18 先把所有图的候选放一起取全局前 5，一张图的第 1 名挤掉另一张图第 1 名的问题。
+ * 不再做全局截断：10 张图最多 50 个候选，每张图的第 1 名一定在结果里。
+ */
+export function mergePerImageTopMatches(perImage: TitleMatch[][], limit = OCR_PER_IMAGE_LIMIT): MergedImageMatch[] {
+  const byMusic = new Map<string, MergedImageMatch>();
+  perImage.forEach((matches, imageIndex) => {
+    for (const match of topMatchesForImage(matches, limit)) {
+      const key = `${match.music.type}:${match.music.id}`;
+      const existing = byMusic.get(key);
+      if (!existing) {
+        byMusic.set(key, { ...match, imageIndexes: [imageIndex] });
+        continue;
+      }
+      if (!existing.imageIndexes.includes(imageIndex)) existing.imageIndexes.push(imageIndex);
+      if (match.score > existing.score) byMusic.set(key, { ...match, imageIndexes: existing.imageIndexes });
+    }
+  });
+  return [...byMusic.values()].sort((left, right) => right.score - left.score);
+}
+
+/** 是否经别名命中（UI 标注用）。 */
+export function hasMatchedAlias(match: Pick<TitleMatch, 'matchedKind'>): boolean {
+  return match.matchedKind === 'alias';
+}
+
+/** 「为什么是这首」：命中字段 + 识别到的那行文字 + 匹配度。 */
+export function describeMatchReason(match: TitleMatch): string {
+  const percent = Math.round(match.score * 100);
+  const source = match.recognizedText.length > 24 ? `${match.recognizedText.slice(0, 24)}…` : match.recognizedText;
+  const field = match.matchedKind === 'alias'
+    ? `别名「${match.matchedText ?? ''}」`
+    : match.matchedKind === 'artist'
+      ? `曲师「${match.matchedText ?? match.music.basic_info.artist}」`
+      : match.matchedKind === 'charter'
+        ? `谱师「${match.matchedText ?? ''}」`
+        : '曲名';
+  return `识别文字「${source}」与${field}相似 ${percent}%`;
+}

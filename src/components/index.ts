@@ -20,3 +20,4 @@ export { PlanProgressRing } from './PlanProgressRing';
 export { ChangelogOverlay } from './ChangelogOverlay';
 export { SongShareCard } from './SongShareCard';
 export { ShareCardOverlay } from './ShareCardOverlay';
+export { SyncReportCard } from './SyncReportCard';

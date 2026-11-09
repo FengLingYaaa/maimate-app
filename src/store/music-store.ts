@@ -2,6 +2,7 @@
  * 曲目数据 Zustand Store
  * 管理全量曲库、筛选结果和 Diving-Fish 谱面统计。
  */
+import { useLevelStore } from '../data/level-store';
 
 import { create } from 'zustand';
 import { MusicData, FilterOptions, ChartStatsMap } from '../data/types';
@@ -112,6 +113,9 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
         updating: hasBackgroundRefresh || get().chartStatsUpdating,
       });
 
+      // v1.19.0：定数变更检测（与上一次保存的定数基线对比）。
+      void useLevelStore.getState().checkMusicData(result.data);
+
       // 统计数据不阻塞曲库首屏；详情页会在加载完成后自动显示拟合定数。
       void get().loadChartStats(forceRefresh);
 
@@ -122,6 +126,7 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
             const timestamp = await getCacheTimestamp();
             if (requestId !== musicLoadSequence) return;
 
+            void useLevelStore.getState().checkMusicData(data);
             const currentFilters = get().filters;
             // v1.17.1：后台刷新重建 musicList 时同样带上最新 chartStats 与成绩索引。
             set({

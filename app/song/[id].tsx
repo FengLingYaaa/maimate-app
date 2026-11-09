@@ -5,6 +5,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   BackHandler,
   View,
   Text,
@@ -25,7 +26,8 @@ import { formatClearStatus } from '../../src/data/status-labels';
 import { shareCardFileName } from '../../src/data/share-card';
 import { openMusicPlatformSearch } from '../../src/data/external-links';
 import { getMusicPlatformSearchText, MUSIC_PLATFORM_LABELS } from '../../src/data/music-platforms';
-import { getSongAliases } from '../../src/data/song-aliases';
+import { getSongAliasEntries } from '../../src/data/song-aliases';
+import { addCustomAlias, checkCustomAlias, removeCustomAlias } from '../../src/data/custom-aliases';
 import type { ChartData, DetailBoardId, MusicPlatform } from '../../src/data/types';
 
 const ALIAS_PREVIEW_COUNT = 12;
@@ -124,19 +126,79 @@ export default function SongDetail() {
   }, [targetEntry?.targetScore, music?.id, selectedDiff]);
 
   // v1.18.0：别名小节（Yuzu 别名库）。SD/DX 同名两条记录的别名合并去重展示。
+  // v1.19.0：合并本地自定义别名（自定义在前、带「自定义」标注），可添加/长按删除。
   const [aliasesExpanded, setAliasesExpanded] = useState(false);
+  const [aliasRevision, setAliasRevision] = useState(0);
+  const [aliasEditing, setAliasEditing] = useState(false);
+  const [aliasInput, setAliasInput] = useState('');
+  const [aliasMessage, setAliasMessage] = useState<string | null>(null);
+  const sameTitleSongs = useMemo(
+    () => (music ? rawData.filter(candidate => candidate.title === music.title && candidate.id !== music.id) : []),
+    [music, rawData],
+  );
   const aliases = useMemo(() => {
     if (!music) return [];
-    const sameTitle = rawData.filter(candidate => candidate.title === music.title && candidate.id !== music.id);
-    const merged = [...getSongAliases(music), ...sameTitle.flatMap(candidate => getSongAliases(candidate))];
+    const merged = [music, ...sameTitleSongs].flatMap(song => getSongAliasEntries(song));
+    merged.sort((left, right) => (left.source === right.source ? 0 : left.source === 'custom' ? -1 : 1));
     const seen = new Set<string>();
     return merged.filter(alias => {
-      const key = alias.trim().normalize('NFKC').toLocaleLowerCase();
+      const key = alias.text.trim().normalize('NFKC').toLocaleLowerCase();
       if (!key || seen.has(key)) return false;
       seen.add(key);
       return true;
     });
-  }, [music, rawData]);
+    // aliasRevision：自定义别名增删后重新读取。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [music, sameTitleSongs, aliasRevision]);
+  const customAliasCount = aliases.filter(alias => alias.source === 'custom').length;
+
+  /** 自定义别名按 songId 保存；同名的 SD/DX 两条记录一起写，保证两种谱面都能搜到。 */
+  const saveCustomAlias = useCallback(async (text: string) => {
+    if (!music) return;
+    for (const song of [music, ...sameTitleSongs]) await addCustomAlias(song.id, text);
+    setAliasInput('');
+    setAliasEditing(false);
+    setAliasMessage(`已添加自定义别名「${text}」（仅保存在本机）`);
+    setAliasRevision(value => value + 1);
+  }, [music, sameTitleSongs]);
+
+  const submitCustomAlias = useCallback(() => {
+    if (!music) return;
+    const check = checkCustomAlias(aliasInput, music, rawData);
+    if (!check.ok) {
+      setAliasMessage(check.message ?? '无法添加这个别名');
+      return;
+    }
+    if (check.sharedWith.length > 0) {
+      const names = check.sharedWith.slice(0, 3).map(song => `「${song.title}」`).join('、');
+      Alert.alert(
+        '别名已被其它歌使用',
+        `${names}${check.sharedWith.length > 3 ? ` 等 ${check.sharedWith.length} 首` : ''}也叫「${check.alias}」。搜索时会并列显示，由你自己区分。仍要添加吗？`,
+        [
+          { text: '取消', style: 'cancel' },
+          { text: '仍然添加', onPress: () => { void saveCustomAlias(check.alias); } },
+        ],
+      );
+      return;
+    }
+    void saveCustomAlias(check.alias);
+  }, [aliasInput, music, rawData, saveCustomAlias]);
+
+  const confirmRemoveCustomAlias = useCallback((text: string) => {
+    if (!music) return;
+    Alert.alert('删除自定义别名', `删除「${text}」？删除后该曲的搜索结果恢复为 Yuzu 别名库的原始结果。`, [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '删除',
+        style: 'destructive',
+        onPress: async () => {
+          for (const song of [music, ...sameTitleSongs]) await removeCustomAlias(song.id, text);
+          setAliasMessage(`已删除自定义别名「${text}」`);
+          setAliasRevision(value => value + 1);
+        },
+      },
+    ]);
+  }, [music, sameTitleSongs]);
   const searchAlias = useCallback((alias: string) => {
     router.push({ pathname: '/' as any, params: { q: alias } });
   }, [router]);
@@ -229,20 +291,48 @@ export default function SongDetail() {
           </View>
         </View>
 
-        {/* v1.18.0：别名（点 chip 回曲库搜索该别名） */}
-        {aliases.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>别名 · {aliases.length}</Text>
+        {/* v1.18.0：别名（点 chip 回曲库搜索该别名）；v1.19.0：始终显示，可添加/长按删除自定义别名 */}
+        <View style={styles.section}>
+          <View style={styles.aliasHeader}>
+            <Text style={[styles.sectionTitle, styles.aliasHeaderTitle]}>别名 · {aliases.length}</Text>
+            <Pressable onPress={() => { setAliasEditing(value => !value); setAliasMessage(null); }} hitSlop={8} accessibilityLabel="添加自定义别名">
+              <Text style={styles.aliasAddText}>{aliasEditing ? '取消' : '＋ 添加我的叫法'}</Text>
+            </Pressable>
+          </View>
+          {aliasEditing && (
+            <View style={styles.aliasInputRow}>
+              <TextInput
+                style={styles.aliasInput}
+                value={aliasInput}
+                onChangeText={setAliasInput}
+                placeholder="输入你习惯的叫法（最长 40 字）"
+                placeholderTextColor={Colors.text.muted}
+                maxLength={60}
+                autoFocus
+                onSubmitEditing={submitCustomAlias}
+                returnKeyType="done"
+              />
+              <Pressable style={styles.aliasSaveButton} onPress={submitCustomAlias}>
+                <Text style={styles.aliasSaveText}>保存</Text>
+              </Pressable>
+            </View>
+          )}
+          {!!aliasMessage && <Text style={styles.aliasMessage}>{aliasMessage}</Text>}
+          {aliases.length > 0 ? (
             <View style={styles.aliasChipRow}>
               {(aliasesExpanded ? aliases : aliases.slice(0, ALIAS_PREVIEW_COUNT)).map(alias => (
                 <Pressable
-                  key={alias}
-                  style={({ pressed }) => [styles.aliasChip, pressed && styles.aliasChipPressed]}
-                  onPress={() => searchAlias(alias)}
+                  key={`${alias.source}:${alias.text}`}
+                  style={({ pressed }) => [styles.aliasChip, alias.source === 'custom' && styles.aliasChipCustom, pressed && styles.aliasChipPressed]}
+                  onPress={() => searchAlias(alias.text)}
+                  onLongPress={alias.source === 'custom' ? () => confirmRemoveCustomAlias(alias.text) : undefined}
                   accessibilityRole="button"
-                  accessibilityLabel={`搜索别名 ${alias}`}
+                  accessibilityLabel={`${alias.source === 'custom' ? '自定义别名' : '别名'} ${alias.text}`}
                 >
-                  <Text style={styles.aliasChipText} numberOfLines={1}>{alias}</Text>
+                  <Text style={styles.aliasChipText} numberOfLines={1}>
+                    {alias.source === 'custom' && <Text style={styles.aliasCustomTag}>自定义 </Text>}
+                    {alias.text}
+                  </Text>
                 </Pressable>
               ))}
               {aliases.length > ALIAS_PREVIEW_COUNT && (
@@ -251,9 +341,13 @@ export default function SongDetail() {
                 </Pressable>
               )}
             </View>
-            <Text style={styles.aliasSource}>别名来自 Yuzu 别名库（社区投票），点击可在曲库中搜索</Text>
-          </View>
-        )}
+          ) : (
+            <Text style={styles.aliasSource}>这首歌还没有别名，可以添加你自己的叫法。</Text>
+          )}
+          <Text style={styles.aliasSource}>
+            别名来自 Yuzu 别名库（社区投票），点击可在曲库中搜索{customAliasCount > 0 ? '；「自定义」只保存在本机，长按可删除' : ''}
+          </Text>
+        </View>
 
         {/* 难度选择器 */}
         <View style={styles.section}>
@@ -602,6 +696,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border.light,
   },
+  aliasHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  aliasHeaderTitle: { marginBottom: 0 },
+  aliasAddText: { fontSize: 12, fontWeight: '800', color: Colors.accent.primary },
+  aliasInputRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  aliasInput: { flex: 1, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, borderWidth: 1, borderColor: Colors.border.light, backgroundColor: Colors.bg.secondary, color: Colors.text.primary, fontSize: 13 },
+  aliasSaveButton: { justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10, backgroundColor: Colors.accent.primary },
+  aliasSaveText: { fontSize: 13, fontWeight: '800', color: '#fff' },
+  aliasMessage: { fontSize: 11, color: Colors.accent.secondary, marginBottom: 6 },
+  aliasChipCustom: { borderColor: Colors.accent.primary, backgroundColor: `${Colors.accent.primary}14` },
+  aliasCustomTag: { fontSize: 10, fontWeight: '800', color: Colors.accent.primary },
   aliasChipPressed: {
     borderColor: Colors.accent.secondary,
     backgroundColor: Colors.bg.tertiary,

@@ -110,3 +110,101 @@ export function computeRatingHistoryStats(points: RatingHistoryPoint[], now: num
     count: points.length,
   };
 }
+
+/**
+ * v1.19.0：备份导入用——逐点校验并规范化外部传入的历史点列。
+ * 坏点丢弃、按 `at` 去重（保留后出现的）、升序；超过上限时截断，只保留最新的 limit 个点。
+ */
+export function normalizeRatingHistoryPoints(
+  input: unknown,
+  limit: number = RATING_HISTORY_MAX_POINTS,
+): { points: RatingHistoryPoint[]; dropped: number; truncated: number } {
+  if (!Array.isArray(input)) return { points: [], dropped: 0, truncated: 0 };
+  const byAt = new Map<string, RatingHistoryPoint>();
+  let dropped = 0;
+  for (const raw of input) {
+    if (!isValidPoint(raw)) {
+      dropped += 1;
+      continue;
+    }
+    const point: RatingHistoryPoint = {
+      at: new Date(Date.parse(raw.at)).toISOString(),
+      totalRating: Math.round(raw.totalRating),
+      b50Rating: Math.round(raw.b50Rating),
+      songCount: Math.max(0, Math.round(raw.songCount)),
+    };
+    if (byAt.has(point.at)) dropped += 1;
+    byAt.set(point.at, point);
+  }
+  const sorted = [...byAt.values()].sort((left, right) => Date.parse(left.at) - Date.parse(right.at));
+  const truncated = Math.max(0, sorted.length - limit);
+  return { points: truncated > 0 ? sorted.slice(-limit) : sorted, dropped, truncated };
+}
+
+/** v1.19.0：分享卡用——区间裁剪。 */
+export type RatingHistoryRange = '30d' | '90d' | 'all';
+export function sliceRatingHistory(points: RatingHistoryPoint[], range: RatingHistoryRange, now: number = Date.now()): RatingHistoryPoint[] {
+  if (range === 'all') return points;
+  const days = range === '30d' ? 30 : 90;
+  const cutoff = now - days * 24 * 60 * 60 * 1000;
+  return points.filter(point => Date.parse(point.at) >= cutoff);
+}
+
+/** v1.19.0：分享卡用——降采样：同一天只取最后一个点，再均匀抽样到 maxPoints（保留首尾）。 */
+export function downsampleRatingHistory(points: RatingHistoryPoint[], maxPoints = 120): RatingHistoryPoint[] {
+  const byDay = new Map<string, RatingHistoryPoint>();
+  for (const point of points) byDay.set(localDayKey(point.at), point);
+  const daily = [...byDay.values()];
+  if (daily.length <= maxPoints) return daily;
+  const result: RatingHistoryPoint[] = [];
+  const step = (daily.length - 1) / (maxPoints - 1);
+  for (let index = 0; index < maxPoints; index += 1) result.push(daily[Math.round(index * step)]);
+  return result.filter((point, index) => index === 0 || point !== result[index - 1]);
+}
+
+/** v1.19.0：分享卡数据——阶段涨幅与是否画曲线。 */
+export interface RatingHistoryShareData {
+  latest: number;
+  first: number;
+  delta: number;
+  max: number;
+  min: number;
+  count: number;
+  fromAt: string;
+  toAt: string;
+  /** 少于 2 个点时不画曲线，只显示当前 Rating。 */
+  drawCurve: boolean;
+  points: RatingHistoryPoint[];
+}
+
+export function buildRatingHistoryShareData(points: RatingHistoryPoint[]): RatingHistoryShareData | null {
+  if (points.length === 0) return null;
+  const ratings = points.map(point => point.totalRating);
+  return {
+    latest: ratings[ratings.length - 1],
+    first: ratings[0],
+    delta: ratings[ratings.length - 1] - ratings[0],
+    max: Math.max(...ratings),
+    min: Math.min(...ratings),
+    count: points.length,
+    fromAt: points[0].at,
+    toAt: points[points.length - 1].at,
+    drawCurve: points.length >= 2,
+    points: downsampleRatingHistory(points),
+  };
+}
+
+/** 图片生成失败时的文字版兜底。 */
+export function formatRatingHistoryShareText(data: RatingHistoryShareData, rangeLabel: string): string {
+  const day = (iso: string) => {
+    const date = new Date(iso);
+    return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+  };
+  const sign = data.delta > 0 ? `+${data.delta}` : String(data.delta);
+  const lines = [`【MaiMate】我的 Rating：${data.latest}`];
+  if (data.drawCurve) {
+    lines.push(`${rangeLabel}（${day(data.fromAt)}–${day(data.toAt)}）：${data.first} → ${data.latest}（${sign}）`);
+    lines.push(`最高 ${data.max} · 最低 ${data.min} · 共 ${data.count} 次同步记录`);
+  }
+  return lines.join('\n');
+}

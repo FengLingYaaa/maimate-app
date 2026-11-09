@@ -12,6 +12,8 @@ import type {
 import { normalizeBilibiliVideoUrl } from './bilibili-links';
 import { migratePlanEntryIds, migratePlanGraveyardIds, normalizePlanEntries } from './plan-entries';
 import { DEFAULT_SETTINGS, mergeDetailBoards, normalizeSnapshotLimit } from './settings-defaults';
+import { RATING_HISTORY_MAX_POINTS, normalizeRatingHistoryPoints, type RatingHistoryPoint } from './rating-history';
+import { countCustomAliases, normalizeCustomAliasMap } from './custom-aliases';
 
 /** 备份文件格式标识与当前 schema 版本。 */
 export const BACKUP_FORMAT = 'cc.flya.maimate.backup';
@@ -26,6 +28,8 @@ export const BACKUP_LIMITS = {
   snapshots: 20,
   changes: 1000,
   bilibiliLinks: 5000,
+  /** v1.19.0：Rating 历史点数上限（与本机存储上限一致，约 90KB）；超出时截断保留最新。 */
+  ratingHistory: RATING_HISTORY_MAX_POINTS,
 } as const;
 
 export interface BackupPlanData {
@@ -47,6 +51,13 @@ export interface BackupData {
   scores: BackupScoresData;
   bilibiliLinks: BilibiliVideoLink[];
   fortuneSeed: string | null;
+  /**
+   * v1.19.0 可选：Rating 历史。schemaVersion 不变（仍为 1）——旧版 App 按已知字段重建数据，会忽略它；
+   * 旧备份没有该字段时为 undefined，恢复时保留本机历史。字段存在时恢复为整体替换（不按时间戳混拼）。
+   */
+  ratingHistory?: RatingHistoryPoint[];
+  /** v1.19.0 可选：本地自定义别名（songId → 别名）。规则同 ratingHistory。 */
+  customAliases?: Record<string, string[]>;
 }
 
 export interface MaiMateBackup {
@@ -64,6 +75,12 @@ export interface BackupSummary {
   snapshots: number;
   bilibiliLinks: number;
   hasFortuneSeed: boolean;
+  /** v1.19.0：Rating 历史点数；null = 备份不含该字段（恢复时保留本机记录）。 */
+  ratingHistoryPoints?: number | null;
+  /** v1.19.0：自定义别名条数；null = 备份不含该字段。 */
+  customAliases?: number | null;
+  /** v1.19.0：单字段校验失败/截断等非致命问题（不影响其它字段导入）。 */
+  warnings?: string[];
 }
 
 export class BackupError extends Error {
@@ -111,6 +128,10 @@ export function buildBackup(
       scores: data.scores,
       bilibiliLinks: data.bilibiliLinks.map(sanitizeBilibiliLinkForExport),
       fortuneSeed: typeof data.fortuneSeed === 'string' && data.fortuneSeed ? data.fortuneSeed : null,
+      ...(data.ratingHistory !== undefined
+        ? { ratingHistory: normalizeRatingHistoryPoints(data.ratingHistory, BACKUP_LIMITS.ratingHistory).points }
+        : {}),
+      ...(data.customAliases !== undefined ? { customAliases: normalizeCustomAliasMap(data.customAliases) } : {}),
     },
     excluded: ['divingFishToken', 'musicCache', 'chartStatsCache', 'downloadedCovers'],
   };
@@ -231,6 +252,116 @@ function normalizeBilibiliLink(input: unknown): BilibiliVideoLink | null {
   };
 }
 
+/**
+ * v1.19.0：解析可选字段 ratingHistory / customAliases。
+ * - 缺失 → 不返回该字段（恢复时保留本机数据）；
+ * - 类型错误或全部坏点 → 跳过该字段并记 warning（同样保留本机数据），不抛错；
+ * - 超过上限 → 截断（保留最新），记 warning。
+ */
+export function parseOptionalBackupFields(
+  data: Record<string, unknown>,
+  warnings: string[],
+): Pick<BackupData, 'ratingHistory' | 'customAliases'> {
+  const result: Pick<BackupData, 'ratingHistory' | 'customAliases'> = {};
+  if (data.ratingHistory !== undefined) {
+    try {
+      if (!Array.isArray(data.ratingHistory)) throw new Error('not array');
+      const parsed = normalizeRatingHistoryPoints(data.ratingHistory, BACKUP_LIMITS.ratingHistory);
+      if (data.ratingHistory.length > 0 && parsed.points.length === 0) throw new Error('all invalid');
+      result.ratingHistory = parsed.points;
+      if (parsed.truncated > 0) warnings.push(`Rating 历史超过 ${BACKUP_LIMITS.ratingHistory} 条上限，已截断保留最新的 ${parsed.points.length} 条`);
+      if (parsed.dropped > 0) warnings.push(`Rating 历史有 ${parsed.dropped} 条无效或重复记录已跳过`);
+    } catch {
+      warnings.push('Rating 历史数据损坏，已跳过（保留本机记录）');
+    }
+  }
+  if (data.customAliases !== undefined) {
+    const raw = data.customAliases;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      warnings.push('自定义别名数据损坏，已跳过（保留本机记录）');
+    } else {
+      result.customAliases = normalizeCustomAliasMap(raw);
+    }
+  }
+  return result;
+}
+
+/** v1.19.0：恢复事务用的最小存储接口（AsyncStorage 子集），便于 node 回归脚本注入假存储。 */
+export interface BackupStorage {
+  multiGet(keys: readonly string[]): Promise<ReadonlyArray<readonly [string, string | null]>>;
+  multiSet(pairs: Array<[string, string]>): Promise<void>;
+  multiRemove(keys: string[]): Promise<void>;
+}
+
+/**
+ * v1.19.0：事务式写入——先取回滚快照，写入 pairs 并删除 removeKeys；任一步失败按快照还原
+ * （快照里为 null 的键删除），然后重新抛出原错误。
+ */
+export async function applyRestoreTransaction(
+  storage: BackupStorage,
+  userKeys: readonly string[],
+  pairs: Array<[string, string]>,
+  removeKeys: string[],
+): Promise<void> {
+  const rollback = await storage.multiGet(userKeys);
+  try {
+    await storage.multiSet(pairs);
+    if (removeKeys.length > 0) await storage.multiRemove(removeKeys);
+  } catch (error) {
+    const restorePairs = rollback.filter(([, value]) => value !== null) as Array<[string, string]>;
+    const missing = rollback.filter(([, value]) => value === null).map(([key]) => key);
+    try {
+      if (restorePairs.length > 0) await storage.multiSet(restorePairs);
+      if (missing.length > 0) await storage.multiRemove(missing);
+    } catch {
+      // 回滚也失败时至少不清空存储。
+    }
+    throw error instanceof Error ? error : new BackupError('恢复失败');
+  }
+}
+
+/** v1.19.0：恢复时写入的键名（由 backup-io 传入 CACHE_KEYS 与新增键）。 */
+export interface RestoreKeys {
+  planData: string;
+  planGraveyard: string;
+  settings: string;
+  scoreData: string;
+  scoreSnapshots: string;
+  scoreChanges: string;
+  bilibiliLinks: string;
+  fortuneSeed: string;
+  ratingHistory: string;
+  customAliases: string;
+}
+
+/**
+ * 由已校验备份生成要写入的键值对。
+ * v1.19.0：ratingHistory / customAliases 字段存在 → 整体替换（不按时间戳混拼）；缺失（旧备份）→ 不写，保留本机数据。
+ */
+export function buildRestorePairs(backup: MaiMateBackup, keys: RestoreKeys, now = Date.now()): Array<[string, string]> {
+  const { plan, scores, settings, bilibiliLinks, fortuneSeed, ratingHistory, customAliases } = backup.data;
+  const pairs: Array<[string, string]> = [
+    [keys.planData, JSON.stringify({ entries: plan.entries, updatedAt: now })],
+    [keys.planGraveyard, JSON.stringify(plan.graveyard)],
+    [keys.settings, JSON.stringify(settings)],
+    [keys.scoreData, JSON.stringify({ scores: scores.scores, sync: scores.sync, profile: scores.profile })],
+    [keys.scoreSnapshots, JSON.stringify(scores.snapshots)],
+    [keys.scoreChanges, JSON.stringify(scores.changes)],
+    [keys.bilibiliLinks, JSON.stringify(bilibiliLinks)],
+  ];
+  if (fortuneSeed) pairs.push([keys.fortuneSeed, fortuneSeed]);
+  if (ratingHistory) {
+    pairs.push([keys.ratingHistory, JSON.stringify({
+      points: ratingHistory,
+      updatedAt: ratingHistory.length > 0 ? ratingHistory[ratingHistory.length - 1].at : undefined,
+    })]);
+  }
+  if (customAliases) {
+    pairs.push([keys.customAliases, JSON.stringify({ bySongId: customAliases, updatedAt: new Date(now).toISOString() })]);
+  }
+  return pairs;
+}
+
 /** 解析并校验备份；任何损坏/未来版本/超限都抛出 BackupError。 */
 export function parseAndValidateBackup(text: string, now = Date.now()): { backup: MaiMateBackup; summary: BackupSummary } {
   if (typeof text !== 'string' || !text.trim()) throw new BackupError('备份文件为空');
@@ -316,6 +447,10 @@ export function parseAndValidateBackup(text: string, now = Date.now()): { backup
   // 运势种子
   const fortuneSeed = typeof data.fortuneSeed === 'string' && data.fortuneSeed ? data.fortuneSeed : null;
 
+  // v1.19.0：可选字段。单字段校验失败只跳过该字段（恢复时保留本机数据），不影响其它字段导入。
+  const warnings: string[] = [];
+  const optional = parseOptionalBackupFields(data, warnings);
+
   const backup: MaiMateBackup = {
     format: BACKUP_FORMAT,
     schemaVersion: BACKUP_SCHEMA_VERSION,
@@ -330,6 +465,7 @@ export function parseAndValidateBackup(text: string, now = Date.now()): { backup
       scores: { scores, profile, sync, snapshots, changes },
       bilibiliLinks,
       fortuneSeed,
+      ...optional,
     },
     excluded: Array.isArray(input.excluded) ? input.excluded.filter((item): item is string => typeof item === 'string') : [],
   };
@@ -340,6 +476,9 @@ export function parseAndValidateBackup(text: string, now = Date.now()): { backup
     snapshots: snapshots.length,
     bilibiliLinks: bilibiliLinks.length,
     hasFortuneSeed: Boolean(fortuneSeed),
+    ratingHistoryPoints: optional.ratingHistory ? optional.ratingHistory.length : null,
+    customAliases: optional.customAliases ? countCustomAliases(optional.customAliases) : null,
+    warnings,
   };
 
   return { backup, summary };

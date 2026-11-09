@@ -229,6 +229,54 @@ export function getMusicSearchHit(music: MusicData, query: string): MusicSearchH
   return best;
 }
 
+/**
+ * v1.19.0：别名命中检查（推分计划页搜索范围「别名」与卡片 badge 使用）。
+ * - 空串 / 只有空格 → 不匹配；纯数字 ID、小数定数查询不算别名命中；
+ * - 与 getMusicSearchHit 同一套打分（scoreNormalized），只看别名字段（含自定义别名）。
+ * 返回命中分最高的别名原文，未命中返回 null。
+ */
+export function getMatchedAliasText(music: MusicData, keyword: string | undefined): string | null {
+  const trimmed = (keyword ?? '').trim();
+  if (!trimmed) return null;
+  const folded = trimmed.normalize('NFKC');
+  if (/^\d+$/.test(folded) || parseConstantQuery(folded) !== null) {
+    // 纯数字只认别名精确相等（与 getMusicSearchHit 的数字规则一致）。
+    if (!/^\d+$/.test(folded)) return null;
+    const exact = getSearchFields(music).find(field => field.kind === 'alias' && field.normalized.replace(/\s/g, '') === folded);
+    return exact ? exact.raw : null;
+  }
+  let best: { score: number; raw: string } | null = null;
+  for (const field of getSearchFields(music)) {
+    if (field.kind !== 'alias') continue;
+    const score = scoreNormalized(field.normalized, trimmed);
+    if (score === null) continue;
+    if (!best || score > best.score) best = { score, raw: field.raw };
+  }
+  return best ? best.raw : null;
+}
+
+export function hasMatchedAlias(music: MusicData, keyword: string | undefined): boolean {
+  return getMatchedAliasText(music, keyword) !== null;
+}
+
+/** v1.19.0：是否经正式标题命中（搜索范围「标题」用）。空串不匹配。 */
+export function hasMatchedTitle(music: MusicData, keyword: string | undefined): boolean {
+  const trimmed = (keyword ?? '').trim();
+  if (!trimmed) return false;
+  return getSearchFields(music).some(field => field.kind === 'title' && scoreNormalized(field.normalized, trimmed) !== null);
+}
+
+/**
+ * v1.19.0：搜索结果卡片上要显示的别名命中文本——只有「最佳命中来自别名」时才标注，
+ * 标题本身就能命中的歌不标（与曲库页 v1.18.0 行为一致）。
+ */
+export function getAliasHitText(music: MusicData, query: string | undefined): string | null {
+  const trimmed = (query ?? '').trim();
+  if (!trimmed) return null;
+  const hit = getMusicSearchHit(music, trimmed);
+  return hit?.kind === 'alias' ? hit.text : null;
+}
+
 /** 返回歌曲与标题搜索词的相关度，供筛选结果排序。 */
 export function getMusicSearchScore(music: MusicData, query: string): number | null {
   return getMusicSearchHit(music, query)?.score ?? null;

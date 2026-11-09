@@ -28,6 +28,8 @@ interface Props {
   onRemove: (entryId: string) => void;
   onTarget: (entryId: string, value: number | null) => void;
   onReorder: (orderedIds: string[]) => boolean;
+  /** v1.19.0：搜索时返回该曲的别名命中文本与是否自定义（无命中返回 null）。 */
+  getAliasHit?: (music: MusicData) => { text: string; custom: boolean } | null;
 }
 
 /**
@@ -50,6 +52,7 @@ export function PlanDragList({
   onRemove,
   onTarget,
   onReorder,
+  getAliasHit,
 }: Props) {
   const insets = useSafeAreaInsets();
   const draggingRef = useRef(false);
@@ -78,11 +81,12 @@ export function PlanDragList({
       getScore={getScore}
       scoreSortDifficultyIndex={scoreSortDifficultyIndex}
       getSortScore={getSortScore}
+      getAliasHit={getAliasHit}
       onOpen={onOpen}
       onRemove={onRemove}
       onTarget={onTarget}
     />
-  ), [allSongs, allScores, canDrag, getScore, getSortScore, onOpen, onRemove, onTarget, scoreSortDifficultyIndex, showChinaVersion, showProjectedRating]);
+  ), [allSongs, allScores, canDrag, getScore, getSortScore, onOpen, onRemove, onTarget, scoreSortDifficultyIndex, showChinaVersion, showProjectedRating, getAliasHit]);
 
   return (
     <View style={styles.flex}>
@@ -142,8 +146,10 @@ function PlanDragRowView({
   onOpen,
   onRemove,
   onTarget,
+  getAliasHit,
 }: RenderItemParams<PlanDragRow> & Omit<Props, 'rows' | 'onReorder'>) {
   const entryId = item.entry.entryId;
+  const aliasHit = getAliasHit?.(item.music) ?? null;
   return (
     <ScaleDecorator activeScale={1.025}>
       <View style={[styles.row, isActive && styles.activeRow]}>
@@ -162,6 +168,8 @@ function PlanDragRowView({
           onLongPress={canDrag ? drag : () => undefined}
           onRemove={() => onRemove(entryId)}
           onTarget={value => onTarget(entryId, value)}
+          aliasHit={aliasHit?.text ?? null}
+          aliasHitCustom={aliasHit?.custom ?? false}
         />
       </View>
     </ScaleDecorator>

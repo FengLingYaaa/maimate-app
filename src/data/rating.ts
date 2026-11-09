@@ -77,3 +77,40 @@ export function formatAchievement(value: number): string {
 export function getRatingCoefficientTable(): readonly RatingCoefficient[] {
   return RATING_COEFFICIENTS;
 }
+
+/**
+ * v1.19.0：DX Rating 段位（颜色档）表。下限含本身；15000 以上为彩框，之后按每 100 分一档推荐。
+ * 注：阈值按 maimai DX 现行底板颜色档整理，如游戏调整以游戏内为准。
+ */
+export interface RatingTier {
+  min: number;
+  name: string;
+}
+
+export const DX_RATING_TIERS: readonly RatingTier[] = [
+  { min: 0, name: '白' },
+  { min: 1000, name: '蓝' },
+  { min: 2000, name: '绿' },
+  { min: 4000, name: '黄' },
+  { min: 7000, name: '红' },
+  { min: 10000, name: '紫' },
+  { min: 12000, name: '铜' },
+  { min: 13000, name: '银' },
+  { min: 14000, name: '金' },
+  { min: 14500, name: '白金' },
+  { min: 15000, name: '彩' },
+] as const;
+
+export function getRatingTier(rating: number): RatingTier {
+  let current = DX_RATING_TIERS[0];
+  for (const tier of DX_RATING_TIERS) if (rating >= tier.min) current = tier;
+  return current;
+}
+
+/** 下一档目标：还没到彩框时取下一个颜色档；彩框之后取下一个整百。 */
+export function getNextRatingTarget(rating: number): { target: number; label: string } {
+  const next = DX_RATING_TIERS.find(tier => tier.min > rating);
+  if (next) return { target: next.min, label: `${next.name}框 ${next.min}` };
+  const target = (Math.floor(rating / 100) + 1) * 100;
+  return { target, label: `${target}` };
+}

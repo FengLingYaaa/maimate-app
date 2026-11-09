@@ -7,7 +7,10 @@ import { MUSIC_PLATFORM_OPTIONS, getSortLabel } from '../../../src/data/settings
 import { measureStorageBreakdown, clearCovers, clearOtherCache, formatBytes, type StorageBreakdown } from '../../../src/data/storage-usage';
 import { diagnoseScoreImportEndpoints } from '../../../src/data/score-import-diagnostics';
 import { refreshAliasLibrary } from '../../../src/api/aliases';
-import { getActiveAliasLibraryInfo } from '../../../src/data/song-aliases';
+import { getActiveAliasLibraryInfo, getCustomAliasMap } from '../../../src/data/song-aliases';
+import { clearCustomAliases, countCustomAliases } from '../../../src/data/custom-aliases';
+import { syncReportToast } from '../../../src/data/sync-report';
+import { SyncReportCard } from '../../../src/components/SyncReportCard';
 
 /** v1.18.0：轻提示（Android 原生 Toast，其它平台退回 Alert）。 */
 function showToast(message: string): void {
@@ -27,7 +30,36 @@ export default function SettingsPage() {
   const syncScores = useScoreStore(s => s.syncScores);
   const clearScores = useScoreStore(s => s.clearScores);
   const snapshots = useScoreStore(s => s.snapshots);
-  const changes = useScoreStore(s => s.changes);
+  const lastSyncReport = useScoreStore(s => s.lastSyncReport);
+  // v1.19.0：同步成功且 Rating 上涨时弹 Toast；失败 / Token 无效 / 没涨不弹。
+  const handleSyncScores = async () => {
+    await syncScores();
+    const state = useScoreStore.getState();
+    if (state.sync.status !== 'success') return;
+    const report = state.lastSyncReport;
+    if (!report || report.syncedAt !== state.sync.lastSyncedAt) return;
+    const toast = syncReportToast(report);
+    if (toast) showToast(toast);
+  };
+  // v1.19.0：本地自定义别名计数（进入页面时读取）。
+  const [customAliasCount, setCustomAliasCount] = useState(() => countCustomAliases(getCustomAliasMap()));
+  useEffect(() => {
+    setCustomAliasCount(countCustomAliases(getCustomAliasMap()));
+  }, []);
+  const handleClearCustomAliases = () => {
+    Alert.alert('清空自定义别名', `删除本机保存的 ${customAliasCount} 条自定义别名？Yuzu 别名不受影响。`, [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '清空',
+        style: 'destructive',
+        onPress: async () => {
+          await clearCustomAliases();
+          setCustomAliasCount(0);
+          showToast('已清空自定义别名');
+        },
+      },
+    ]);
+  };
   // v1.18.0：别名库手动刷新。
   const [aliasInfo, setAliasInfo] = useState(() => getActiveAliasLibraryInfo());
   const [aliasRefreshing, setAliasRefreshing] = useState(false);
@@ -252,13 +284,22 @@ export default function SettingsPage() {
         {tokenConfigured && <Text style={styles.configuredText}>状态：已配置（Token 内容已隐藏）</Text>}
         {!!tokenMessage && <Text style={styles.messageText}>{tokenMessage}</Text>}
         <View style={styles.buttonRow}>
-          <Pressable style={styles.secondaryButton} disabled={working} onPress={() => void syncScores()}>
-            <Text style={styles.secondaryButtonText}>立即同步成绩</Text>
+          <Pressable style={styles.secondaryButton} disabled={working} onPress={() => void handleSyncScores()}>
+            <Text style={styles.secondaryButtonText}>{sync.status === 'syncing' ? '同步中…' : '立即同步成绩'}</Text>
           </Pressable>
           <Pressable style={styles.dangerButton} disabled={working} onPress={handleClearToken}>
             <Text style={styles.dangerButtonText}>删除 Token</Text>
           </Pressable>
         </View>
+        {/* v1.19.0：本次同步战报（只保留最新一次；取代原「最近成绩变化」原始 chartKey 列表）。 */}
+        {lastSyncReport && (
+          <SyncReportCard
+            report={lastSyncReport}
+            onOpenB50={() => router.push('/b50' as any)}
+            onOpenHistory={() => router.push('/rating-history' as any)}
+            onOpenSong={ref => router.push({ pathname: '/song/[id]' as any, params: { id: ref.songId, type: ref.musicType, difficultyIndex: String(ref.difficultyIndex) } })}
+          />
+        )}
         <Pressable style={[styles.secondaryButton, working && styles.disabled]} disabled={working} onPress={() => void handleDiagnoseToken()}>
           <Text style={styles.secondaryButtonText}>{working ? '请求处理中…' : '诊断成绩连接（不发送已保存 Token）'}</Text>
         </Pressable>
@@ -295,16 +336,6 @@ export default function SettingsPage() {
           <Text style={styles.syncText}>上次同步：{sync.lastSyncedAt ? new Date(sync.lastSyncedAt).toLocaleString() : '尚未同步'}</Text>
           {!!sync.message && <Text style={styles.messageText}>{sync.message}</Text>}
         </View>
-        {changes.length > 0 && (
-           <View style={styles.syncCard}>
-             <Text style={styles.syncTitle}>最近成绩变化</Text>
-             {changes.slice(0, 5).map(change => (
-               <Text key={`${change.chartKey}-${change.changedAt}`} style={styles.syncText}>
-                 {change.chartKey}：{change.current ? `${change.current.achievement.toFixed(4)}%` : '当前记录已消失'}
-               </Text>
-             ))}
-           </View>
-         )}
          <Pressable style={styles.secondaryButton} onPress={handleClearScores}>
           <Text style={styles.secondaryButtonText}>清除本地成绩</Text>
         </Pressable>
@@ -317,7 +348,13 @@ export default function SettingsPage() {
           <Text style={styles.syncText}>当前使用：{aliasInfo.source === 'refreshed' ? '手动刷新的别名库' : '内置快照'}</Text>
           <Text style={styles.syncText}>收录：{aliasInfo.songCount} 首 / {aliasInfo.aliasCount} 条</Text>
           <Text style={styles.syncText}>更新时间：{new Date(aliasInfo.updatedAt).toLocaleString()}</Text>
+          <Text style={styles.syncText}>我的自定义别名：{customAliasCount} 条（仅保存在本机，在歌曲详情页添加）</Text>
         </View>
+        {customAliasCount > 0 && (
+          <Pressable style={styles.secondaryButton} onPress={handleClearCustomAliases}>
+            <Text style={styles.secondaryButtonText}>清空自定义别名</Text>
+          </Pressable>
+        )}
         <Pressable style={[styles.secondaryButton, aliasRefreshing && styles.disabled]} disabled={aliasRefreshing} onPress={() => void handleRefreshAliases()}>
           <Text style={styles.secondaryButtonText}>{aliasRefreshing ? '正在更新别名库…' : '刷新别名库'}</Text>
         </Pressable>
